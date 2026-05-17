@@ -9,6 +9,11 @@ internal static class WorkspaceBuilder
         var projectFile =
             WorkspaceProjectLocator.ResolveProject(workspaceDirectory, explicitProjectPathOrNull);
 
+        return BuildResolvedProject(workspaceDirectory, projectFile);
+    }
+
+    internal static WorkspaceBuildResult BuildResolvedProject(string workspaceDirectory, FileInfo projectFile)
+    {
         RunDotnetBuild(projectFile.FullName);
 
         return WorkspaceBuildResult.RequirePrimaryAssembly(workspaceDirectory, projectFile);

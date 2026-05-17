@@ -6,41 +6,25 @@ namespace MyEfVibe;
 
 internal static class DbContextActivator
 {
-    internal static object ResolveInstance(WorkspaceHost host, string? contextFullName, string? connectionString,
-        MyEfVibeProvider? provider)
+    internal static object ResolveInstance(
+        WorkspaceHost host,
+        string? contextFullName,
+        string? connectionString,
+        MyEfVibeProvider? provider,
+        bool allowInteractiveSelection = true)
     {
         var discoveredDbContextTypes =
-            DiscoverDbContextConcreteTypes(host).OrderBy(static t => t.FullName, StringComparer.Ordinal).ToArray();
+            DiscoverDbContextConcreteTypes(host, contextFullName)
+                .OrderBy(static t => t.FullName, StringComparer.Ordinal)
+                .ToArray();
 
         if (discoveredDbContextTypes.Length == 0)
-            throw new InvalidOperationException(
-                "No concrete `Microsoft.EntityFrameworkCore.DbContext` implementations were discovered in the workspace output.");
+            throw new InvalidOperationException(BuildNoDbContextDiscoveredMessage(host, contextFullName));
 
-        Type selectedDbContextType;
-
-        if (!string.IsNullOrWhiteSpace(contextFullName))
-        {
-            selectedDbContextType =
-                discoveredDbContextTypes.SingleOrDefault(t =>
-                    string.Equals(t.FullName, contextFullName, StringComparison.Ordinal))
-
-                ?? throw new InvalidOperationException(
-                    $"DbContext `{contextFullName}` was not found. Known contexts:{Environment.NewLine}"
-                    + string.Join(Environment.NewLine,
-                        discoveredDbContextTypes.Select(static ctx => $" - {ctx.FullName}")));
-        }
-        else if (discoveredDbContextTypes.Length > 1)
-        {
-            throw new InvalidOperationException(
-                "Multiple DbContext types were discovered. Choose one with `-c/--context`."
-                + $"{Environment.NewLine}"
-                + string.Join(Environment.NewLine,
-                    discoveredDbContextTypes.Select(static ctx => $" - {ctx.FullName}")));
-        }
-        else
-        {
-            selectedDbContextType = discoveredDbContextTypes.Single();
-        }
+        var selectedDbContextType = SelectDbContextType(
+            discoveredDbContextTypes,
+            contextFullName,
+            allowInteractiveSelection);
 
         if (TryCreateUsingDesignTimeFactory(selectedDbContextType, host, out var designTimeInstance))
             return designTimeInstance;
@@ -49,7 +33,11 @@ internal static class DbContextActivator
             return parameterlessInstance;
 
         if (string.IsNullOrWhiteSpace(connectionString)
-            && AppSettingsConnectionResolver.TryResolve(host.OutputDirectory, out var fromSettings, out var inferredProvider))
+            && AppSettingsConnectionResolver.TryResolve(
+                host.OutputDirectory,
+                host.WorkspaceDirectory,
+                out var fromSettings,
+                out var inferredProvider))
         {
             connectionString = fromSettings;
             provider ??= inferredProvider;
@@ -73,11 +61,71 @@ internal static class DbContextActivator
             + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite) to build `DbContextOptions<TContext>`.");
     }
 
-    private static ImmutableArray<Type> DiscoverDbContextConcreteTypes(WorkspaceHost host)
+    private static Type SelectDbContextType(
+        IReadOnlyList<Type> discoveredDbContextTypes,
+        string? contextFullName,
+        bool allowInteractiveSelection)
     {
+        if (!string.IsNullOrWhiteSpace(contextFullName))
+        {
+            return discoveredDbContextTypes.SingleOrDefault(type =>
+                       string.Equals(type.FullName, contextFullName, StringComparison.Ordinal)
+                       || string.Equals(type.Name, contextFullName, StringComparison.Ordinal))
+
+                   ?? throw new InvalidOperationException(
+                       $"DbContext `{contextFullName}` was not found. Known contexts:{Environment.NewLine}"
+                       + string.Join(Environment.NewLine,
+                           discoveredDbContextTypes.Select(static ctx => $" - {ctx.FullName}")));
+        }
+
+        if (discoveredDbContextTypes.Count == 1)
+            return discoveredDbContextTypes[0];
+
+        if (allowInteractiveSelection && InteractiveSelection.CanPrompt)
+        {
+            return InteractiveSelection.Choose(
+                "[bold]Multiple DbContext types were found. Which one should be used?[/]",
+                discoveredDbContextTypes
+                    .Select(type => new SelectionOption<Type>(
+                        type,
+                        $"{type.FullName} [grey]({type.Assembly.GetName().Name})[/]"))
+                    .ToArray());
+        }
+
+        throw new InvalidOperationException(
+            "Multiple DbContext types were discovered. Choose one with `-c/--context`."
+            + $"{Environment.NewLine}"
+            + string.Join(Environment.NewLine,
+                discoveredDbContextTypes.Select(static ctx => $" - {ctx.FullName}")));
+    }
+
+    private static ImmutableArray<Type> DiscoverDbContextConcreteTypes(
+        WorkspaceHost host,
+        string? preferredContextFullName)
+    {
+        host.EnsureEntityFrameworkCoreLoaded();
+
+        if (!string.IsNullOrWhiteSpace(preferredContextFullName)
+            && TryResolveContextType(host, preferredContextFullName, out var preferred))
+            return ImmutableArray.Create(preferred);
+
         var distinctConcreteContexts = new HashSet<Type>();
 
-        foreach (var assembly in host.EnumerateApplicationAssemblies())
+        AddDbContextTypesFromAssembly(host.PrimaryAssembly, distinctConcreteContexts);
+
+        foreach (var assembly in host.EnumerateDiscoveryAssemblies())
+        {
+            if (ReferenceEquals(assembly, host.PrimaryAssembly))
+                continue;
+
+            AddDbContextTypesFromAssembly(assembly, distinctConcreteContexts);
+        }
+
+        return distinctConcreteContexts.ToImmutableArray();
+    }
+
+    private static void AddDbContextTypesFromAssembly(Assembly assembly, HashSet<Type> distinctConcreteContexts)
+    {
         foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
         {
             if (!IsConcreteDbContext(exported))
@@ -86,13 +134,105 @@ internal static class DbContextActivator
             distinctConcreteContexts.Add(exported);
         }
 
-        return distinctConcreteContexts.ToImmutableArray();
+        if (distinctConcreteContexts.Count > 0)
+            return;
+
+        try
+        {
+            foreach (var candidate in assembly.GetTypes())
+            {
+                if (!IsConcreteDbContext(candidate))
+                    continue;
+
+                distinctConcreteContexts.Add(candidate);
+            }
+        }
+        catch (ReflectionTypeLoadException loaderFailure)
+        {
+            foreach (var candidate in loaderFailure.Types)
+            {
+                if (candidate is null || !IsConcreteDbContext(candidate))
+                    continue;
+
+                distinctConcreteContexts.Add(candidate);
+            }
+        }
+    }
+
+    private static bool TryResolveContextType(WorkspaceHost host, string contextFullName, out Type resolved)
+    {
+        resolved = null!;
+
+        foreach (var assembly in host.EnumerateDiscoveryAssemblies().Prepend(host.PrimaryAssembly))
+        {
+            var fromGetType = assembly.GetType(contextFullName, throwOnError: false, ignoreCase: true);
+
+            if (fromGetType is not null && IsConcreteDbContext(fromGetType))
+            {
+                resolved = fromGetType;
+                return true;
+            }
+
+            foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
+            {
+                if (!IsConcreteDbContext(exported))
+                    continue;
+
+                if (string.Equals(exported.FullName, contextFullName, StringComparison.Ordinal)
+                    || string.Equals(exported.Name, contextFullName, StringComparison.Ordinal))
+                {
+                    resolved = exported;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static string BuildNoDbContextDiscoveredMessage(WorkspaceHost host, string? requestedContextFullName)
+    {
+        var scannedAssemblies = host.EnumerateDiscoveryAssemblies()
+            .Select(static assembly => assembly.GetName().Name)
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToArray();
+
+        var scannedSummary = scannedAssemblies.Length == 0
+            ? "No workspace assemblies were scanned."
+            : "Scanned assemblies: " + string.Join(", ", scannedAssemblies)
+              + (scannedAssemblies.Length == 12 ? ", …" : string.Empty);
+
+        var requestedHint = string.IsNullOrWhiteSpace(requestedContextFullName)
+            ? string.Empty
+            : $"{Environment.NewLine}Requested context: {requestedContextFullName}";
+
+        return
+            "No concrete `Microsoft.EntityFrameworkCore.DbContext` implementations were discovered in the workspace output."
+            + requestedHint
+            + $"{Environment.NewLine}{scannedSummary}"
+            + $"{Environment.NewLine}Output directory: {host.OutputDirectory}"
+            + $"{Environment.NewLine}For class libraries, prefer the API/startup project so dependencies and appsettings are available:"
+            + $"{Environment.NewLine} -p apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj"
+            + $"{Environment.NewLine}Update efvibe if this persists — older builds did not load EF Core from NuGet package cache.";
     }
 
     private static bool IsConcreteDbContext(Type candidate)
     {
         if (!candidate.IsClass || candidate.IsAbstract)
             return false;
+
+        if (string.Equals(candidate.FullName, "Microsoft.EntityFrameworkCore.DbContext", StringComparison.Ordinal))
+            return false;
+
+        if (candidate.Namespace?.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal) == true)
+            return false;
+
+        var dbContextBase = ResolveDbContextBaseType(candidate.Assembly);
+
+        if (dbContextBase is not null)
+            return dbContextBase.IsAssignableFrom(candidate) && !ReferenceEquals(candidate, dbContextBase);
 
         for (var walk = candidate.BaseType; walk is not null; walk = walk.BaseType)
             if (string.Equals(walk.FullName, "Microsoft.EntityFrameworkCore.DbContext", StringComparison.Ordinal))
@@ -101,10 +241,42 @@ internal static class DbContextActivator
         return false;
     }
 
+    private static Type? ResolveDbContextBaseType(Assembly inspectionAnchor)
+    {
+        foreach (var loaded in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (!string.Equals(loaded.GetName().Name, "Microsoft.EntityFrameworkCore", StringComparison.Ordinal))
+                continue;
+
+            return loaded.GetType("Microsoft.EntityFrameworkCore.DbContext");
+        }
+
+        try
+        {
+            var referenced = inspectionAnchor.GetReferencedAssemblies()
+                .FirstOrDefault(static name =>
+                    string.Equals(name.Name, "Microsoft.EntityFrameworkCore", StringComparison.Ordinal));
+
+            if (referenced is null)
+                return null;
+
+            return AssemblyLoadContext.Default.LoadFromAssemblyName(referenced)
+                .GetType("Microsoft.EntityFrameworkCore.DbContext");
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+        catch (FileLoadException)
+        {
+            return null;
+        }
+    }
+
     private static bool TryCreateUsingDesignTimeFactory(Type dbContextConcreteType, WorkspaceHost host,
         out object instance)
     {
-        foreach (var assembly in host.EnumerateApplicationAssemblies())
+        foreach (var assembly in host.EnumerateDiscoveryAssemblies())
         foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
         {
             if (exported.IsAbstract || !exported.IsClass)

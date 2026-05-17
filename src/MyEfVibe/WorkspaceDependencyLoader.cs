@@ -6,7 +6,53 @@ namespace MyEfVibe;
 
 internal static class WorkspaceDependencyLoader
 {
-    internal static void PreloadIntoDefaultContext(AssemblyDependencyResolver resolver, string entryAssemblyPath)
+    internal static void Preload(
+        AssemblyLoadContext loadContext,
+        AssemblyDependencyResolver resolver,
+        string entryAssemblyPath,
+        WorkspaceDepsManifest? depsManifest)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (depsManifest is not null)
+        {
+            foreach (var bootstrap in new[]
+                     {
+                         "System.Configuration.ConfigurationManager",
+                         "Microsoft.Data.SqlClient",
+                         "Microsoft.EntityFrameworkCore.Abstractions",
+                         "Microsoft.EntityFrameworkCore",
+                         "Microsoft.EntityFrameworkCore.Relational",
+                     })
+            {
+                if (depsManifest.TryResolve(bootstrap, out var bootstrapPath))
+                    TryLoad(loadContext, bootstrapPath);
+            }
+
+            foreach (var absolutePath in depsManifest.RuntimeAssemblyPaths)
+            {
+                var assemblySimpleName = Path.GetFileNameWithoutExtension(absolutePath);
+
+                if (!seen.Add(assemblySimpleName))
+                    continue;
+
+                if (IsDesignTimeOrToolingAssembly(assemblySimpleName))
+                    continue;
+
+                TryLoad(loadContext, absolutePath);
+            }
+
+            return;
+        }
+
+        PreloadUsingDependencyResolverOnly(loadContext, resolver, entryAssemblyPath, seen);
+    }
+
+    private static void PreloadUsingDependencyResolverOnly(
+        AssemblyLoadContext loadContext,
+        AssemblyDependencyResolver resolver,
+        string entryAssemblyPath,
+        HashSet<string> seen)
     {
         var outputDirectory = Path.GetDirectoryName(entryAssemblyPath)!;
 
@@ -34,8 +80,6 @@ internal static class WorkspaceDependencyLoader
             || !targets.TryGetProperty(runtimeTargetName, out var targetNode))
             return;
 
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
         foreach (var assemblySimpleName in EnumerateRuntimeAssemblySimpleNames(targetNode))
         {
             if (!seen.Add(assemblySimpleName))
@@ -49,7 +93,7 @@ internal static class WorkspaceDependencyLoader
             if (resolvedPath is null)
                 continue;
 
-            TryLoadIntoDefault(resolvedPath);
+            TryLoad(loadContext, resolvedPath);
         }
     }
 
@@ -80,11 +124,11 @@ internal static class WorkspaceDependencyLoader
             || assemblySimpleName.StartsWith("Humanizer", StringComparison.OrdinalIgnoreCase)
             || assemblySimpleName.StartsWith("Mono.TextTemplating", StringComparison.OrdinalIgnoreCase);
 
-    private static void TryLoadIntoDefault(string absolutePath)
+    private static void TryLoad(AssemblyLoadContext loadContext, string absolutePath)
     {
         try
         {
-            AssemblyLoadContext.Default.LoadFromAssemblyPath(absolutePath);
+            loadContext.LoadFromAssemblyPath(absolutePath);
         }
         catch (BadImageFormatException)
         {

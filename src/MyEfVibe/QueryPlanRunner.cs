@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.Common;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Spectre.Console;
@@ -21,9 +22,8 @@ internal static partial class QueryPlanRunner
 
         var provider = ResolveProvider(dbContext);
         var executableSql = SanitizeTranslatedSql(translatedSql);
-        var explainSql = BuildExplainSql(provider, executableSql);
 
-        if (explainSql is null)
+        if (provider is null)
         {
             CliUi.WriteWarning("EXPLAIN is not supported for this provider.");
             return;
@@ -31,7 +31,13 @@ internal static partial class QueryPlanRunner
 
         try
         {
-            var rows = await ExecuteQueryAsync(dbContext, explainSql, inspectionAssemblies, cancellationToken);
+            var rows = provider == MyEfVibeProvider.SqlServer
+                ? await ExecuteSqlServerShowPlanAsync(dbContext, executableSql, inspectionAssemblies, cancellationToken)
+                : await ExecuteQueryAsync(
+                    dbContext,
+                    BuildExplainSql(provider.Value, executableSql),
+                    inspectionAssemblies,
+                    cancellationToken);
 
             if (rows.Count == 0)
             {
@@ -98,7 +104,7 @@ internal static partial class QueryPlanRunner
     [GeneratedRegex(@"^-- @(?<name>\w+)='(?<value>.*)'$")]
     private static partial Regex ParameterCommentRegex();
 
-    private static string? BuildExplainSql(MyEfVibeProvider? provider, string sql)
+    private static string BuildExplainSql(MyEfVibeProvider provider, string sql)
     {
         var trimmed = sql.Trim().TrimEnd(';');
 
@@ -106,9 +112,28 @@ internal static partial class QueryPlanRunner
         {
             MyEfVibeProvider.Npgsql => $"EXPLAIN {trimmed}",
             MyEfVibeProvider.Sqlite => $"EXPLAIN QUERY PLAN {trimmed}",
-            MyEfVibeProvider.SqlServer => $"SET SHOWPLAN_ALL ON;{Environment.NewLine}{trimmed}",
             _ => $"EXPLAIN {trimmed}",
         };
+    }
+
+    private static async Task<IReadOnlyList<string>> ExecuteSqlServerShowPlanAsync(
+        object dbContext,
+        string sql,
+        IEnumerable<Assembly> inspectionAssemblies,
+        CancellationToken cancellationToken)
+    {
+        await using var scope = await OpenConnectionScopeAsync(dbContext, inspectionAssemblies, cancellationToken);
+
+        await ExecuteNonQueryAsync(scope.Connection, "SET SHOWPLAN_ALL ON", cancellationToken);
+
+        try
+        {
+            return await ReadQueryRowsAsync(scope.Connection, sql, cancellationToken);
+        }
+        finally
+        {
+            await ExecuteNonQueryAsync(scope.Connection, "SET SHOWPLAN_ALL OFF", cancellationToken);
+        }
     }
 
     private static MyEfVibeProvider? ResolveProvider(object dbContext)
@@ -141,45 +166,83 @@ internal static partial class QueryPlanRunner
         IEnumerable<Assembly> inspectionAssemblies,
         CancellationToken cancellationToken)
     {
+        await using var scope = await OpenConnectionScopeAsync(dbContext, inspectionAssemblies, cancellationToken);
+        return await ReadQueryRowsAsync(scope.Connection, sql, cancellationToken);
+    }
+
+    private static async Task<ConnectionScope> OpenConnectionScopeAsync(
+        object dbContext,
+        IEnumerable<Assembly> inspectionAssemblies,
+        CancellationToken cancellationToken)
+    {
         var database = dbContext.GetType().GetProperty("Database")?.GetValue(dbContext)
             ?? throw new InvalidOperationException("Database facade not found.");
 
         if (!RelationalDatabaseFacadeInvoker.TryGetDbConnection(database, inspectionAssemblies, out var connection)
-            || connection is null)
+            || connection is not DbConnection dbConnection)
         {
             throw new InvalidOperationException(
                 "Could not resolve EF Core GetDbConnection. Ensure Microsoft.EntityFrameworkCore.Relational is loaded.");
         }
 
-        var openedHere = connection.State != ConnectionState.Open;
+        var openedHere = dbConnection.State != ConnectionState.Open;
 
         if (openedHere)
-            await connection.OpenAsync(cancellationToken);
+            await dbConnection.OpenAsync(cancellationToken);
 
-        try
+        return new ConnectionScope(dbConnection, openedHere);
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadQueryRowsAsync(
+        DbConnection connection,
+        string sql,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var rows = new List<string>();
+
+        while (await reader.ReadAsync(cancellationToken))
         {
-            await using var command = connection.CreateCommand();
-            command.CommandText = sql;
+            var values = new string[reader.FieldCount];
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var rows = new List<string>();
+            for (var column = 0; column < reader.FieldCount; column++)
+                values[column] = reader.GetValue(column)?.ToString() ?? string.Empty;
 
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                var values = new string[reader.FieldCount];
-
-                for (var column = 0; column < reader.FieldCount; column++)
-                    values[column] = reader.GetValue(column)?.ToString() ?? string.Empty;
-
-                rows.Add(string.Join(" | ", values));
-            }
-
-            return rows;
+            rows.Add(string.Join(" | ", values));
         }
-        finally
+
+        return rows;
+    }
+
+    private static async Task ExecuteNonQueryAsync(
+        DbConnection connection,
+        string sql,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private sealed class ConnectionScope : IAsyncDisposable
+    {
+        internal ConnectionScope(DbConnection connection, bool openedHere)
         {
-            if (openedHere && connection.State != ConnectionState.Closed)
-                await connection.CloseAsync();
+            Connection = connection;
+            _openedHere = openedHere;
+        }
+
+        internal DbConnection Connection { get; }
+
+        private readonly bool _openedHere;
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_openedHere && Connection.State != ConnectionState.Closed)
+                await Connection.CloseAsync();
         }
     }
 }

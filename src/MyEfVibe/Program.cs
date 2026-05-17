@@ -98,15 +98,35 @@ internal static class Program
 
         var oneShotExpression = ResolveOneShotExpression(expressionOptionValue, expressionArgumentTokens);
 
+        var workspaceRoot = workspace.FullName.TrimEnd(Path.DirectorySeparatorChar);
+        FileInfo resolvedProject;
         WorkspaceBuildResult workspaceBuild;
+
+        try
+        {
+            resolvedProject = WorkspaceProjectLocator.ResolveProject(
+                workspaceRoot,
+                projectPath?.FullName);
+        }
+        catch (WorkspaceException workspaceFailure)
+        {
+            CliUi.WriteErrorPanel("Workspace failure", workspaceFailure.Message);
+            return 10;
+        }
+        catch (InvalidOperationException selectionFailure)
+        {
+            CliUi.WriteErrorPanel("Workspace failure", selectionFailure.Message);
+            return 10;
+        }
+
+        var projectLabel = Path.GetRelativePath(workspaceRoot, resolvedProject.FullName);
+        AnsiConsole.MarkupLine($"[dim]Host project:[/] [cyan]{Markup.Escape(projectLabel)}[/]");
 
         try
         {
             workspaceBuild = CliUi.RunWithStatus(
                 "Building workspace…",
-                () => WorkspaceBuilder.Build(
-                    workspace.FullName.TrimEnd(Path.DirectorySeparatorChar),
-                    projectPath?.FullName));
+                () => WorkspaceBuilder.BuildResolvedProject(workspaceRoot, resolvedProject));
         }
         catch (WorkspaceException workspaceFailure)
         {
@@ -114,7 +134,6 @@ internal static class Program
             return 10;
         }
 
-        var projectLabel = Path.GetRelativePath(workspaceBuild.WorkspaceDirectory, workspaceBuild.ProjectPath);
         AnsiConsole.MarkupLine($"[green]✓[/] Built [cyan]{Markup.Escape(projectLabel)}[/]");
 
         using var host = WorkspaceHost.Load(workspaceBuild);
@@ -127,7 +146,8 @@ internal static class Program
                 host,
                 contextFullName,
                 connectionString,
-                parsedProvider);
+                parsedProvider,
+                allowInteractiveSelection: string.IsNullOrWhiteSpace(oneShotExpression));
         }
         catch (InvalidOperationException resolutionFailure)
         {

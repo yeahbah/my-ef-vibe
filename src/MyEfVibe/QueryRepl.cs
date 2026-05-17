@@ -28,7 +28,7 @@ internal sealed class QueryRepl
         _contextTypeName = dbContext.GetType().Name;
         _projectLabel = projectLabel;
         _sqlSettings = sqlSettings;
-        _lineReader = new ReplLineReader(_history, new ReplCompletionService(session));
+        _lineReader = new ReplLineReader(_history, new ReplCompletionService());
         _commands = new ReplCommandHandler(session, host, dbContext, sqlSettings, _analytics, _history);
     }
 

@@ -10,7 +10,7 @@ internal sealed record WorkspaceBuildResult(
     string PrimaryAssemblyDll)
 {
     internal ImmutableHashSet<string> ReferenceAssemblyPaths =>
-        ArtifactResolver.CollectReferencePaths(OutputDirectory).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        WorkspaceReferenceCollector.Collect(OutputDirectory, PrimaryAssemblyDll);
 
     internal static WorkspaceBuildResult RequirePrimaryAssembly(string workspaceRootDirectory,
         FileInfo csprojFile)

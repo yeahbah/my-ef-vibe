@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 
 namespace MyEfVibe;
 
@@ -63,8 +64,12 @@ internal static class QueryEvaluator
         {
             stopwatch.Stop();
 
+            var message = failure is TypeInitializationException or ReflectionTypeLoadException
+                ? DescribeExceptionChain(failure)
+                : failure.Message;
+
             throw new EvaluationFailedException(
-                EvaluationMetrics.Failed(snippet, stopwatch.ElapsedMilliseconds, failure.Message),
+                EvaluationMetrics.Failed(snippet, stopwatch.ElapsedMilliseconds, message),
                 failure);
         }
     }
@@ -95,6 +100,16 @@ internal static class QueryEvaluator
         {
             return null;
         }
+    }
+
+    private static string DescribeExceptionChain(Exception failure)
+    {
+        var lines = new List<string> { failure.Message };
+
+        for (var inner = failure.InnerException; inner is not null; inner = inner.InnerException)
+            lines.Add(inner.Message);
+
+        return string.Join(Environment.NewLine, lines);
     }
 }
 

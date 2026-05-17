@@ -1,8 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Completion;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Host.Mef;
-
 namespace MyEfVibe;
 
 internal sealed record CompletionSuggestion(
@@ -13,89 +8,63 @@ internal sealed record CompletionSuggestion(
 
 internal sealed class ReplCompletionService
 {
-    private static readonly MefHostServices MefHost =
-        MefHostServices.Create(MefHostServices.DefaultAssemblies);
+    private static readonly string[] Keywords =
+    [
+        "dbContext",
+        "Where",
+        "Select",
+        "OrderBy",
+        "ThenBy",
+        "GroupBy",
+        "Join",
+        "Include",
+        "First",
+        "FirstOrDefault",
+        "Single",
+        "SingleOrDefault",
+        "ToList",
+        "ToListAsync",
+        "Count",
+        "CountAsync",
+        "Any",
+        "All",
+        "Take",
+        "Skip",
+        "Distinct",
+        "AsNoTracking",
+        "AsQueryable",
+    ];
 
-    private readonly ScriptSession _session;
-
-    internal ReplCompletionService(ScriptSession session)
-    {
-        _session = session;
-    }
-
-    internal async Task<IReadOnlyList<CompletionSuggestion>> GetSuggestionsAsync(
+    internal Task<IReadOnlyList<CompletionSuggestion>> GetSuggestionsAsync(
         string currentLine,
         int cursorPosition,
         CancellationToken cancellationToken = default)
     {
         if (cursorPosition < 0 || cursorPosition > currentLine.Length)
-            return Array.Empty<CompletionSuggestion>();
+            return Task.FromResult<IReadOnlyList<CompletionSuggestion>>(Array.Empty<CompletionSuggestion>());
 
-        var (source, position, lineStartInDocument) =
-            _session.CreateCompletionSource(currentLine, cursorPosition);
+        var wordStart = cursorPosition;
 
-        var workspace = new AdhocWorkspace(MefHost);
+        while (wordStart > 0 && IsIdentifierPart(currentLine[wordStart - 1]))
+            wordStart--;
 
-        var project = workspace
-            .AddProject("MyEfVibeRepl", LanguageNames.CSharp)
-            .AddMetadataReferences(_session.MetadataReferences)
-            .WithCompilationOptions(_session.CompilationOptions);
+        var prefix = currentLine[wordStart..cursorPosition];
 
-        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+        if (prefix.Length == 0)
+            return Task.FromResult<IReadOnlyList<CompletionSuggestion>>(Array.Empty<CompletionSuggestion>());
 
-        var document = project.AddDocument("repl.cs", await syntaxTree.GetRootAsync(cancellationToken));
-
-        var completionService = CompletionService.GetService(document);
-
-        if (completionService is null)
-            return Array.Empty<CompletionSuggestion>();
-
-        var completionList = await completionService.GetCompletionsAsync(
-            document,
-            position,
-            options: null,
-            cancellationToken: cancellationToken);
-
-        if (completionList is null)
-            return Array.Empty<CompletionSuggestion>();
-
-        var suggestions = new List<CompletionSuggestion>();
-
-        foreach (var item in completionList.ItemsList)
-        {
-            var displayText = item.DisplayText;
-
-            if (string.IsNullOrWhiteSpace(displayText))
-                continue;
-
-            var change = await completionService.GetChangeAsync(document, item, cancellationToken: cancellationToken);
-            var span = change.TextChange.Span;
-            var replaceStart = Math.Clamp(span.Start - lineStartInDocument, 0, currentLine.Length);
-            var replaceEnd = Math.Clamp(span.End - lineStartInDocument, replaceStart, currentLine.Length);
-            var insertText = change.TextChange.NewText;
-
-            if (string.IsNullOrEmpty(insertText))
-                insertText = displayText;
-
-            if (!IsUsableInsertText(insertText))
-                continue;
-
-            suggestions.Add(new CompletionSuggestion(
-                displayText,
-                insertText,
-                replaceStart,
-                replaceEnd - replaceStart));
-        }
-
-        return suggestions
-            .DistinctBy(static suggestion => $"{suggestion.ReplaceStart}:{suggestion.ReplaceLength}:{suggestion.InsertText}")
-            .OrderBy(static suggestion => suggestion.DisplayText, StringComparer.OrdinalIgnoreCase)
+        var suggestions = Keywords
+            .Where(keyword => keyword.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Select(keyword => new CompletionSuggestion(
+                keyword,
+                keyword,
+                wordStart,
+                prefix.Length))
             .ToArray();
+
+        return Task.FromResult<IReadOnlyList<CompletionSuggestion>>(suggestions);
     }
 
-    private static bool IsUsableInsertText(string insertText) =>
-        insertText.Length is > 0 and <= 128
-        && !insertText.Contains('\n')
-        && !insertText.Contains('\r')
-        && !insertText.Contains('{');
+    private static bool IsIdentifierPart(char character)
+        => char.IsLetterOrDigit(character) || character is '_' or '@';
 }

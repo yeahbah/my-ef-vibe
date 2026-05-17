@@ -12,12 +12,14 @@ internal sealed class WorkspaceHost : IDisposable
         WorkspaceAssemblyResolver resolver,
         InteractiveAssemblyLoader assemblyLoader,
         Assembly primaryAssembly,
-        string outputDirectory)
+        string outputDirectory,
+        string workspaceDirectory)
     {
         _resolver = resolver;
         AssemblyLoader = assemblyLoader;
         PrimaryAssembly = primaryAssembly;
         OutputDirectory = outputDirectory;
+        WorkspaceDirectory = workspaceDirectory;
     }
 
     internal InteractiveAssemblyLoader AssemblyLoader { get; }
@@ -26,15 +28,21 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal string OutputDirectory { get; }
 
+    internal string WorkspaceDirectory { get; }
+
     internal static WorkspaceHost Load(WorkspaceBuildResult workspaceBuild)
     {
         var sharedFrameworkCatalog =
             SharedFrameworkCatalog.Load(workspaceBuild.OutputDirectory, workspaceBuild.PrimaryAssemblyDll);
 
+        var depsManifest = WorkspaceDepsManifest.TryLoad(workspaceBuild.PrimaryAssemblyDll);
+
         var assemblyResolver =
-            WorkspaceAssemblyResolver.Install(workspaceBuild.PrimaryAssemblyDll, sharedFrameworkCatalog);
+            WorkspaceAssemblyResolver.Install(workspaceBuild.PrimaryAssemblyDll, sharedFrameworkCatalog, depsManifest);
 
         assemblyResolver.PreloadDependencies(workspaceBuild.PrimaryAssemblyDll);
+
+        EnsureWorkspaceConfigurationManagerLoaded(assemblyResolver);
 
         var primaryAssembly = assemblyResolver.LoadEntryAssembly(workspaceBuild.PrimaryAssemblyDll);
 
@@ -61,7 +69,144 @@ internal sealed class WorkspaceHost : IDisposable
             }
         }
 
-        return new WorkspaceHost(assemblyResolver, assemblyLoader, primaryAssembly, workspaceBuild.OutputDirectory);
+        return new WorkspaceHost(
+            assemblyResolver,
+            assemblyLoader,
+            primaryAssembly,
+            workspaceBuild.OutputDirectory,
+            workspaceBuild.WorkspaceDirectory);
+    }
+
+    private static void EnsureWorkspaceConfigurationManagerLoaded(WorkspaceAssemblyResolver resolver)
+    {
+        if (AppDomain.CurrentDomain.GetAssemblies().Any(static assembly =>
+                string.Equals(
+                    assembly.GetName().Name,
+                    "System.Configuration.ConfigurationManager",
+                    StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        if (resolver.DepsManifest?.TryResolve("System.Configuration.ConfigurationManager", out var path) != true)
+            return;
+
+        try
+        {
+            AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+        }
+        catch (Exception failure)
+        {
+            throw new InvalidOperationException(
+                "Failed to load `System.Configuration.ConfigurationManager` required by Microsoft.Data.SqlClient."
+                + $"{Environment.NewLine}Path: {path}"
+                + $"{Environment.NewLine}{failure.Message}",
+                failure);
+        }
+    }
+
+    internal void EnsureEntityFrameworkCoreLoaded()
+    {
+        if (AppDomain.CurrentDomain.GetAssemblies().Any(static assembly =>
+                string.Equals(assembly.GetName().Name, "Microsoft.EntityFrameworkCore", StringComparison.Ordinal)))
+            return;
+
+        if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore.Abstractions", out var abstractionsPath) == true)
+            LoadOrGetAssembly(abstractionsPath);
+
+        if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore", out var corePath) == true)
+        {
+            LoadOrGetAssembly(corePath);
+            return;
+        }
+
+        var outputCandidate = Path.Combine(OutputDirectory, "Microsoft.EntityFrameworkCore.dll");
+
+        if (File.Exists(outputCandidate))
+        {
+            LoadOrGetAssembly(outputCandidate);
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Could not load `Microsoft.EntityFrameworkCore` for the built project."
+            + $"{Environment.NewLine}Ensure the project references EF Core and was built successfully,"
+            + $" or use the API host project with `-p` so dependencies are available.");
+    }
+
+    internal IEnumerable<Assembly> EnumerateDiscoveryAssemblies()
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var assemblyPath in EnumerateDiscoveryAssemblyPaths())
+        {
+            Assembly assembly;
+
+            try
+            {
+                assembly = LoadOrGetAssembly(assemblyPath);
+            }
+            catch (BadImageFormatException)
+            {
+                continue;
+            }
+            catch (FileLoadException)
+            {
+                continue;
+            }
+
+            var identity = assembly.FullName ?? assembly.GetName().Name ?? assemblyPath;
+
+            if (!seen.Add(identity))
+                continue;
+
+            if (IsToolingAssembly(assembly.GetName().Name))
+                continue;
+
+            yield return assembly;
+        }
+    }
+
+    private IEnumerable<string> EnumerateDiscoveryAssemblyPaths()
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (Directory.Exists(OutputDirectory))
+        {
+            foreach (var dllPath in Directory.EnumerateFiles(OutputDirectory, "*.dll", SearchOption.TopDirectoryOnly))
+            {
+                if (!WorkspaceAssemblyFilter.ShouldScanAssembly(dllPath))
+                    continue;
+
+                if (seen.Add(dllPath))
+                    yield return dllPath;
+            }
+        }
+
+        if (_resolver.DepsManifest is null)
+            yield break;
+
+        foreach (var dllPath in _resolver.DepsManifest.RuntimeAssemblyPaths)
+        {
+            if (!File.Exists(dllPath))
+                continue;
+
+            if (!WorkspaceAssemblyFilter.ShouldScanAssembly(dllPath))
+                continue;
+
+            if (seen.Add(dllPath))
+                yield return dllPath;
+        }
+    }
+
+    private static Assembly LoadOrGetAssembly(string absolutePath)
+    {
+        var assemblyName = AssemblyName.GetAssemblyName(absolutePath);
+
+        var alreadyLoaded = AppDomain.CurrentDomain
+            .GetAssemblies()
+            .FirstOrDefault(assembly =>
+                string.Equals(assembly.GetName().Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase));
+
+        return alreadyLoaded ?? AssemblyLoadContext.Default.LoadFromAssemblyPath(absolutePath);
     }
 
     internal IEnumerable<Assembly> EnumerateLoadedAssemblies()
