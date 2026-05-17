@@ -10,7 +10,7 @@ internal sealed class ReplCompletionService
 {
     private static readonly string[] Keywords =
     [
-        "dbContext",
+        "db",
         "Where",
         "Select",
         "OrderBy",

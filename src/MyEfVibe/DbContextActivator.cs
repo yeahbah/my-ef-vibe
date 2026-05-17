@@ -34,12 +34,12 @@ internal static class DbContextActivator
 
         if (string.IsNullOrWhiteSpace(connectionString)
             && AppSettingsConnectionResolver.TryResolve(
+                host.StartupProjectPath,
                 host.OutputDirectory,
-                host.WorkspaceDirectory,
-                out var fromSettings,
+                out var fromConfiguration,
                 out var inferredProvider))
         {
-            connectionString = fromSettings;
+            connectionString = fromConfiguration;
             provider ??= inferredProvider;
         }
 
@@ -58,7 +58,9 @@ internal static class DbContextActivator
             + $"{Environment.NewLine}"
             + " - Add a public parameterless constructor on the DbContext."
             + $"{Environment.NewLine}"
-            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite) to build `DbContextOptions<TContext>`.");
+            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite) to build `DbContextOptions<TContext>`."
+            + $"{Environment.NewLine}"
+            + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.");
     }
 
     private static Type SelectDbContextType(
@@ -213,8 +215,7 @@ internal static class DbContextActivator
             + requestedHint
             + $"{Environment.NewLine}{scannedSummary}"
             + $"{Environment.NewLine}Output directory: {host.OutputDirectory}"
-            + $"{Environment.NewLine}For class libraries, prefer the API/startup project so dependencies and appsettings are available:"
-            + $"{Environment.NewLine} -p apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj"
+            + $"{Environment.NewLine}For class libraries, pass the persistence project with `-p` and the API with `-s` (auto-inferred when possible)."
             + $"{Environment.NewLine}Update efvibe if this persists — older builds did not load EF Core from NuGet package cache.";
     }
 

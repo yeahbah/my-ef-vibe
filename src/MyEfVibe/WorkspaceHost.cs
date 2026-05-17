@@ -12,23 +12,31 @@ internal sealed class WorkspaceHost : IDisposable
         WorkspaceAssemblyResolver resolver,
         InteractiveAssemblyLoader assemblyLoader,
         Assembly primaryAssembly,
+        string projectPath,
+        string startupProjectPath,
         string outputDirectory,
-        string workspaceDirectory)
+        string sessionDirectory)
     {
         _resolver = resolver;
         AssemblyLoader = assemblyLoader;
         PrimaryAssembly = primaryAssembly;
+        ProjectPath = projectPath;
+        StartupProjectPath = startupProjectPath;
         OutputDirectory = outputDirectory;
-        WorkspaceDirectory = workspaceDirectory;
+        SessionDirectory = sessionDirectory;
     }
 
     internal InteractiveAssemblyLoader AssemblyLoader { get; }
 
     internal Assembly PrimaryAssembly { get; }
 
+    internal string ProjectPath { get; }
+
+    internal string StartupProjectPath { get; }
+
     internal string OutputDirectory { get; }
 
-    internal string WorkspaceDirectory { get; }
+    internal string SessionDirectory { get; }
 
     internal static WorkspaceHost Load(WorkspaceBuildResult workspaceBuild)
     {
@@ -73,8 +81,10 @@ internal sealed class WorkspaceHost : IDisposable
             assemblyResolver,
             assemblyLoader,
             primaryAssembly,
+            workspaceBuild.ProjectPath,
+            workspaceBuild.StartupProjectPath,
             workspaceBuild.OutputDirectory,
-            workspaceBuild.WorkspaceDirectory);
+            workspaceBuild.SessionDirectory);
     }
 
     private static void EnsureWorkspaceConfigurationManagerLoaded(WorkspaceAssemblyResolver resolver)

@@ -2,8 +2,8 @@
 
 Interactive CLI to run LINQ against an external .NET project's EF Core `DbContext`.
 
-Point `efvibe` at a workspace, get a REPL with `dbContext` in scope, see translated SQL,
-execution metrics, and helpers like `:plan`, `:stats`, and `:tracked`.
+Point `efvibe` at your solution, get a REPL with **`db`** (your `DbContext`) in scope, see translated SQL,
+execution metrics, and helpers like `:tables`, `:describe`, `:dbinfo`, `:plan`, and `:stats`.
 
 Requires [.NET 8 SDK](https://dotnet.microsoft.com/download) or newer (tool ships `net8.0`, `net9.0`, and `net10.0` assets).
 
@@ -28,35 +28,65 @@ Restore the pinned tool after cloning:
 
 ```bash
 dotnet tool restore
-efvibe -w ./path/to/project
+efvibe -w ./myefvibe-session
 ```
 
 Update [`.config/dotnet-tools.json`](.config/dotnet-tools.json) when releasing a new version.
 
 ## Quick start
 
+Run from your solution root (where `.csproj` files live):
+
 ```bash
-efvibe -w /path/to/your/dotnet/project
+efvibe -w ./myefvibe-session
 ```
 
-When several `.csproj` files exist, `efvibe` scores them (DbContext in source, EF references, host vs library) and picks one automatically, or prompts you to choose. Use `-p` in scripts or CI when several projects exist and the host is not obvious.
+| Flag | Role |
+|------|------|
+| `-w`, `--workspace` | **Session directory** — `:export` CSV/JSON and other artifacts (created if missing) |
+| `-p`, `--project` | **EF project** to build — the `.csproj` that contains (or references) the `DbContext` |
+| `-s`, `--startup-project` | **Config project** — user secrets and `appsettings` (like `dotnet ef --startup-project`) |
 
-In the REPL, end input with `;` to run. Use `:help` for commands.
+If `-p` is omitted, projects are discovered under the **current directory** (not `-w`). If `-s` / `--startup-project` is omitted, `efvibe` infers a project that references the EF project and has user secrets or appsettings.
+
+In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). End input with `;` to run. Use `:help` for all commands.
+
+**Explore the model**
+
+| Command | Purpose |
+|---------|---------|
+| `:tables` | List DbSets and row counts |
+| `:describe Product` | Entity properties (types, PK/FK, columns) |
+| `:dbinfo` | Provider, connection string, server version |
+| `:tracked` | Change tracker summary |
 
 One-shot:
 
 ```bash
-efvibe -w ./MyApp -e "dbContext.Products.Count();"
+efvibe -w ./myefvibe-session -e "db.Products.Count();"
 ```
 
-Explicit project and SQL Server (e.g. AdventureWorks with Docker on macOS/Linux):
+### Class library + API (recommended pattern)
+
+DbContext in persistence, connection string on the API:
 
 ```bash
-efvibe -w . \
-  -p ./src/MyApp.Infrastructure/MyApp.Infrastructure.csproj \
-  -c MyApp.Infrastructure.DbContexts.AppDbContext \
-  --provider sqlserver \
-  --connection-string "Server=localhost,1433;Database=MyApp;User Id=sa;Password=Your_password;Encrypt=false;TrustServerCertificate=true"
+efvibe -w ./myefvibe-session \
+  -p ./apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj \
+  -s ./apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj \
+  -c AdventureWorks.Infrastructure.Persistence.DbContexts.AdventureWorksDbContext
+```
+
+`-s` / `--startup-project` is often optional when the API references the persistence project.
+
+Local development without installing the tool:
+
+```bash
+dotnet run --project src/MyEfVibe/MyEfVibe.csproj -f net10.0 -- \
+  -w ./myefvibe-session \
+  -p ./apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj \
+  -s ./apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj \
+  -c AdventureWorks.Infrastructure.Persistence.DbContexts.AdventureWorksDbContext
 ```
 
 ## macOS and SQL Server
@@ -67,21 +97,39 @@ Typical issues:
 
 | Symptom | Cause / fix |
 |---------|-------------|
+| `The target principal name is incorrect` / `Cannot generate SSPI context` | Wrong config source — use `-s` for the API (not the persistence library). macOS needs SQL auth in user secrets/appsettings, not Windows integrated security. |
 | `SqlClient is not supported on this platform` | Old `efvibe` build; use a current build with RID-aware dependency loading. |
 | `LocalAppContextSwitches` / `ConfigurationManager` errors | Host/tool vs workspace assembly conflict; fixed in recent builds (workspace deps preload). |
 | `:plan` — `SET SHOWPLAN` batch error | SQL Server requires `SET SHOWPLAN_ALL` in its own batch; fixed in recent builds. |
 
 For greenfield Mac work without Docker, use `--provider sqlite` or `npgsql` on a project that targets those providers.
 
-## Workspace discovery
+## Projects and configuration
 
-`efvibe` builds your project and resolves NuGet dependencies from `.deps.json`, including **class library** projects that do not copy EF/SqlClient into `bin/`. It scans workspace assemblies for `DbContext` types and can construct a context via:
+`efvibe` builds the **EF project** (`-p`) and loads assemblies from its output and `.deps.json`, including **class libraries** that do not copy EF/SqlClient into `bin/`.
 
-- `IDesignTimeDbContextFactory<T>`
-- Parameterless constructor
-- `--connection-string` + `--provider` (`sqlserver` \| `npgsql` \| `sqlite`)
+Configuration (connection strings) always comes from the **startup project** (`-s` / `--startup-project`, or auto-inferred), not from the EF library — same split as `dotnet ef`.
 
-Connection strings can also be read from `appsettings*.json` near the built output or workspace root.
+DbContext construction (in order):
+
+1. `IDesignTimeDbContextFactory<T>`
+2. Parameterless constructor
+3. User secrets on the startup project, then `appsettings*.json` next to that project
+4. `--connection-string` + `--provider` (`sqlserver` \| `npgsql` \| `sqlite`)
+
+User secrets use flat keys such as `ConnectionStrings:DefaultConnection` in `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json`.
+
+`:export csv` / `:export json` writes under `-w` by default; optional paths are relative to the session directory.
+
+## REPL reference
+
+The scripting global is **`db`** (not `dbContext`). Full command list, charts, benchmarks, and export options are in [features.md](features.md).
+
+Highlights:
+
+- **`:describe <entity>`** (`:desc`) — property sheet for an entity (`Product`, `AddressEntity`, DbSet name `Products`, or full type name). Shows CLR types (including arrays such as `byte[]`); adds PK, FK, column name, and max length when EF model metadata is available.
+- **`:dbinfo`** — DbContext type, EF/Core version, provider, connection state, connection string, and server version.
+- **`:plan`** — execution plan for the last translated SQL (provider-specific).
 
 ## License
 

@@ -6,31 +6,31 @@ internal static class WorkspaceProjectSelector
 
     internal sealed record RankedProject(string CsprojPath, int Score, string Label);
 
-    internal static FileInfo Resolve(string workspaceDirectory, string? explicitCsprojPathOrNull)
+    internal static FileInfo Resolve(string searchDirectory, string? explicitCsprojPathOrNull)
     {
-        var normalizedWorkspace =
-            Path.GetFullPath(workspaceDirectory.TrimEnd(Path.DirectorySeparatorChar));
+        var normalizedSearch =
+            Path.GetFullPath(searchDirectory.TrimEnd(Path.DirectorySeparatorChar));
 
-        if (!Directory.Exists(normalizedWorkspace))
-            throw new WorkspaceException($"Workspace `{normalizedWorkspace}` does not exist.");
+        if (!Directory.Exists(normalizedSearch))
+            throw new WorkspaceException($"Project search directory `{normalizedSearch}` does not exist.");
 
         if (!string.IsNullOrWhiteSpace(explicitCsprojPathOrNull))
-            return LocateExplicit(explicitCsprojPathOrNull, normalizedWorkspace);
+            return ProjectPathResolver.ResolveCsproj(explicitCsprojPathOrNull, normalizedSearch);
 
-        var discovered = DiscoverCsproj(normalizedWorkspace)
+        var discovered = DiscoverCsproj(normalizedSearch)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         if (discovered.Length == 0)
-            throw new WorkspaceException($"No `.csproj` files were discovered under `{normalizedWorkspace}`.");
+            throw new WorkspaceException($"No `.csproj` files were discovered under `{normalizedSearch}`.");
 
         if (discovered.Length == 1)
             return new FileInfo(discovered.Single());
 
-        var ranked = RankProjects(normalizedWorkspace, discovered);
+        var ranked = RankProjects(normalizedSearch, discovered);
 
         if (ranked.Count == 0 || ranked[0].Score <= 0)
-            return PromptAmongAllProjects(normalizedWorkspace, discovered);
+            return PromptAmongAllProjects(normalizedSearch, discovered);
 
         if (ranked.Count == 1
             || ranked[0].Score - ranked[1].Score >= AutoPickScoreGap
@@ -183,28 +183,10 @@ internal static class WorkspaceProjectSelector
         return new FileInfo(choice);
     }
 
-    private static FileInfo LocateExplicit(string explicitCandidate, string normalizedWorkspace)
-    {
-        var candidatePath =
-            Path.IsPathRooted(explicitCandidate)
-                ? explicitCandidate
-                : Path.GetFullPath(Path.Combine(normalizedWorkspace, explicitCandidate));
-
-        candidatePath = candidatePath.TrimEnd(Path.DirectorySeparatorChar);
-
-        if (!File.Exists(candidatePath))
-            throw new WorkspaceException($"Specified project `{candidatePath}` does not exist.");
-
-        if (!string.Equals(Path.GetExtension(candidatePath), ".csproj", StringComparison.OrdinalIgnoreCase))
-            throw new WorkspaceException("`-p/--project` must resolve to a `.csproj` file.");
-
-        return new FileInfo(candidatePath);
-    }
-
-    private static IEnumerable<string> DiscoverCsproj(string normalizedWorkspaceDirectory)
+    private static IEnumerable<string> DiscoverCsproj(string normalizedSearchDirectory)
         =>
         Directory
-            .EnumerateFiles(normalizedWorkspaceDirectory, "*.csproj", SearchOption.AllDirectories)
+            .EnumerateFiles(normalizedSearchDirectory, "*.csproj", SearchOption.AllDirectories)
             .Where(static path => !IsUnderBuildArtifacts(path));
 
     private static bool IsUnderBuildArtifacts(string absolutePathCandidate)

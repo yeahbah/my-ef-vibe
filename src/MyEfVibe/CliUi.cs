@@ -106,11 +106,13 @@ internal static class CliUi
 
         table.AddRow("[cyan]:help[/]", "Show this help");
         table.AddRow("[cyan]:clear[/]", "Clear the terminal screen");
-        table.AddRow("[cyan]:reset[/]", "Clear script variables ([grey]dbContext[/] stays)");
+        table.AddRow("[cyan]:reset[/]", "Clear script variables ([grey]db[/] stays)");
         table.AddRow("[cyan]:sql[/]", "Toggle SQL output");
         table.AddRow("[cyan]:stats[/]", "Session evaluation statistics");
         table.AddRow("[cyan]:tracked[/]", "Change tracker summary");
         table.AddRow("[cyan]:tables[/]", "List DbSets and row counts");
+        table.AddRow("[cyan]:dbinfo[/]", "Database, provider, and connection details");
+        table.AddRow("[cyan]:describe <entity>[/]", "Entity properties (DbSet name or type)");
         table.AddRow("[cyan]:plan[/]", "EXPLAIN last translated SQL");
         table.AddRow("[cyan]:compare set[/]", "Save baseline · [cyan]:compare[/] diff last run");
         table.AddRow("[cyan]:history stats[/]", "History with timings");
@@ -127,9 +129,9 @@ internal static class CliUi
 
         var examples = new List<string>
         {
-            "dbContext.JsonBlobDocuments.Count()",
-            "dbContext.JsonBlobDocuments.AsNoTracking().Take(5).ToList()",
-            "var q = dbContext.Orders.Where(o => o.Total > 100)",
+            "db.JsonBlobDocuments.Count()",
+            "db.JsonBlobDocuments.AsNoTracking().Take(5).ToList()",
+            "var q = db.Orders.Where(o => o.Total > 100)",
             "q.Count()",
         };
 

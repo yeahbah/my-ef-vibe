@@ -224,7 +224,7 @@ internal sealed class QueryRepl
 
             case "reset":
                 _session.Reset();
-                CliUi.WriteSuccess("Script state cleared. `dbContext` is unchanged.");
+                CliUi.WriteSuccess("Script state cleared. `db` is unchanged.");
                 return (true, false);
 
             case "sql":

@@ -36,7 +36,7 @@ internal sealed class ScriptSession
         _dbContextType = dbContextType;
         _globalsType = typeof(ScriptGlobals<>).MakeGenericType(dbContextType);
         _globals = Activator.CreateInstance(_globalsType)!;
-        _globalsType.GetProperty("dbContext")!.SetValue(_globals, dbContextInstance);
+        _globalsType.GetProperty("db")!.SetValue(_globals, dbContextInstance);
 
         var referencePaths = MetadataPathComposer.Compose(workspaceAssemblyPaths);
 
@@ -91,7 +91,7 @@ internal sealed class ScriptSession
         var dbContextTypeName = _dbContextType.FullName!;
 
         builder.Append(submissionIndent);
-        builder.AppendLine($"{dbContextTypeName} dbContext = null!;");
+        builder.AppendLine($"{dbContextTypeName} db = null!;");
 
         foreach (var submission in _submissionHistory)
         {

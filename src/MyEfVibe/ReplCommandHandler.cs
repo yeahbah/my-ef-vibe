@@ -45,6 +45,15 @@ internal sealed class ReplCommandHandler
                 await SchemaBrowser.WriteTablesAsync(_dbContext, cancellationToken);
                 return true;
 
+            case "dbinfo":
+                await DbInfoReporter.WriteAsync(_dbContext, _host, cancellationToken);
+                return true;
+
+            case "describe":
+            case "desc":
+                EntityDescriptor.Write(_dbContext, string.Join(' ', parts.Skip(1)));
+                return true;
+
             case "plan":
                 await QueryPlanRunner.WritePlanAsync(
                     _dbContext,
@@ -179,6 +188,6 @@ internal sealed class ReplCommandHandler
         var format = parts[1];
         var path = parts.Length > 2 ? parts[2] : null;
 
-        ResultExporter.Export(_analytics.ExportRows, format, path);
+        ResultExporter.Export(_analytics.ExportRows, _host.SessionDirectory, format, path);
     }
 }

@@ -5,20 +5,23 @@ namespace MyEfVibe;
 internal static class AppSettingsConnectionResolver
 {
     internal static bool TryResolve(
-        string outputDirectory,
-        string workspaceDirectory,
+        string startupProjectPath,
+        string efOutputDirectory,
         out string connectionString,
         out MyEfVibeProvider? provider)
     {
         connectionString = string.Empty;
         provider = null;
 
-        foreach (var settingsPath in EnumerateCandidateSettingsPaths(outputDirectory, workspaceDirectory))
+        if (UserSecretsConnectionResolver.TryResolve(startupProjectPath, efOutputDirectory, out connectionString, out provider))
+            return true;
+
+        foreach (var settingsPath in EnumerateStartupSettingsPaths(startupProjectPath))
         {
             if (!TryReadConnectionString(settingsPath, out connectionString))
                 continue;
 
-            provider = InferProvider(outputDirectory, connectionString);
+            provider = InferProvider(efOutputDirectory, connectionString);
 
             return !string.IsNullOrWhiteSpace(connectionString);
         }
@@ -26,46 +29,44 @@ internal static class AppSettingsConnectionResolver
         return false;
     }
 
-    private static IEnumerable<string> EnumerateCandidateSettingsPaths(
-        string outputDirectory,
-        string workspaceDirectory)
+    private static IEnumerable<string> EnumerateStartupSettingsPaths(string startupProjectPath)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var startupDirectory = Path.GetDirectoryName(startupProjectPath)!;
 
         foreach (var settingsFileName in new[] { "appsettings.json", "appsettings.Development.json" })
         {
-            foreach (var directory in EnumerateSearchDirectories(outputDirectory, workspaceDirectory))
+            foreach (var directory in EnumerateStartupSearchDirectories(startupDirectory))
             {
                 var candidate = Path.Combine(directory, settingsFileName);
 
                 if (seen.Add(candidate) && File.Exists(candidate))
                     yield return candidate;
             }
-
-            if (!Directory.Exists(workspaceDirectory))
-                continue;
-
-            foreach (var candidate in Directory.EnumerateFiles(
-                         workspaceDirectory,
-                         settingsFileName,
-                         SearchOption.AllDirectories))
-            {
-                if (!seen.Add(candidate))
-                    continue;
-
-                if (IsUnderBuildArtifacts(candidate))
-                    continue;
-
-                yield return candidate;
-            }
         }
     }
 
-    private static IEnumerable<string> EnumerateSearchDirectories(string outputDirectory, string workspaceDirectory)
+    private static IEnumerable<string> EnumerateStartupSearchDirectories(string startupProjectDirectory)
     {
-        yield return outputDirectory;
+        yield return startupProjectDirectory;
 
-        var current = outputDirectory;
+        var binRoot = Path.Combine(startupProjectDirectory, "bin");
+
+        if (Directory.Exists(binRoot))
+        {
+            foreach (var configuration in new[] { "Release", "Debug" })
+            {
+                var configurationRoot = Path.Combine(binRoot, configuration);
+
+                if (!Directory.Exists(configurationRoot))
+                    continue;
+
+                foreach (var tfmFolder in Directory.EnumerateDirectories(configurationRoot))
+                    yield return tfmFolder;
+            }
+        }
+
+        var current = startupProjectDirectory;
 
         for (var depth = 0; depth < 8; depth++)
         {
@@ -76,25 +77,7 @@ internal static class AppSettingsConnectionResolver
 
             current = parent;
             yield return current;
-
-            if (string.Equals(
-                    Path.GetFullPath(parent).TrimEnd(Path.DirectorySeparatorChar),
-                    Path.GetFullPath(workspaceDirectory).TrimEnd(Path.DirectorySeparatorChar),
-                    StringComparison.OrdinalIgnoreCase))
-                break;
         }
-    }
-
-    private static bool IsUnderBuildArtifacts(string absolutePath)
-    {
-        foreach (var segment in absolutePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-        {
-            if (string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
-
-        return false;
     }
 
     private static bool TryReadConnectionString(string settingsPath, out string connectionString)
@@ -106,7 +89,7 @@ internal static class AppSettingsConnectionResolver
         if (!document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings))
             return false;
 
-        foreach (var preferredName in new[] { "DefaultConnection", "Postgres", "Sqlite", "Database" })
+        foreach (var preferredName in ConnectionStringKeys.PreferredNames)
         {
             if (connectionStrings.TryGetProperty(preferredName, out var named)
                 && named.GetString() is { Length: > 0 } preferred)
@@ -130,7 +113,7 @@ internal static class AppSettingsConnectionResolver
         return false;
     }
 
-    private static MyEfVibeProvider? InferProvider(string outputDirectory, string connectionString)
+    internal static MyEfVibeProvider? InferProvider(string outputDirectory, string connectionString)
     {
         if (Directory.EnumerateFiles(outputDirectory, "Npgsql*.dll").Any())
             return MyEfVibeProvider.Npgsql;

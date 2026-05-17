@@ -12,12 +12,16 @@ internal static class Program
 
         var workspaceOption = new Option<DirectoryInfo>(
             aliases: new[] { "-w", "--workspace" },
-            description: "Directory that contains the .NET project you want to query against.")
+            description: "Session directory for exports and other artifacts (created if missing).")
         { IsRequired = true };
 
         var projectOption = new Option<FileInfo?>(
             aliases: new[] { "-p", "--project" },
-            description: "Explicit path to a `.csproj` when more than one project exists in the workspace.");
+            description: "EF Core project to build (`.csproj` with the DbContext).");
+
+        var startupProjectOption = new Option<FileInfo?>(
+            aliases: new[] { "-s", "--startup-project" },
+            description: "Startup project for configuration (user secrets, appsettings). Auto-inferred from project references when omitted.");
 
         var contextOption = new Option<string?>(
             aliases: new[] { "-c", "--context" },
@@ -36,7 +40,7 @@ internal static class Program
             description: "Run a single expression and exit (non-interactive).");
 
         var sqlOption = new Option<bool>(
-            aliases: new[] { "-s", "--sql" },
+            aliases: new[] { "--sql" },
             description: "Show generated SQL (executed commands and translated IQueryable SQL).",
             getDefaultValue: () => true);
 
@@ -52,6 +56,7 @@ internal static class Program
         {
             workspaceOption,
             projectOption,
+            startupProjectOption,
             contextOption,
             connectionOption,
             providerOption,
@@ -62,23 +67,32 @@ internal static class Program
 
         rootCommand.Name = "efvibe";
 
-        rootCommand.SetHandler(
-            InvokeAsync,
-            workspaceOption,
-            projectOption,
-            contextOption,
-            connectionOption,
-            providerOption,
-            expressionOption,
-            sqlOption,
-            expressionArgument);
+        var parseResult = rootCommand.Parse(args);
 
-        return await rootCommand.InvokeAsync(args);
+        if (parseResult.Errors.Count > 0)
+        {
+            foreach (var error in parseResult.Errors)
+                AnsiConsole.MarkupLine($"[red]{Markup.Escape(error.Message)}[/]");
+
+            return 1;
+        }
+
+        return await InvokeAsync(
+            parseResult.GetValueForOption(workspaceOption)!,
+            parseResult.GetValueForOption(projectOption),
+            parseResult.GetValueForOption(startupProjectOption),
+            parseResult.GetValueForOption(contextOption),
+            parseResult.GetValueForOption(connectionOption),
+            parseResult.GetValueForOption(providerOption),
+            parseResult.GetValueForOption(expressionOption),
+            parseResult.GetValueForOption(sqlOption),
+            parseResult.GetValueForArgument(expressionArgument));
     }
 
     private static async Task<int> InvokeAsync(
         DirectoryInfo workspace,
         FileInfo? projectPath,
+        FileInfo? startupProjectPath,
         string? contextFullName,
         string? connectionString,
         string? providerRaw,
@@ -98,15 +112,26 @@ internal static class Program
 
         var oneShotExpression = ResolveOneShotExpression(expressionOptionValue, expressionArgumentTokens);
 
-        var workspaceRoot = workspace.FullName.TrimEnd(Path.DirectorySeparatorChar);
+        var sessionDirectory = SessionPaths.EnsureSessionDirectory(workspace.FullName);
+        var searchDirectory = ProjectPathResolver.ResolveSearchDirectory(
+            sessionDirectory,
+            projectPath?.FullName,
+            startupProjectPath?.FullName);
+
         FileInfo resolvedProject;
+        FileInfo resolvedStartup;
         WorkspaceBuildResult workspaceBuild;
 
         try
         {
             resolvedProject = WorkspaceProjectLocator.ResolveProject(
-                workspaceRoot,
+                searchDirectory,
                 projectPath?.FullName);
+
+            resolvedStartup = StartupProjectResolver.Resolve(
+                searchDirectory,
+                resolvedProject,
+                startupProjectPath?.FullName);
         }
         catch (WorkspaceException workspaceFailure)
         {
@@ -119,14 +144,20 @@ internal static class Program
             return 10;
         }
 
-        var projectLabel = Path.GetRelativePath(workspaceRoot, resolvedProject.FullName);
-        AnsiConsole.MarkupLine($"[dim]Host project:[/] [cyan]{Markup.Escape(projectLabel)}[/]");
+        var projectLabel = Path.GetRelativePath(searchDirectory, resolvedProject.FullName);
+        var startupLabel = Path.GetRelativePath(searchDirectory, resolvedStartup.FullName);
+
+        AnsiConsole.MarkupLine($"[dim]Session directory:[/] [cyan]{Markup.Escape(sessionDirectory)}[/]");
+        AnsiConsole.MarkupLine($"[dim]EF project:[/] [cyan]{Markup.Escape(projectLabel)}[/]");
+
+        if (!string.Equals(resolvedStartup.FullName, resolvedProject.FullName, StringComparison.OrdinalIgnoreCase))
+            AnsiConsole.MarkupLine($"[dim]Startup project (config):[/] [cyan]{Markup.Escape(startupLabel)}[/]");
 
         try
         {
             workspaceBuild = CliUi.RunWithStatus(
-                "Building workspace…",
-                () => WorkspaceBuilder.BuildResolvedProject(workspaceRoot, resolvedProject));
+                "Building EF project…",
+                () => WorkspaceBuilder.BuildResolvedProject(sessionDirectory, resolvedProject, resolvedStartup));
         }
         catch (WorkspaceException workspaceFailure)
         {

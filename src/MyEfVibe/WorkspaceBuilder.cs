@@ -4,19 +4,26 @@ namespace MyEfVibe;
 
 internal static class WorkspaceBuilder
 {
-    internal static WorkspaceBuildResult Build(string workspaceDirectory, string? explicitProjectPathOrNull)
+    internal static WorkspaceBuildResult Build(
+        string sessionDirectory,
+        string searchDirectory,
+        string? explicitProjectPathOrNull,
+        string? explicitStartupPathOrNull)
     {
-        var projectFile =
-            WorkspaceProjectLocator.ResolveProject(workspaceDirectory, explicitProjectPathOrNull);
+        var projectFile = WorkspaceProjectLocator.ResolveProject(searchDirectory, explicitProjectPathOrNull);
+        var startupProject = StartupProjectResolver.Resolve(searchDirectory, projectFile, explicitStartupPathOrNull);
 
-        return BuildResolvedProject(workspaceDirectory, projectFile);
+        return BuildResolvedProject(sessionDirectory, projectFile, startupProject);
     }
 
-    internal static WorkspaceBuildResult BuildResolvedProject(string workspaceDirectory, FileInfo projectFile)
+    internal static WorkspaceBuildResult BuildResolvedProject(
+        string sessionDirectory,
+        FileInfo projectFile,
+        FileInfo startupProject)
     {
         RunDotnetBuild(projectFile.FullName);
 
-        return WorkspaceBuildResult.RequirePrimaryAssembly(workspaceDirectory, projectFile);
+        return WorkspaceBuildResult.RequirePrimaryAssembly(sessionDirectory, projectFile, startupProject);
     }
 
     private static void RunDotnetBuild(string csprojFullPath)

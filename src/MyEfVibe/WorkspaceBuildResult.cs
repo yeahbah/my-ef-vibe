@@ -4,16 +4,19 @@ using System.Globalization;
 namespace MyEfVibe;
 
 internal sealed record WorkspaceBuildResult(
-    string WorkspaceDirectory,
+    string SessionDirectory,
     string ProjectPath,
+    string StartupProjectPath,
     string OutputDirectory,
     string PrimaryAssemblyDll)
 {
     internal ImmutableHashSet<string> ReferenceAssemblyPaths =>
         WorkspaceReferenceCollector.Collect(OutputDirectory, PrimaryAssemblyDll);
 
-    internal static WorkspaceBuildResult RequirePrimaryAssembly(string workspaceRootDirectory,
-        FileInfo csprojFile)
+    internal static WorkspaceBuildResult RequirePrimaryAssembly(
+        string sessionDirectory,
+        FileInfo csprojFile,
+        FileInfo startupProject)
     {
         var projectDirectory =
             csprojFile.Directory!.FullName.TrimEnd(Path.DirectorySeparatorChar);
@@ -28,10 +31,10 @@ internal sealed record WorkspaceBuildResult(
             Path.GetDirectoryName(dll)!;
 
         return new WorkspaceBuildResult(
-            WorkspaceDirectory: Path.GetFullPath(workspaceRootDirectory.TrimEnd(Path.DirectorySeparatorChar)),
+            SessionDirectory: Path.GetFullPath(sessionDirectory.TrimEnd(Path.DirectorySeparatorChar)),
             ProjectPath: csprojFile.FullName,
-            OutputDirectory:
-            outputDirectory,
+            StartupProjectPath: startupProject.FullName,
+            OutputDirectory: outputDirectory,
             PrimaryAssemblyDll: dll);
     }
 

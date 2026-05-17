@@ -41,6 +41,13 @@ internal static class CsprojInspector
                || UsesWebSdk(csprojAbsolutePath);
     }
 
+    internal static bool TryGetUserSecretsId(string csprojAbsolutePath, out string userSecretsId)
+    {
+        userSecretsId = ReadProperty(csprojAbsolutePath, "UserSecretsId") ?? string.Empty;
+
+        return !string.IsNullOrWhiteSpace(userSecretsId);
+    }
+
     internal static bool IsTestProject(string csprojAbsolutePath)
     {
         var fileName = Path.GetFileNameWithoutExtension(csprojAbsolutePath);

@@ -1,34 +1,53 @@
 # MyEfVibe features
 
-MyEfVibe is an interactive CLI for running LINQ against an **external** EF Core `DbContext`. It builds your workspace, loads its assemblies into a Roslyn scripting session, and exposes the context as `dbContext` in a REPL.
+MyEfVibe is an interactive CLI for running LINQ against an **external** EF Core `DbContext`. It builds the EF project, loads assemblies into a Roslyn scripting session, and exposes the context as `db` in a REPL.
 
 Licensed under [Apache 2.0](LICENSE).
 
 ## Core workflow
 
-1. Point the tool at a workspace directory (a .NET project or solution folder).
-2. MyEfVibe resolves the host `.csproj` (auto-select or `-p`), runs `dotnet build`, and loads assemblies from the output folder and `.deps.json` (including NuGet package paths and RID-specific runtimes such as `runtimes/unix/...` on macOS).
-3. It locates a concrete `DbContext` type and constructs an instance when possible.
-4. It attaches workspace assemblies to a Roslyn scripting session so entity types, extension methods, and project types are available in scripts.
-5. You run LINQ in the REPL (or a one-shot expression); results, SQL, and metrics are shown in the terminal.
+1. Choose a **session directory** (`-w`) for exports and session artifacts.
+2. MyEfVibe resolves the **EF project** to build (`-p`, auto-select, or prompt) and the **startup project** for configuration (`-s` / `--startup-project`, auto-inferred from project references, or same as EF project).
+3. It runs `dotnet build` on the EF project and loads assemblies from the output folder and `.deps.json` (including NuGet package paths and RID-specific runtimes such as `runtimes/unix/...` on macOS).
+4. It locates a concrete `DbContext` type and constructs an instance when possible.
+5. It attaches workspace assemblies to a Roslyn scripting session so entity types, extension methods, and project types are available in scripts.
+6. You run LINQ in the REPL (or a one-shot expression); results, SQL, and metrics are shown in the terminal.
 
-### Project selection
+### EF project selection (`-p`)
 
-When `-p` is omitted and multiple projects exist, candidates are scored by:
+When `-p` is omitted, projects are discovered under the **current working directory** (not `-w`). Candidates are scored by:
 
 - DbContext type names found in `.cs` sources
 - EF Core package references (direct or transitive)
 - Project kind (executable / web host preferred over pure class libraries)
 - Whether the project references another candidate that contains a DbContext
 
-Use `-p` to override. Use `-c` when multiple `DbContext` types are found.
+Use `-p` for the `.csproj` that contains the `DbContext` (often a persistence/infrastructure library). Use `-c` when multiple `DbContext` types are found.
 
-In CI or piped stdin (non-interactive), specify `-p` when the workspace has several projects and auto-selection is ambiguous.
+In CI or piped stdin (non-interactive), specify `-p` when several projects exist and auto-selection is ambiguous.
+
+### Startup project selection (`-s`, `--startup-project`)
+
+Configuration is read from the **startup project**, not the EF project:
+
+- **User secrets** — `UserSecretsId` in the startup `.csproj`
+- **`appsettings.json` / `appsettings.Development.json`** — next to that project
+
+When `-s` / `--startup-project` is omitted, `efvibe` looks for projects that **reference** the EF project and scores them by user secrets, appsettings, and whether they are a web host or executable. If none match, the EF project is used for config.
+
+Typical layout:
+
+| Project | Flag | Purpose |
+|---------|------|---------|
+| `AdventureWorks.Infrastructure.Persistence` | `-p` | Build, load `DbContext` and entities |
+| `AdventureWorks.API` | `-s` / `--startup-project` | `dotnet user-secrets`, `appsettings`, Docker SQL connection |
+
+Passing only `-p` to a class library without `-s` can yield wrong connection strings (for example Windows SSPI on macOS).
 
 Example:
 
 ```csharp
-dbContext.JsonBlobDocuments
+db.JsonBlobDocuments
     .AsNoTracking()
     .Where(d => d.Title.Contains("demo"))
     .Take(10)
@@ -39,14 +58,15 @@ dbContext.JsonBlobDocuments
 
 | Option | Description |
 |--------|-------------|
-| `-w`, `--workspace` | Workspace directory (required) |
-| `-p`, `--project` | Explicit `.csproj` when several exist |
+| `-w`, `--workspace` | Session directory for `:export` output and artifacts (required) |
+| `-p`, `--project` | EF Core `.csproj` to build (DbContext assembly) |
+| `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--sql` or `:sql`. |
 | `-c`, `--context` | Fully qualified `DbContext` type name |
 | `--connection-string`, `-cs` | Connection string for manual `DbContextOptions` construction |
 | `--provider` | Provider with `-cs`: `sqlserver`, `npgsql`, `sqlite` |
 | `-e`, `--expression` | Run one expression and exit |
 | `expression` (positional) | Same as `-e` when passed as trailing arguments |
-| `-s`, `--sql` | Show SQL (default: **on**) |
+| `--sql` | Show SQL (default: **on**; toggle in REPL with `:sql`) |
 
 Install as a .NET tool: `dotnet tool install --global efvibe`, then run `efvibe`.
 Requires .NET 8+ (package includes net8.0, net9.0, and net10.0 tool assets).
@@ -60,12 +80,22 @@ Local repo: `dotnet tool restore` (see `.config/dotnet-tools.json`).
 | **`;` at end of line** | Run the full snippet |
 | **`;` alone on a line** | Run what you typed above |
 | **Shift+Enter** | Newline inside the current input |
-| **Tab** | Keyword completion (LINQ / `dbContext` helpers) |
+| **Tab** | Keyword completion (LINQ / `db` helpers) |
 | **↑ / ↓** | Command history |
 
 Statements such as `var id = 1;` keep their terminator for Roslyn. Trailing `;` on a **final expression** line is stripped so the REPL can display a return value (e.g. `.ToList();`).
 
 `:commands` (e.g. `:help`, `:quit`) run on a single line and do not require `;`.
+
+### Scripting global: `db`
+
+The active `DbContext` instance is exposed as **`db`** in every snippet:
+
+```csharp
+db.Orders.Where(o => o.Total > 100).Count()
+```
+
+`:reset` clears script variables but leaves `db` unchanged.
 
 ## SQL output
 
@@ -102,18 +132,20 @@ Re-show with `:warnings`.
 |---------|-------------|
 | `:help`, `:h`, `:?` | Command list and examples |
 | `:clear`, `:cls` | Clear the terminal |
-| `:reset` | Clear script variables (`dbContext` unchanged) |
+| `:reset` | Clear script variables (`db` unchanged) |
 | `:sql` | Toggle SQL output |
 | `:stats` | Session evaluation table and aggregates |
 | `:tracked` | Change tracker summary by state |
 | `:tables` | DbSets with row counts |
+| `:dbinfo` | DbContext type, provider, connection string, server version, and related metadata |
+| `:describe <entity>`, `:desc` | Entity property sheet (see below) |
 | `:plan` | Execution plan for last translated SQL — `EXPLAIN` (PostgreSQL), `EXPLAIN QUERY PLAN` (SQLite), `SET SHOWPLAN_ALL` (SQL Server, separate batches) |
 | `:compare set` | Set baseline for comparison |
 | `:compare` | Diff baseline vs last run (timings, rows, SQL) |
 | `:compare clear` | Clear comparison baseline |
 | `:history stats` | Input history with per-snippet timings |
 | `:benchmark N` | Run last snippet `N` times (default 5) |
-| `:export csv\|json [path]` | Export last tabular result |
+| `:export csv\|json [path]` | Export last tabular result to the session directory (`-w`); optional path is relative to `-w` |
 | `:warnings` | Warnings for last evaluation |
 | `:chart`, `:viz` | Terminal charts (see below) |
 | `:quit`, `:q`, `:exit` | Exit |
@@ -130,6 +162,33 @@ Re-show with `:warnings`.
 
 `:benchmark` also shows an iteration timing chart.
 
+### Schema and connection (`:tables`, `:describe`, `:dbinfo`)
+
+**`:tables`** — table of each DbSet name, CLR entity type, and row count (`Count()` per set).
+
+**`:describe <entity>`** (alias `:desc`) — resolves an entity from DbSet names or type names on the current context:
+
+```text
+:describe Product
+:describe Products
+:describe AddressEntity
+:describe AdventureWorks.Domain.Product
+```
+
+Matching order: exact DbSet name → exact type name → suffix → substring. Ambiguous names list candidates; unknown names list all DbSets.
+
+Output columns: **Member**, **Type**, **nullable**, **Notes**. Scalar properties are listed first; navigation properties last with a `navigation` note. When EF Core model metadata is available, notes can include `PK`, `FK`, `column: …`, and `max N`.
+
+**`:dbinfo`** — panel with:
+
+- DbContext full type name
+- EF project and startup project (when different)
+- Session directory (`-w`)
+- EF Core assembly version
+- Provider display name and EF provider name
+- Command timeout and DbSet count
+- Live connection: state, data source, database, server version, connection string
+
 ## Session analytics
 
 Per evaluation is recorded for `:stats`, `:compare`, `:history stats`, and `:benchmark`:
@@ -142,8 +201,9 @@ Per evaluation is recorded for `:stats`, `:compare`, `:history stats`, and `:ben
 ## UI
 
 - Spectre.Console panels, tables, and colors
-- Startup banner and session panel (context, project, SQL toggle, input hints)
-- Spinner while the workspace builds
+- Startup lines: session directory, EF project, startup project (when different), build status
+- Session panel (context, project, SQL toggle, input hints)
+- Spinner while the EF project builds
 
 ## Scripting model
 
@@ -156,8 +216,14 @@ Per evaluation is recorded for `:stats`, `:compare`, `:history stats`, and `:ben
 Non-interactive run for CI or quick checks:
 
 ```bash
-efvibe -w ./MyApp -e "dbContext.Products.Count();"
-efvibe -w ./MyApp dbContext.Products.Count();
+efvibe -w ./myefvibe-session \
+  -p ./src/MyApp.Infrastructure/MyApp.Infrastructure.csproj \
+  -s ./src/MyApp.Api/MyApp.Api.csproj \
+  -e "db.Products.Count();"
+```
+
+```bash
+efvibe -w ./myefvibe-session -p ./src/MyApp.Api/MyApp.Api.csproj db.Products.Count();
 ```
 
 ## Database providers
@@ -168,11 +234,23 @@ efvibe -w ./MyApp dbContext.Products.Count();
 | PostgreSQL | `npgsql` | `EXPLAIN` for `:plan` |
 | SQLite | `sqlite` | `EXPLAIN QUERY PLAN` for `:plan`; good for local files |
 
-Pass `--connection-string` (or rely on `appsettings*.json` next to the build output). `--provider` is required when using `-cs` explicitly.
+Pass `--connection-string` (or rely on the startup project). `--provider` is required when using `-cs` explicitly.
+
+### Connection string resolution (no `-cs`)
+
+When you do not pass `--connection-string`, and the DbContext cannot be created via a design-time factory or parameterless constructor, `efvibe` loads credentials from the **startup project** in this order:
+
+1. **User secrets** — `UserSecretsId` on the startup `.csproj`, then `~/.microsoft/usersecrets/<id>/secrets.json` (macOS/Linux).
+2. **`appsettings.json` / `appsettings.Development.json`** — next to the startup project (and its `bin` output if present).
+
+Preferred keys: `ConnectionStrings:DefaultConnection`, then `Postgres`, `Sqlite`, `Database`, then any other `ConnectionStrings:*` entry. Provider is inferred from EF assemblies in the **built EF project** output.
+
+Use `-p` for the persistence/library project and `-s` for the API (or rely on auto-inference when the API references the library).
 
 ## macOS notes
 
-- **SQL Server:** run the database in Docker; connect to `localhost,1433` (or your mapped port). This is the normal cross-platform dev setup — not a Windows-only stack.
+- **SQL Server:** run the database in Docker; connect to `localhost,1433` (or your mapped port). Store `User Id=sa;Password=...` in the **API** user secrets or appsettings via `-s` — not integrated security.
+- **SSPI errors:** `Cannot generate SSPI context` usually means config was read from the wrong project. Point `-s` at the API, not the persistence library.
 - **Assembly loading:** library projects keep dependencies in the NuGet cache; `efvibe` reads `.deps.json` so EF Core and SqlClient resolve correctly on Unix.
 - **Avoiding host conflicts:** the tool preloads workspace `System.Configuration.ConfigurationManager` (9.x) before SqlClient initializes, so it does not clash with older copies pulled in by optional Roslyn packages.
 
