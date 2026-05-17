@@ -1,0 +1,164 @@
+using System.CommandLine;
+using System.Diagnostics;
+using Spectre.Console;
+
+namespace MyEfVibe;
+
+internal static class Program
+{
+    public static async Task<int> Main(string[] args)
+    {
+        CliUi.Configure();
+
+        var workspaceOption = new Option<DirectoryInfo>(
+            aliases: new[] { "-w", "--workspace" },
+            description: "Directory that contains the .NET project you want to query against.")
+        { IsRequired = true };
+
+        var projectOption = new Option<FileInfo?>(
+            aliases: new[] { "-p", "--project" },
+            description: "Explicit path to a `.csproj` when more than one project exists in the workspace.");
+
+        var contextOption = new Option<string?>(
+            aliases: new[] { "-c", "--context" },
+            description: "Fully qualified DbContext type name when multiple contexts are present.");
+
+        var connectionOption = new Option<string?>(
+            aliases: new[] { "--connection-string", "-cs" },
+            description: "Connection string used when constructing `DbContextOptions<TContext>` manually.");
+
+        var providerOption = new Option<string?>(
+            aliases: new[] { "--provider" },
+            description: "Database provider key used with `--connection-string`: sqlserver | npgsql | sqlite.");
+
+        var expressionOption = new Option<string?>(
+            aliases: new[] { "-e", "--expression" },
+            description: "Run a single expression and exit (non-interactive).");
+
+        var sqlOption = new Option<bool>(
+            aliases: new[] { "-s", "--sql" },
+            description: "Show generated SQL (executed commands and translated IQueryable SQL).",
+            getDefaultValue: () => true);
+
+        var expressionArgument = new Argument<string[]>("expression")
+
+        {
+            Arity = ArgumentArity.ZeroOrMore,
+            Description = "Optional one-shot expression when `-e` is omitted but arguments are provided.",
+        };
+
+        var rootCommand = new RootCommand(
+            "Interactive EF Core LINQ shell against another project's DbContext.")
+        {
+            workspaceOption,
+            projectOption,
+            contextOption,
+            connectionOption,
+            providerOption,
+            expressionOption,
+            sqlOption,
+            expressionArgument,
+        };
+
+        rootCommand.Name = "efvibe";
+
+        rootCommand.SetHandler(
+            InvokeAsync,
+            workspaceOption,
+            projectOption,
+            contextOption,
+            connectionOption,
+            providerOption,
+            expressionOption,
+            sqlOption,
+            expressionArgument);
+
+        return await rootCommand.InvokeAsync(args);
+    }
+
+    private static async Task<int> InvokeAsync(
+        DirectoryInfo workspace,
+        FileInfo? projectPath,
+        string? contextFullName,
+        string? connectionString,
+        string? providerRaw,
+        string? expressionOptionValue,
+        bool showSql,
+        string[]? expressionArgumentTokens)
+    {
+        var sqlSettings = new SqlDisplaySettings { ShowSql = showSql };
+
+        var parsedProvider = ProviderParser.ParseOrNull(providerRaw);
+
+        if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
+        {
+            CliUi.WriteError("`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite).");
+            return 3;
+        }
+
+        var oneShotExpression = ResolveOneShotExpression(expressionOptionValue, expressionArgumentTokens);
+
+        WorkspaceBuildResult workspaceBuild;
+
+        try
+        {
+            workspaceBuild = CliUi.RunWithStatus(
+                "Building workspace…",
+                () => WorkspaceBuilder.Build(
+                    workspace.FullName.TrimEnd(Path.DirectorySeparatorChar),
+                    projectPath?.FullName));
+        }
+        catch (WorkspaceException workspaceFailure)
+        {
+            CliUi.WriteErrorPanel("Workspace failure", workspaceFailure.Message);
+            return 10;
+        }
+
+        var projectLabel = Path.GetRelativePath(workspaceBuild.WorkspaceDirectory, workspaceBuild.ProjectPath);
+        AnsiConsole.MarkupLine($"[green]✓[/] Built [cyan]{Markup.Escape(projectLabel)}[/]");
+
+        using var host = WorkspaceHost.Load(workspaceBuild);
+
+        object dbContextInstance;
+
+        try
+        {
+            dbContextInstance = DbContextActivator.ResolveInstance(
+                host,
+                contextFullName,
+                connectionString,
+                parsedProvider);
+        }
+        catch (InvalidOperationException resolutionFailure)
+        {
+            CliUi.WriteErrorPanel("DbContext resolution failed", resolutionFailure.Message);
+            return 14;
+        }
+
+        var session = new ScriptSession(
+            dbContextInstance.GetType(),
+            dbContextInstance,
+            workspaceBuild.ReferenceAssemblyPaths,
+            host.AssemblyLoader);
+
+        if (!string.IsNullOrWhiteSpace(oneShotExpression))
+            return await QueryRunner.RunOnceAsync(dbContextInstance, session, host, sqlSettings, oneShotExpression);
+
+        var repl = new QueryRepl(session, host, dbContextInstance, sqlSettings, projectLabel);
+
+        await repl.RunAsync();
+
+        return 0;
+    }
+
+    private static string? ResolveOneShotExpression(string? expressionOptionValue, string[]? expressionArgumentTokens)
+    {
+        if (!string.IsNullOrWhiteSpace(expressionOptionValue))
+            return expressionOptionValue.Trim();
+
+        if (expressionArgumentTokens is not { Length: > 0 })
+            return null;
+
+        return string.Join(' ', expressionArgumentTokens).Trim();
+    }
+}

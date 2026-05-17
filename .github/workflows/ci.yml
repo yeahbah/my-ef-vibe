@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore MyEfVibe.slnx
+
+      - name: Build
+        run: dotnet build MyEfVibe.slnx -c Release --no-restore
+
+      - name: Pack
+        run: dotnet pack src/MyEfVibe/MyEfVibe.csproj -c Release --no-build -o ./artifacts
+
+      - name: Verify tool targets
+        run: |
+          test -f artifacts/efvibe.*.nupkg
+          unzip -l artifacts/efvibe.*.nupkg | grep -E 'tools/net(8|9|10)\.0/any/myefvibe\.dll'
