@@ -7,6 +7,20 @@ execution metrics, and helpers like `:tables`, `:describe`, `:dbinfo`, `:plan`, 
 
 Requires [.NET 8 SDK](https://dotnet.microsoft.com/download) or newer (tool ships `net8.0`, `net9.0`, and `net10.0` assets).
 
+## Screenshots
+
+Startup banner, session panel, and a LINQ query with translated SQL, results, and `:plan`:
+
+![efvibe REPL with query, SQL, results, and query plan](screenshots/screen1.png)
+
+`:tables` — DbSets, entity types, and row counts:
+
+![efvibe :tables](screenshots/screen2.png)
+
+`:dbinfo` — provider, connection, and startup project details:
+
+![efvibe :dbinfo](screenshots/screen3.png)
+
 ## Install
 
 From NuGet (when published):
