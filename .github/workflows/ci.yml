@@ -6,8 +6,13 @@ on:
   pull_request:
     branches: [main, master]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
 
     steps:
@@ -29,9 +34,87 @@ jobs:
         run: dotnet build MyEfVibe.slnx -c Release --no-restore
 
       - name: Pack
-        run: dotnet pack src/MyEfVibe/MyEfVibe.csproj -c Release --no-build -o ./artifacts
+        run: >
+          dotnet pack src/MyEfVibe/MyEfVibe.csproj
+          -c Release
+          --no-build
+          -o ./artifacts
+          /p:Version=0.0.0-ci.${{ github.run_number }}
 
       - name: Verify tool targets
         run: |
           test -f artifacts/efvibe.*.nupkg
           unzip -l artifacts/efvibe.*.nupkg | grep -E 'tools/net(8|9|10)\.0/any/myefvibe\.dll'
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip version bump commits
+        id: skip
+        run: |
+          if [[ "${{ github.event.head_commit.message }}" == *"[skip ci]"* ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if commit already tagged
+        id: tagged
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          if git describe --tags --exact-match HEAD 2>/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Commit already has tag: $(git describe --tags --exact-match HEAD)"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next version
+        id: version
+        if: steps.skip.outputs.skip != 'true' && steps.tagged.outputs.skip != 'true'
+        run: |
+          chmod +x .github/scripts/next-version.sh
+          VERSION="$(.github/scripts/next-version.sh)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Next release version: $VERSION"
+
+      - name: Create and push tag
+        if: steps.skip.outputs.skip != 'true' && steps.tagged.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists; skipping."
+            exit 0
+          fi
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Sync version in repo
+        if: steps.skip.outputs.skip != 'true' && steps.tagged.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          sed -i "s/<Version>.*<\/Version>/<Version>${VERSION}<\/Version>/" src/MyEfVibe/MyEfVibe.csproj
+          jq --arg v "$VERSION" '.tools.efvibe.version = $v' .config/dotnet-tools.json > .config/dotnet-tools.json.tmp
+          mv .config/dotnet-tools.json.tmp .config/dotnet-tools.json
+          if git diff --quiet; then
+            echo "No file changes to commit."
+            exit 0
+          fi
+          git add src/MyEfVibe/MyEfVibe.csproj .config/dotnet-tools.json
+          git commit -m "chore: bump version to ${VERSION} [skip ci]"
+          git push origin HEAD:${{ github.ref_name }}

@@ -56,9 +56,21 @@ The open source CLI remains free to use under Apache 2.0.
 
 ## Publishing
 
-See [PUBLISHING.md](PUBLISHING.md) for packing and pushing `efvibe` to NuGet.org.
+Every push to `main` runs CI, then automatically:
 
-CI runs on push/PR; NuGet publish runs when you push a `v*` tag (requires `NUGET_API_KEY` secret).
+1. Computes the next patch version (max of latest `v*` git tag, NuGet, and `.csproj`)
+2. Creates and pushes a `v*` tag (e.g. `v0.1.4`)
+3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe) and opens a GitHub Release
+
+Set the repository secret **`NUGET_API_KEY`** ([nuget.org API key](https://www.nuget.org/account/apikeys)) for publish to work.
+
+Manual publish: **Actions → Publish to NuGet → Run workflow** (optional version input), or push a tag:
+
+```bash
+git tag v0.1.5 && git push origin v0.1.5
+```
+
+Version-bump commits from CI include `[skip ci]` so they do not trigger another release.
 
 ## Contributing
 
