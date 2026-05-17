@@ -6,14 +6,19 @@ internal sealed class ReplLineReader
 {
     private readonly InputHistory _history;
     private readonly ReplCompletionService? _completion;
+    private readonly LinqScanReviewSession? _scanReview;
     private readonly Queue<string> _pendingRecalledLines = new();
     [ThreadStatic]
     private static int _lastRenderedLineCount;
 
-    internal ReplLineReader(InputHistory history, ReplCompletionService? completion = null)
+    internal ReplLineReader(
+        InputHistory history,
+        ReplCompletionService? completion = null,
+        LinqScanReviewSession? scanReview = null)
     {
         _history = history;
         _completion = completion;
+        _scanReview = scanReview;
     }
 
     internal bool HasPendingRecalledLines => _pendingRecalledLines.Count > 0;
@@ -120,6 +125,9 @@ internal sealed class ReplLineReader
                     break;
 
                 case ConsoleKey.LeftArrow:
+                    if (TryScanReviewNavigatePrevious(prompt, buffer, ref cursor))
+                        break;
+
                     if (cursor > 0)
                     {
                         Console.Write('\b');
@@ -130,6 +138,9 @@ internal sealed class ReplLineReader
                     break;
 
                 case ConsoleKey.RightArrow:
+                    if (TryScanReviewNavigateNext(prompt, buffer, ref cursor))
+                        break;
+
                     if (cursor < buffer.Length)
                     {
                         Console.Write(buffer[cursor]);
@@ -182,6 +193,31 @@ internal sealed class ReplLineReader
             }
         }
     }
+
+    private bool TryScanReviewNavigateNext(string prompt, StringBuilder buffer, ref int cursor)
+    {
+        if (_scanReview?.IsActive != true || buffer.Length > 0 || cursor > 0)
+            return false;
+
+        _scanReview.TryNext();
+        RenderMultiline(ResolvePrompt(prompt), buffer, cursor);
+
+        return true;
+    }
+
+    private bool TryScanReviewNavigatePrevious(string prompt, StringBuilder buffer, ref int cursor)
+    {
+        if (_scanReview?.IsActive != true || buffer.Length > 0 || cursor > 0)
+            return false;
+
+        _scanReview.TryPrevious();
+        RenderMultiline(ResolvePrompt(prompt), buffer, cursor);
+
+        return true;
+    }
+
+    private string ResolvePrompt(string fallbackPrompt) =>
+        _scanReview?.GetActivePrompt() ?? fallbackPrompt;
 
     private void ApplyRecalledEntry(string entry, string prompt, StringBuilder buffer, ref int cursor)
     {

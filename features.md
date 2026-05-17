@@ -6,7 +6,7 @@ Licensed under [Apache 2.0](LICENSE).
 
 ## Core workflow
 
-1. Choose a **session directory** (`-w`) for exports and session artifacts.
+1. Choose a **session directory** (`-w`) for exports, scan results (`myefvibe-scan-lite.json`), and other session artifacts.
 2. MyEfVibe resolves the **EF project** to build (`-p`, auto-select, or prompt) and the **startup project** for configuration (`-s` / `--startup-project`, auto-inferred from project references, or same as EF project).
 3. It runs `dotnet build` on the EF project and loads assemblies from the output folder and `.deps.json` (including NuGet package paths and RID-specific runtimes such as `runtimes/unix/...` on macOS).
 4. It locates a concrete `DbContext` type and constructs an instance when possible.
@@ -139,6 +139,9 @@ Re-show with `:warnings`.
 | `:tables` | DbSets with row counts |
 | `:dbinfo` | DbContext type, provider, connection string, server version, and related metadata |
 | `:describe <entity>`, `:desc` | Entity property sheet (see below) |
+| `:scan lite` | Static Roslyn scan of EF project sources for slow-query patterns (see below) |
+| `:next`, `:prev` | Step through `:scan lite` review queue (also **→** / **←** on empty prompt) |
+| `:repeat`, `:end` | Restart scan review at first finding · exit scan review |
 | `:plan` | Execution plan for last translated SQL — `EXPLAIN` (PostgreSQL), `EXPLAIN QUERY PLAN` (SQLite), `SET SHOWPLAN_ALL` (SQL Server, separate batches) |
 | `:compare set` | Set baseline for comparison |
 | `:compare` | Diff baseline vs last run (timings, rows, SQL) |
@@ -161,6 +164,35 @@ Re-show with `:warnings`.
 | `:chart result` | Numeric column from last result (≤25 rows) |
 
 `:benchmark` also shows an iteration timing chart.
+
+### Static LINQ scan (`:scan lite`)
+
+**`:scan lite`** walks `.cs` files in the built EF project and its referenced projects (test projects skipped). It uses Roslyn syntax analysis and the same heuristics as snippet `:warnings` — no database, no SQL generation.
+
+```text
+:scan lite
+```
+
+Output:
+
+1. Summary panel — finding count, files scanned, project count
+2. Findings saved to `myefvibe-scan-lite.json` in the session directory (`-w`)
+3. **Review queue** — one finding at a time; step through with:
+
+| Command | Action |
+|---------|--------|
+| `:next` or **→** (empty prompt) | Next finding |
+| `:prev` or **←** (empty prompt) | Previous finding |
+| `:repeat` | Back to the first finding |
+| `:end` | Exit review mode |
+
+At the last finding, `:next` reports that the queue is complete.
+
+Each finding includes a **Fix** section with concrete remediation hints (e.g. `AsSplitQuery()` for cartesian includes, `OrderBy` before `Take`, batching for N+1).
+
+Rules include: client-side `AsEnumerable()`, unbounded materialization, multiple `Include`/`ThenInclude`, `Take` without `OrderBy`, raw SQL, and possible N+1 inside loops.
+
+**`:scan deep`** (future) may resolve expressions and show translated SQL per call site.
 
 ### Schema and connection (`:tables`, `:describe`, `:dbinfo`)
 

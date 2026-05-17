@@ -7,6 +7,9 @@ internal static class CliUi
     internal const string PrimaryPrompt = "[bold cyan]❯[/] ";
     internal const string ContinuationPrompt = "[grey]…[/] ";
 
+    internal static string ScanReviewPrompt(int oneBasedIndex, int total) =>
+        $"[bold yellow][[scan {oneBasedIndex}/{total}]][/] [bold cyan]❯[/] ";
+
     internal static int GetVisiblePromptWidth(string markupPrompt) =>
         markupPrompt switch
         {
@@ -113,6 +116,9 @@ internal static class CliUi
         table.AddRow("[cyan]:tables[/]", "List DbSets and row counts");
         table.AddRow("[cyan]:dbinfo[/]", "Database, provider, and connection details");
         table.AddRow("[cyan]:describe <entity>[/]", "Entity properties (DbSet name or type)");
+        table.AddRow("[cyan]:scan lite[/]", "Static LINQ performance scan of EF project sources");
+        table.AddRow("[cyan]:next[/] · [cyan]:prev[/]", "Step through scan findings (also → / ← on empty prompt)");
+        table.AddRow("[cyan]:repeat[/] · [cyan]:end[/]", "Restart scan review queue · exit scan review");
         table.AddRow("[cyan]:plan[/]", "EXPLAIN last translated SQL");
         table.AddRow("[cyan]:compare set[/]", "Save baseline · [cyan]:compare[/] diff last run");
         table.AddRow("[cyan]:history stats[/]", "History with timings");

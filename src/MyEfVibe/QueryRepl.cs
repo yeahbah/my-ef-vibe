@@ -12,6 +12,7 @@ internal sealed class QueryRepl
     private readonly SqlDisplaySettings _sqlSettings;
     private readonly SessionAnalytics _analytics = new();
     private readonly InputHistory _history = new();
+    private readonly LinqScanReviewSession _scanReview = new();
     private readonly ReplLineReader _lineReader;
     private readonly ReplCommandHandler _commands;
 
@@ -28,8 +29,8 @@ internal sealed class QueryRepl
         _contextTypeName = dbContext.GetType().Name;
         _projectLabel = projectLabel;
         _sqlSettings = sqlSettings;
-        _lineReader = new ReplLineReader(_history, new ReplCompletionService());
-        _commands = new ReplCommandHandler(session, host, dbContext, sqlSettings, _analytics, _history);
+        _lineReader = new ReplLineReader(_history, new ReplCompletionService(), _scanReview);
+        _commands = new ReplCommandHandler(session, host, dbContext, sqlSettings, _analytics, _history, _scanReview);
     }
 
     internal async Task RunAsync(CancellationToken cancellationToken = default)
@@ -82,7 +83,7 @@ internal sealed class QueryRepl
 
         try
         {
-            firstLine = _lineReader.ReadLine(CliUi.PrimaryPrompt);
+            firstLine = _lineReader.ReadLine(_scanReview.GetActivePrompt() ?? CliUi.PrimaryPrompt);
         }
         catch (EndOfStreamException)
         {

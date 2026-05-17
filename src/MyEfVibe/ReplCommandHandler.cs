@@ -8,6 +8,7 @@ internal sealed class ReplCommandHandler
     private readonly SqlDisplaySettings _sqlSettings;
     private readonly SessionAnalytics _analytics;
     private readonly InputHistory _history;
+    private readonly LinqScanReviewSession _scanReview;
 
     internal ReplCommandHandler(
         ScriptSession session,
@@ -15,7 +16,8 @@ internal sealed class ReplCommandHandler
         object dbContext,
         SqlDisplaySettings sqlSettings,
         SessionAnalytics analytics,
-        InputHistory history)
+        InputHistory history,
+        LinqScanReviewSession scanReview)
     {
         _session = session;
         _host = host;
@@ -23,6 +25,7 @@ internal sealed class ReplCommandHandler
         _sqlSettings = sqlSettings;
         _analytics = analytics;
         _history = history;
+        _scanReview = scanReview;
     }
 
     internal async Task<bool> TryHandleAsync(string command, CancellationToken cancellationToken)
@@ -52,6 +55,33 @@ internal sealed class ReplCommandHandler
             case "describe":
             case "desc":
                 EntityDescriptor.Write(_dbContext, string.Join(' ', parts.Skip(1)));
+                return true;
+
+            case "scan":
+                HandleScan(parts);
+                return true;
+
+            case "next":
+                if (!_scanReview.IsActive)
+                    return false;
+
+                _scanReview.TryNext();
+                return true;
+
+            case "prev":
+            case "previous":
+                if (!_scanReview.IsActive)
+                    return false;
+
+                _scanReview.TryPrevious();
+                return true;
+
+            case "repeat":
+                _scanReview.GoToStart();
+                return true;
+
+            case "end":
+                _scanReview.End();
                 return true;
 
             case "plan":
@@ -98,6 +128,37 @@ internal sealed class ReplCommandHandler
             default:
                 return false;
         }
+    }
+
+    private void HandleScan(string[] parts)
+    {
+        if (parts.Length < 2)
+        {
+            LinqScanPresenter.WriteUsage();
+            return;
+        }
+
+        var mode = parts[1].ToLowerInvariant();
+
+        if (mode != "lite")
+        {
+            CliUi.WriteWarning("Unknown scan mode. Usage: :scan lite (`:scan deep` is not implemented yet).");
+            return;
+        }
+
+        var result = CliUi.RunWithStatus(
+            "Scanning project sources for LINQ patterns…",
+            () => LinqLiteScanner.Scan(_host.ProjectPath));
+
+        var displayRoot = Path.GetDirectoryName(_host.ProjectPath)!;
+
+        if (result.Findings.Count == 0)
+        {
+            LinqScanPresenter.WriteLiteSummary(result, displayRoot, string.Empty);
+            return;
+        }
+
+        _scanReview.Begin(result, _host.SessionDirectory, displayRoot);
     }
 
     private void HandleCompare(string[] parts)

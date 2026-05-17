@@ -3,7 +3,7 @@
 Interactive CLI to run LINQ against an external .NET project's EF Core `DbContext`.
 
 Point `efvibe` at your solution, get a REPL with **`db`** (your `DbContext`) in scope, see translated SQL,
-execution metrics, and helpers like `:tables`, `:describe`, `:dbinfo`, `:plan`, and `:stats`.
+execution metrics, and helpers like `:tables`, `:describe`, `:dbinfo`, `:plan`, `:stats`, and `:scan lite`.
 
 Requires [.NET 8 SDK](https://dotnet.microsoft.com/download) or newer (tool ships `net8.0`, `net9.0`, and `net10.0` assets).
 
@@ -73,6 +73,7 @@ In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). End 
 | `:describe Product` | Entity properties (types, PK/FK, columns) |
 | `:dbinfo` | Provider, connection string, server version |
 | `:tracked` | Change tracker summary |
+| `:scan lite` | Static scan of project LINQ for slow-query patterns; review findings one at a time |
 
 One-shot:
 
@@ -144,6 +145,7 @@ Highlights:
 - **`:describe <entity>`** (`:desc`) — property sheet for an entity (`Product`, `AddressEntity`, DbSet name `Products`, or full type name). Shows CLR types (including arrays such as `byte[]`); adds PK, FK, column name, and max length when EF model metadata is available.
 - **`:dbinfo`** — DbContext type, EF/Core version, provider, connection state, connection string, and server version.
 - **`:plan`** — execution plan for the last translated SQL (provider-specific).
+- **`:scan lite`** — Roslyn scan of EF project sources (and referenced projects) for LINQ smells; saves `myefvibe-scan-lite.json` under `-w` and walks a review queue (`:next` / `→`, `:prev` / `←`, `:repeat`, `:end`) with per-rule **Fix** recommendations.
 
 ## License
 
