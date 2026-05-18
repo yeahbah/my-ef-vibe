@@ -168,6 +168,14 @@ Highlights:
 - **`:scan lite`** / **`:scan deep`** — project-wide LINQ scan with a review queue, **Fix** hints, optional **Translated SQL** (deep), `:dismiss`, and `:note`.
 - **`:about`** — tool version, license, and session paths.
 
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [features.md](features.md) | Full REPL and CLI reference |
+| [docs/vscode-extension-plan.md](docs/vscode-extension-plan.md) | Planned VS Code extension (phases, CLI hooks, diagnostics) |
+| [docs/linq-scan-feasibility.md](docs/linq-scan-feasibility.md) | How project LINQ scanning works |
+
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
