@@ -9,7 +9,7 @@
 | **`:scan lite`** | Roslyn walk of EF project + referenced projects; file/line, rule, message, code preview, and **Fix** recommendations; review queue with keyboard shortcuts |
 | **`:scan deep`** | Lite findings plus translated SQL where the live `db` context can evaluate the expression; extra `query-site` entries when SQL translates but no heuristic fires |
 
-Session artifacts live under `~/.efvibe/<DbContextName>/` (or `%APPDATA%\efvibe\<DbContextName>\`): `myefvibe-scan-lite.json`, `myefvibe-scan-deep.json`, `myefvibe-scan-dismissals.json`, `myefvibe-scan-notes.json`.
+Session artifacts live under `~/.efvibe/<ProjectName>/<DbContextName>/` (or `%APPDATA%\efvibe\<ProjectName>\<DbContextName>\`): `myefvibe-scan-lite.json`, `myefvibe-scan-deep.json`, `myefvibe-scan-dismissals.json`, `myefvibe-scan-notes.json`.
 | **REPL + `:warnings`** | Same heuristics on the snippet you just ran |
 | **Translated / executed SQL** | Real SQL for that query against your live DB |
 | **`:plan`** | Execution plan for the last translated query |

@@ -6,7 +6,7 @@ Licensed under [Apache 2.0](LICENSE).
 
 ## Core workflow
 
-1. Use the default workspace root (`~/.efvibe` or `%APPDATA%\efvibe`) or pass **`-w`**. Session files live in a **subfolder named after the DbContext** (e.g. `~/.efvibe/AdventureWorksDbContext/`).
+1. Use the default workspace root (`~/.efvibe` or `%APPDATA%\efvibe`) or pass **`-w`**. Session files live under **`<ProjectName>/<DbContextName>/`** (e.g. `~/.efvibe/AdventureWorks.Infrastructure.Persistence/AdventureWorksDbContext/`).
 2. MyEfVibe resolves the **EF project** to build (`-p`, auto-select, or prompt) and the **startup project** for configuration (`-s` / `--startup-project`, auto-inferred from project references, or same as EF project).
 3. It runs `dotnet build` on the EF project and loads assemblies from the output folder and `.deps.json` (including NuGet package paths and RID-specific runtimes such as `runtimes/unix/...` on macOS).
 4. It locates a concrete `DbContext` type and constructs an instance when possible.
@@ -58,7 +58,7 @@ db.JsonBlobDocuments
 
 | Option | Description |
 |--------|-------------|
-| `-w`, `--workspace` | Workspace root; per-DbContext session subfolder; default `~/.efvibe` or `%APPDATA%\efvibe` |
+| `-w`, `--workspace` | Workspace root; session path is `<ProjectName>/<DbContextName>/` beneath it; default `~/.efvibe` or `%APPDATA%\efvibe` |
 | `-p`, `--project` | EF Core `.csproj` to build (DbContext assembly) |
 | `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--sql` or `:sql`. |
 | `-c`, `--context` | Fully qualified `DbContext` type name |
@@ -151,7 +151,7 @@ Re-show with `:warnings`.
 | `:compare clear` | Clear comparison baseline |
 | `:history stats` | Input history with per-snippet timings |
 | `:benchmark N` | Run last snippet `N` times (default 5) |
-| `:export csv\|json [path]` | Export last tabular result to the DbContext session folder; optional path is relative to that folder |
+| `:export csv\|json [path]` | Export last tabular result to `<ProjectName>/<DbContextName>/`; optional path is relative to that folder |
 | `:warnings` | Warnings for last evaluation |
 | `:chart`, `:viz` | Terminal charts (see below) |
 | `:quit`, `:q`, `:exit` | Exit |
@@ -182,7 +182,7 @@ Re-show with `:warnings`.
 Output:
 
 1. Summary panel — finding count, files scanned, project count (deep also shows SQL translated / failed counts)
-2. Findings saved to `myefvibe-scan-lite.json` or `myefvibe-scan-deep.json` in the session directory (`-w`); dismissals in `myefvibe-scan-dismissals.json`, notes in `myefvibe-scan-notes.json`
+2. Findings saved under `<ProjectName>/<DbContextName>/` (`myefvibe-scan-lite.json`, `myefvibe-scan-deep.json`, `myefvibe-scan-dismissals.json`, `myefvibe-scan-notes.json`)
 3. **Review queue** — one finding at a time; step through with:
 
 | Command | Action |
@@ -196,7 +196,7 @@ Output:
 
 At the last finding, `:next` reports that the queue is complete.
 
-Dismissals and notes are keyed by file, line, and rule id (`myefvibe-scan-dismissals.json`, `myefvibe-scan-notes.json` under the DbContext session folder).
+Dismissals and notes are keyed by file, line, and rule id (`myefvibe-scan-dismissals.json`, `myefvibe-scan-notes.json` under the project/DbContext session folder).
 
 Each finding includes a **Fix** section with concrete remediation hints (e.g. `AsSplitQuery()` for cartesian includes, `OrderBy` before `Take`, batching for N+1). Deep findings may also show a **Translated SQL** panel.
 
@@ -223,7 +223,7 @@ Output columns: **Member**, **Type**, **nullable**, **Notes**. Scalar properties
 
 - DbContext full type name
 - EF project and startup project (when different)
-- Session directory (`-w`)
+- Session directory (`<ProjectName>/<DbContextName>/` under workspace root)
 - EF Core assembly version
 - Provider display name and EF provider name
 - Command timeout and DbSet count

@@ -27,16 +27,25 @@ internal static class SessionPaths
         return normalized;
     }
 
-    internal static string GetDbContextSessionFolderName(string dbContextName)
+    internal static string GetProjectSessionFolderName(string projectCsprojPath)
     {
-        return SanitizeFolderName(string.IsNullOrWhiteSpace(dbContextName) ? "DbContext" : dbContextName);
+        var name = Path.GetFileNameWithoutExtension(projectCsprojPath);
+
+        return SanitizeFolderName(string.IsNullOrWhiteSpace(name) ? "project" : name);
     }
 
-    internal static string EnsureDbContextSessionDirectory(string workspaceRoot, string dbContextName)
+    internal static string GetDbContextSessionFolderName(string dbContextName) =>
+        SanitizeFolderName(string.IsNullOrWhiteSpace(dbContextName) ? "DbContext" : dbContextName);
+
+    internal static string EnsureDbContextSessionDirectory(
+        string workspaceRoot,
+        string projectCsprojPath,
+        string dbContextName)
     {
+        var projectFolder = GetProjectSessionFolderName(projectCsprojPath);
         var contextFolder = GetDbContextSessionFolderName(dbContextName);
 
-        return EnsureSessionDirectory(Path.Combine(workspaceRoot, contextFolder));
+        return EnsureSessionDirectory(Path.Combine(workspaceRoot, projectFolder, contextFolder));
     }
 
     internal static string EnsurePendingSessionDirectory(string workspaceRoot) =>

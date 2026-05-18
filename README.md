@@ -55,15 +55,16 @@ Run from your solution root (where `.csproj` files live):
 efvibe
 ```
 
-Session artifacts default to a **per-DbContext folder** under `~/.efvibe/<DbContextName>/` (macOS/Linux) or `%APPDATA%\efvibe\<DbContextName>\` (Windows). Override the root with `-w`:
+Session artifacts default to **`~/.efvibe/<ProjectName>/<DbContextName>/`** (macOS/Linux) or `%APPDATA%\efvibe\<ProjectName>\<DbContextName>\` (Windows). Override the root with `-w`:
 
 ```bash
-efvibe -w ./myefvibe-session   # → ./myefvibe-session/AdventureWorksDbContext/
+efvibe -w ./myefvibe-session
+# → ./myefvibe-session/AdventureWorks.Infrastructure.Persistence/AdventureWorksDbContext/
 ```
 
 | Flag | Role |
 |------|------|
-| `-w`, `--workspace` | **Workspace root** — each DbContext gets its own subfolder (optional; default `~/.efvibe` or `%APPDATA%\efvibe`) |
+| `-w`, `--workspace` | **Workspace root** — `<ProjectName>/<DbContextName>/` under this path (optional; default `~/.efvibe` or `%APPDATA%\efvibe`) |
 | `-p`, `--project` | **EF project** to build — the `.csproj` that contains (or references) the `DbContext` |
 | `-s`, `--startup-project` | **Config project** — user secrets and `appsettings` (like `dotnet ef --startup-project`) |
 
@@ -141,9 +142,9 @@ DbContext construction (in order):
 
 User secrets use flat keys such as `ConnectionStrings:DefaultConnection` in `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json`.
 
-`:export csv` / `:export json` writes under the DbContext session folder; optional paths are relative to that directory.
+`:export csv` / `:export json` writes under `<ProjectName>/<DbContextName>/`; optional paths are relative to that folder.
 
-### Session files (per DbContext)
+### Session files (`<ProjectName>/<DbContextName>/`)
 
 | File | Purpose |
 |------|---------|

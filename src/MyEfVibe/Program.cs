@@ -190,7 +190,10 @@ internal static class Program
             return 14;
         }
 
-        var sessionDirectory = SessionPaths.EnsureDbContextSessionDirectory(workspaceRoot, dbContextType.Name);
+        var sessionDirectory = SessionPaths.EnsureDbContextSessionDirectory(
+            workspaceRoot,
+            resolvedProject.FullName,
+            dbContextType.Name);
         host.SetSessionDirectory(sessionDirectory);
 
         AnsiConsole.MarkupLine($"[dim]DbContext:[/] [cyan]{Markup.Escape(dbContextType.Name)}[/]");
