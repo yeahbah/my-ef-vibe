@@ -8,7 +8,8 @@ internal sealed record WorkspaceBuildResult(
     string ProjectPath,
     string StartupProjectPath,
     string OutputDirectory,
-    string PrimaryAssemblyDll)
+    string PrimaryAssemblyDll,
+    string? StartupOutputDirectory = null)
 {
     internal ImmutableHashSet<string> ReferenceAssemblyPaths =>
         WorkspaceReferenceCollector.Collect(OutputDirectory, PrimaryAssemblyDll);
@@ -30,12 +31,31 @@ internal sealed record WorkspaceBuildResult(
         var outputDirectory =
             Path.GetDirectoryName(dll)!;
 
+        string? startupOutputDirectory = null;
+
+        if (!string.Equals(
+                csprojFile.FullName,
+                startupProject.FullName,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var startupProjectDirectory =
+                startupProject.Directory!.FullName.TrimEnd(Path.DirectorySeparatorChar);
+
+            var startupAssemblyName =
+                CsprojReader.ReadLogicalAssemblyName(startupProject.FullName);
+
+            if (TryLocateBuiltAssembly(Path.Combine(startupProjectDirectory, "bin"), startupAssemblyName,
+                    out var startupDll))
+                startupOutputDirectory = Path.GetDirectoryName(startupDll);
+        }
+
         return new WorkspaceBuildResult(
             SessionDirectory: Path.GetFullPath(sessionDirectory.TrimEnd(Path.DirectorySeparatorChar)),
             ProjectPath: csprojFile.FullName,
             StartupProjectPath: startupProject.FullName,
             OutputDirectory: outputDirectory,
-            PrimaryAssemblyDll: dll);
+            PrimaryAssemblyDll: dll,
+            StartupOutputDirectory: startupOutputDirectory);
     }
 
     private static bool TryLocateBuiltAssembly(string binRoot, string assemblyName, out string dllPath)

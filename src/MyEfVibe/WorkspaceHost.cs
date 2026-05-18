@@ -15,6 +15,7 @@ internal sealed class WorkspaceHost : IDisposable
         string projectPath,
         string startupProjectPath,
         string outputDirectory,
+        string? startupOutputDirectory,
         string sessionDirectory)
     {
         _resolver = resolver;
@@ -23,6 +24,7 @@ internal sealed class WorkspaceHost : IDisposable
         ProjectPath = projectPath;
         StartupProjectPath = startupProjectPath;
         OutputDirectory = outputDirectory;
+        StartupOutputDirectory = startupOutputDirectory;
         SessionDirectory = sessionDirectory;
     }
 
@@ -38,6 +40,8 @@ internal sealed class WorkspaceHost : IDisposable
     internal string StartupProjectPath { get; }
 
     internal string OutputDirectory { get; }
+
+    internal string? StartupOutputDirectory { get; }
 
     internal string SessionDirectory { get; private set; }
 
@@ -87,6 +91,7 @@ internal sealed class WorkspaceHost : IDisposable
             workspaceBuild.ProjectPath,
             workspaceBuild.StartupProjectPath,
             workspaceBuild.OutputDirectory,
+            workspaceBuild.StartupOutputDirectory,
             workspaceBuild.SessionDirectory);
     }
 
@@ -178,13 +183,25 @@ internal sealed class WorkspaceHost : IDisposable
         }
     }
 
+    private IEnumerable<string> EnumerateOutputDirectoriesToScan()
+    {
+        yield return OutputDirectory;
+
+        if (!string.IsNullOrEmpty(StartupOutputDirectory)
+            && !string.Equals(StartupOutputDirectory, OutputDirectory, StringComparison.OrdinalIgnoreCase))
+            yield return StartupOutputDirectory;
+    }
+
     private IEnumerable<string> EnumerateDiscoveryAssemblyPaths()
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        if (Directory.Exists(OutputDirectory))
+        foreach (var scanDirectory in EnumerateOutputDirectoriesToScan())
         {
-            foreach (var dllPath in Directory.EnumerateFiles(OutputDirectory, "*.dll", SearchOption.TopDirectoryOnly))
+            if (!Directory.Exists(scanDirectory))
+                continue;
+
+            foreach (var dllPath in Directory.EnumerateFiles(scanDirectory, "*.dll", SearchOption.TopDirectoryOnly))
             {
                 if (!WorkspaceAssemblyFilter.ShouldScanAssembly(dllPath))
                     continue;

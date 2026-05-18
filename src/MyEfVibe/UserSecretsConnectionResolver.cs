@@ -60,13 +60,24 @@ internal static class UserSecretsConnectionResolver
     {
         connectionString = string.Empty;
 
-        using var document = JsonDocument.Parse(File.ReadAllText(secretsPath));
+        if (!ConfigurationJson.TryParseFile(secretsPath, out var document) || document is null)
+            return false;
+
+        using (document)
+        {
+            return TryReadConnectionStringFromRoot(document.RootElement, out connectionString);
+        }
+    }
+
+    private static bool TryReadConnectionStringFromRoot(JsonElement root, out string connectionString)
+    {
+        connectionString = string.Empty;
 
         foreach (var preferredName in ConnectionStringKeys.PreferredNames)
         {
             var flatKey = ConnectionStringKeys.FlatKey(preferredName);
 
-            if (document.RootElement.TryGetProperty(flatKey, out var named)
+            if (root.TryGetProperty(flatKey, out var named)
                 && named.GetString() is { Length: > 0 } preferred)
             {
                 connectionString = preferred;
@@ -75,7 +86,7 @@ internal static class UserSecretsConnectionResolver
             }
         }
 
-        foreach (var entry in document.RootElement.EnumerateObject())
+        foreach (var entry in root.EnumerateObject())
         {
             if (!entry.Name.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase))
                 continue;

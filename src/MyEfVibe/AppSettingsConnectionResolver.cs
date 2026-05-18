@@ -84,9 +84,23 @@ internal static class AppSettingsConnectionResolver
     {
         connectionString = string.Empty;
 
-        using var document = JsonDocument.Parse(File.ReadAllText(settingsPath));
+        if (!ConfigurationJson.TryParseFile(settingsPath, out var document) || document is null)
+            return false;
 
-        if (!document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings))
+        using (document)
+        {
+            if (!document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings))
+                return false;
+
+            return TryReadConnectionStringsSection(connectionStrings, out connectionString);
+        }
+    }
+
+    private static bool TryReadConnectionStringsSection(JsonElement connectionStrings, out string connectionString)
+    {
+        connectionString = string.Empty;
+
+        if (connectionStrings.ValueKind != JsonValueKind.Object)
             return false;
 
         foreach (var preferredName in ConnectionStringKeys.PreferredNames)

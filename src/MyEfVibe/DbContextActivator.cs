@@ -34,7 +34,10 @@ internal static class DbContextActivator
     {
         var selectedDbContextType = ResolveContextType(host, contextFullName, allowInteractiveSelection);
 
-        if (TryCreateUsingDesignTimeFactory(selectedDbContextType, host, out var designTimeInstance))
+        List<string>? designTimeFactoryErrors = null;
+
+        if (TryCreateUsingDesignTimeFactory(selectedDbContextType, host, out var designTimeInstance,
+                ref designTimeFactoryErrors))
             return designTimeInstance;
 
         if (TryCreateUsingParameterlessConstructor(selectedDbContextType, out var parameterlessInstance))
@@ -57,18 +60,26 @@ internal static class DbContextActivator
                                                              out var optionsInstance))
             return optionsInstance;
 
-        throw new InvalidOperationException(
+        var failureMessage =
             "Unable to construct the DbContext automatically for this project."
             + $"{Environment.NewLine}"
             + "Typical fixes:"
             + $"{Environment.NewLine}"
-            + " - Add an `IDesignTimeDbContextFactory<TContext>` implementation (recommended for tooling)."
+            + " - Add an `IDesignTimeDbContextFactory<TContext>` in the startup project (`-s`) — efvibe builds and scans that output."
             + $"{Environment.NewLine}"
             + " - Add a public parameterless constructor on the DbContext."
             + $"{Environment.NewLine}"
             + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite) to build `DbContextOptions<TContext>`."
             + $"{Environment.NewLine}"
-            + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.");
+            + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.";
+
+        if (designTimeFactoryErrors is { Count: > 0 })
+            failureMessage +=
+                $"{Environment.NewLine}{Environment.NewLine}Design-time factory attempts:"
+                + $"{Environment.NewLine}"
+                + string.Join(Environment.NewLine, designTimeFactoryErrors.Select(static line => $" - {line}"));
+
+        throw new InvalidOperationException(failureMessage);
     }
 
     private static Type SelectDbContextType(
@@ -282,62 +293,223 @@ internal static class DbContextActivator
         }
     }
 
-    private static bool TryCreateUsingDesignTimeFactory(Type dbContextConcreteType, WorkspaceHost host,
-        out object instance)
+    private static bool TryCreateUsingDesignTimeFactory(
+        Type dbContextConcreteType,
+        WorkspaceHost host,
+        out object instance,
+        ref List<string>? errors)
     {
+        instance = null!;
+
+        var seenFactoryTypes = new HashSet<string>(StringComparer.Ordinal);
+
         foreach (var assembly in host.EnumerateDiscoveryAssemblies())
-        foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
+        foreach (var candidate in EnumerateFactoryCandidateTypes(assembly))
         {
-            if (exported.IsAbstract || !exported.IsClass)
+            var factoryKey = candidate.AssemblyQualifiedName ?? candidate.FullName ?? candidate.Name;
+
+            if (!seenFactoryTypes.Add(factoryKey))
                 continue;
 
-            if (!exported.GetInterfaces().Any(iface =>
-                    IsDesignTimeFactoryInterface(iface, dbContextConcreteType)))
+            if (!IsDesignTimeDbContextFactory(candidate, dbContextConcreteType))
                 continue;
 
-            var factoryObject = Activator.CreateInstance(exported);
-
-            if (factoryObject is null)
+            if (!TryCreateFactoryInstance(candidate, out var factoryObject))
+            {
+                errors ??= [];
+                errors.Add($"{candidate.FullName}: could not create factory instance (needs a public parameterless constructor).");
                 continue;
+            }
 
-            var createMethod =
-                exported.GetMethods(BindingFlags.Instance | BindingFlags.Public).SingleOrDefault(methodDescriptor =>
-                    string.Equals(methodDescriptor.Name, "CreateDbContext", StringComparison.Ordinal)
-
-
-                    &&
-                    methodDescriptor.GetParameters().Length == 0);
-
-            if (createMethod is null || !dbContextConcreteType.IsAssignableFrom(createMethod.ReturnType))
+            if (!TryInvokeCreateDbContext(factoryObject, candidate, dbContextConcreteType, out var created,
+                    out var invokeError))
+            {
+                errors ??= [];
+                errors.Add($"{candidate.FullName}: {invokeError}");
                 continue;
-
-            var created = createMethod.Invoke(factoryObject, Array.Empty<object?>());
-
-            if (created is null)
-                continue;
+            }
 
             instance = created;
-
             return true;
         }
 
-        instance = null!;
+        return false;
+    }
+
+    private static IEnumerable<Type> EnumerateFactoryCandidateTypes(Assembly assembly)
+    {
+        var candidates = new List<Type>();
+
+        foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
+            candidates.Add(exported);
+
+        try
+        {
+            candidates.AddRange(assembly.GetTypes());
+        }
+        catch (ReflectionTypeLoadException loaderFailure)
+        {
+            foreach (var candidate in loaderFailure.Types)
+            {
+                if (candidate is not null)
+                    candidates.Add(candidate);
+            }
+        }
+
+        return candidates;
+    }
+
+    private static bool IsDesignTimeDbContextFactory(Type candidate, Type dbContextConcreteType)
+    {
+        if (!candidate.IsClass || candidate.IsAbstract)
+            return false;
+
+        if (candidate.GetInterfaces().Any(iface => IsDesignTimeFactoryInterface(iface, dbContextConcreteType)))
+            return true;
+
+        return HasCreateDbContextMethod(candidate, dbContextConcreteType);
+    }
+
+    private static bool HasCreateDbContextMethod(Type factoryType, Type dbContextConcreteType)
+    {
+        foreach (var method in factoryType.GetMethods(BindingFlags.Instance | BindingFlags.Public
+                                                         | BindingFlags.NonPublic))
+        {
+            if (!string.Equals(method.Name, "CreateDbContext", StringComparison.Ordinal))
+                continue;
+
+            if (!dbContextConcreteType.IsAssignableFrom(method.ReturnType))
+                continue;
+
+            var parameters = method.GetParameters();
+
+            if (parameters.Length == 0)
+                return true;
+
+            if (parameters.Length == 1 && parameters[0].ParameterType == typeof(string[]))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryCreateFactoryInstance(Type factoryType, out object factoryObject)
+    {
+        factoryObject = null!;
+
+        var parameterlessCtor = factoryType.GetConstructor(
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            Type.EmptyTypes,
+            modifiers: null);
+
+        if (parameterlessCtor is not null)
+        {
+            factoryObject = parameterlessCtor.Invoke(null)!;
+            return true;
+        }
+
+        try
+        {
+            factoryObject = Activator.CreateInstance(factoryType)!;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryInvokeCreateDbContext(
+        object factoryObject,
+        Type factoryType,
+        Type dbContextConcreteType,
+        out object created,
+        out string error)
+    {
+        created = null!;
+        error = string.Empty;
+
+        var createMethods = factoryType
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Where(method =>
+                string.Equals(method.Name, "CreateDbContext", StringComparison.Ordinal)
+                && dbContextConcreteType.IsAssignableFrom(method.ReturnType))
+            .ToArray();
+
+        var orderedMethods = createMethods
+            .OrderByDescending(static method => method.GetParameters().Length)
+            .ToArray();
+
+        Exception? lastFailure = null;
+
+        foreach (var createMethod in orderedMethods)
+        {
+            var parameters = createMethod.GetParameters();
+
+            object?[]? invokeArguments = parameters switch
+            {
+                [] => Array.Empty<object?>(),
+                [{ ParameterType: var parameterType }] when parameterType == typeof(string[])
+                    => new object?[] { Array.Empty<string>() },
+                _ => null,
+            };
+
+            if (invokeArguments is null)
+                continue;
+
+            try
+            {
+                var result = createMethod.Invoke(factoryObject, invokeArguments);
+
+                if (result is null)
+                {
+                    error = "`CreateDbContext` returned null.";
+                    return false;
+                }
+
+                created = result;
+                return true;
+            }
+            catch (TargetInvocationException invocationFailure)
+            {
+                lastFailure = invocationFailure.InnerException ?? invocationFailure;
+            }
+            catch (Exception failure)
+            {
+                lastFailure = failure;
+            }
+        }
+
+        if (createMethods.Length == 0)
+        {
+            error = "no `CreateDbContext` method found.";
+            return false;
+        }
+
+        error = lastFailure?.Message ?? "CreateDbContext failed.";
+        if (lastFailure is not null)
+            error += $"{Environment.NewLine}{lastFailure}";
 
         return false;
     }
 
     private static bool IsDesignTimeFactoryInterface(Type iface, Type dbContextConcreteType)
-        =>
-            iface is { IsGenericType: true, Namespace: not null }
+    {
+        if (!iface.IsGenericType || iface.GenericTypeArguments.Length != 1)
+            return false;
 
+        if (iface.GenericTypeArguments[0] != dbContextConcreteType)
+            return false;
 
-            && iface.GenericTypeArguments.Length == 1
+        var genericDefinition = iface.IsGenericTypeDefinition
+            ? iface
+            : iface.GetGenericTypeDefinition();
 
-            && iface.GenericTypeArguments[0] == dbContextConcreteType
-
-            && iface.Namespace == "Microsoft.EntityFrameworkCore.Design"
-
-            && iface.Name.StartsWith("IDesignTimeDbContextFactory", StringComparison.Ordinal);
+        return genericDefinition.Name.StartsWith("IDesignTimeDbContextFactory", StringComparison.Ordinal)
+               && (genericDefinition.Namespace is null
+                   || genericDefinition.Namespace.Contains("EntityFrameworkCore", StringComparison.Ordinal));
+    }
 
     private static bool TryCreateUsingParameterlessConstructor(Type dbContextConcreteType, out object instance)
     {
@@ -406,11 +578,14 @@ internal static class DbContextActivator
         if (compiledOptionsConcreteInstance is null)
             return false;
 
+        var optionsInstanceType = compiledOptionsConcreteInstance.GetType();
+
         var matchingCtor = dbContextConcreteType
             .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .FirstOrDefault(ctorCandidate =>
                 ctorCandidate.GetParameters() is [{ ParameterType: var optionsParameter }]
-                && optionsParameter.IsAssignableFrom(compiledOptionsConcreteInstance.GetType()));
+                && (optionsParameter.IsAssignableFrom(optionsInstanceType)
+                    || optionsInstanceType.IsAssignableTo(optionsParameter)));
 
         if (matchingCtor is null)
             return false;

@@ -23,6 +23,12 @@ internal static class WorkspaceBuilder
     {
         RunDotnetBuild(projectFile.FullName);
 
+        if (!string.Equals(
+                projectFile.FullName,
+                startupProject.FullName,
+                StringComparison.OrdinalIgnoreCase))
+            RunDotnetBuild(startupProject.FullName);
+
         return WorkspaceBuildResult.RequirePrimaryAssembly(sessionDirectory, projectFile, startupProject);
     }
 
