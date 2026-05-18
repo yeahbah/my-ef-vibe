@@ -6,8 +6,10 @@
 
 | Approach | What you get |
 |----------|----------------|
-| **`:scan lite`** | Roslyn walk of EF project + referenced projects; file/line, rule, message, code preview, and **Fix** recommendations; saved to `myefvibe-scan-lite.json` under `-w`; review queue (`:next`, `:prev`, `:repeat`, `:end`) |
-| **`:scan deep`** | Lite findings plus translated SQL where the live `db` context can evaluate the expression; extra `query-site` entries for sites with SQL but no warning; saved to `myefvibe-scan-deep.json` |
+| **`:scan lite`** | Roslyn walk of EF project + referenced projects; file/line, rule, message, code preview, and **Fix** recommendations; review queue with keyboard shortcuts |
+| **`:scan deep`** | Lite findings plus translated SQL where the live `db` context can evaluate the expression; extra `query-site` entries when SQL translates but no heuristic fires |
+
+Session artifacts live under `~/.efvibe/<DbContextName>/` (or `%APPDATA%\efvibe\<DbContextName>\`): `myefvibe-scan-lite.json`, `myefvibe-scan-deep.json`, `myefvibe-scan-dismissals.json`, `myefvibe-scan-notes.json`.
 | **REPL + `:warnings`** | Same heuristics on the snippet you just ran |
 | **Translated / executed SQL** | Real SQL for that query against your live DB |
 | **`:plan`** | Execution plan for the last translated query |
@@ -39,8 +41,19 @@ Before calling `ToQueryString()`, efvibe normalizes each call site:
 - Parameters, locals, and DI-only state from the original method are not available in the REPL harness (e.g. `Where(x => x.Id == id)` when `id` is a method argument).
 - Raw SQL and client-evaluated chains may not produce `IQueryable` probes.
 
+## Scan review shortcuts (empty prompt)
+
+| Input | Action |
+|-------|--------|
+| **→** / `:next` | Next finding |
+| **←** / `:prev` | Previous finding |
+| **Del** / `:dismiss` | Dismiss (skip on future scans) |
+| `:note` … | Save a note (shown in yellow on next scan) |
+| `:repeat` | Restart queue |
+| `:end` | Exit review |
+
 ## Practical recommendation
 
-- **Repo-wide smell pass:** `:scan lite`, then step the queue and apply **Fix** hints.
+- **Repo-wide smell pass:** `:scan lite`, then step the queue and apply **Fix** hints; dismiss noise with **Del** or `:dismiss`.
 - **SQL shape review:** `:scan deep` on the same project when `db` is connected.
 - **What actually runs slow:** REPL on hot paths (`:plan`, `:benchmark`) plus EF command logging in dev/staging.

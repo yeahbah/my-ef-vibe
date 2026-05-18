@@ -26,6 +26,9 @@ internal sealed class WorkspaceHost : IDisposable
         SessionDirectory = sessionDirectory;
     }
 
+    internal void SetSessionDirectory(string sessionDirectory) =>
+        SessionDirectory = SessionPaths.EnsureSessionDirectory(sessionDirectory);
+
     internal InteractiveAssemblyLoader AssemblyLoader { get; }
 
     internal Assembly PrimaryAssembly { get; }
@@ -36,7 +39,7 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal string OutputDirectory { get; }
 
-    internal string SessionDirectory { get; }
+    internal string SessionDirectory { get; private set; }
 
     internal static WorkspaceHost Load(WorkspaceBuildResult workspaceBuild)
     {

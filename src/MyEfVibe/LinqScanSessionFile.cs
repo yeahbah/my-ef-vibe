@@ -87,7 +87,8 @@ internal sealed record LinqScanFindingDto(
     string Message,
     string? Recommendation = null,
     string? TranslatedSql = null,
-    string? SqlTranslationNote = null)
+    string? SqlTranslationNote = null,
+    string? SavedNote = null)
 {
     internal static LinqScanFindingDto From(LinqScanFinding finding) =>
         new(
@@ -98,7 +99,8 @@ internal sealed record LinqScanFindingDto(
             finding.Message,
             finding.ResolvedRecommendation,
             finding.TranslatedSql,
-            finding.SqlTranslationNote);
+            finding.SqlTranslationNote,
+            finding.SavedNote);
 
     internal LinqScanFinding ToFinding() =>
         new(
@@ -109,5 +111,6 @@ internal sealed record LinqScanFindingDto(
             Message,
             Recommendation,
             TranslatedSql,
-            SqlTranslationNote);
+            SqlTranslationNote,
+            SavedNote);
 }

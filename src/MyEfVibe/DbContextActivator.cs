@@ -6,11 +6,9 @@ namespace MyEfVibe;
 
 internal static class DbContextActivator
 {
-    internal static object ResolveInstance(
+    internal static Type ResolveContextType(
         WorkspaceHost host,
         string? contextFullName,
-        string? connectionString,
-        MyEfVibeProvider? provider,
         bool allowInteractiveSelection = true)
     {
         var discoveredDbContextTypes =
@@ -21,10 +19,20 @@ internal static class DbContextActivator
         if (discoveredDbContextTypes.Length == 0)
             throw new InvalidOperationException(BuildNoDbContextDiscoveredMessage(host, contextFullName));
 
-        var selectedDbContextType = SelectDbContextType(
+        return SelectDbContextType(
             discoveredDbContextTypes,
             contextFullName,
             allowInteractiveSelection);
+    }
+
+    internal static object ResolveInstance(
+        WorkspaceHost host,
+        string? contextFullName,
+        string? connectionString,
+        MyEfVibeProvider? provider,
+        bool allowInteractiveSelection = true)
+    {
+        var selectedDbContextType = ResolveContextType(host, contextFullName, allowInteractiveSelection);
 
         if (TryCreateUsingDesignTimeFactory(selectedDbContextType, host, out var designTimeInstance))
             return designTimeInstance;

@@ -90,6 +90,33 @@ internal sealed class ReplCommandHandler
                 _scanReview.End();
                 return true;
 
+            case "dismiss":
+                if (!_scanReview.IsActive)
+                {
+                    CliUi.WriteWarning("No scan review in progress.");
+                    return true;
+                }
+
+                var dismissNote = parts.Length > 1 ? string.Join(' ', parts.Skip(1)) : null;
+                _scanReview.TryDismiss(dismissNote);
+                return true;
+
+            case "note":
+                if (!_scanReview.IsActive)
+                {
+                    CliUi.WriteWarning("No scan review in progress.");
+                    return true;
+                }
+
+                if (parts.Length < 2)
+                {
+                    CliUi.WriteWarning("Usage: :note <text>");
+                    return true;
+                }
+
+                _scanReview.TrySetNote(string.Join(' ', parts.Skip(1)));
+                return true;
+
             case "plan":
                 await QueryPlanRunner.WritePlanAsync(
                     _dbContext,
@@ -169,13 +196,24 @@ internal sealed class ReplCommandHandler
             "Scanning project sources for LINQ patterns…",
             () => LinqLiteScanner.Scan(_host.ProjectPath));
 
-        if (result.Findings.Count == 0)
+        var (filteredFindings, dismissedSkipped) = LinqScanDismissalStore.FilterFindings(
+            result.Findings,
+            _host.SessionDirectory);
+
+        var findingsWithNotes = LinqScanNoteStore.ApplyNotes(filteredFindings, _host.SessionDirectory);
+
+        var filteredResult = new LinqLiteScanResult(
+            result.FilesScanned,
+            result.ProjectsScanned,
+            findingsWithNotes);
+
+        if (filteredResult.Findings.Count == 0)
         {
-            LinqScanPresenter.WriteLiteSummary(result, displayRoot, string.Empty);
+            LinqScanPresenter.WriteLiteSummary(filteredResult, displayRoot, string.Empty, dismissedSkipped);
             return;
         }
 
-        _scanReview.Begin(result, _host.SessionDirectory, displayRoot);
+        _scanReview.Begin(filteredResult, _host.SessionDirectory, displayRoot, dismissedSkippedCount: dismissedSkipped);
     }
 
     private async Task HandleScanDeepAsync(string displayRoot, CancellationToken cancellationToken)
@@ -210,13 +248,30 @@ internal sealed class ReplCommandHandler
         if (result is null)
             return;
 
-        if (result.Findings.Count == 0)
+        var (filteredFindings, dismissedSkipped) = LinqScanDismissalStore.FilterFindings(
+            result.Findings,
+            _host.SessionDirectory);
+
+        var findingsWithNotes = LinqScanNoteStore.ApplyNotes(filteredFindings, _host.SessionDirectory);
+
+        var filteredResult = new LinqLiteScanResult(
+            result.FilesScanned,
+            result.ProjectsScanned,
+            findingsWithNotes);
+
+        if (filteredResult.Findings.Count == 0)
         {
-            LinqScanPresenter.WriteDeepSummary(result, displayRoot, string.Empty, stats);
+            LinqScanPresenter.WriteDeepSummary(filteredResult, displayRoot, string.Empty, stats, dismissedSkipped);
             return;
         }
 
-        _scanReview.Begin(result, _host.SessionDirectory, displayRoot, LinqScanMode.Deep, stats);
+        _scanReview.Begin(
+            filteredResult,
+            _host.SessionDirectory,
+            displayRoot,
+            LinqScanMode.Deep,
+            stats,
+            dismissedSkipped);
     }
 
     private void HandleCompare(string[] parts)

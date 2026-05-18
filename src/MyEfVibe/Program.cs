@@ -10,10 +10,11 @@ internal static class Program
     {
         CliUi.Configure();
 
-        var workspaceOption = new Option<DirectoryInfo>(
+        var workspaceOption = new Option<DirectoryInfo?>(
             aliases: new[] { "-w", "--workspace" },
-            description: "Session directory for exports and other artifacts (created if missing).")
-        { IsRequired = true };
+            description:
+                "Session directory for exports and other artifacts (created if missing). "
+                + "Default: ~/.efvibe on macOS/Linux, %APPDATA%/efvibe on Windows.");
 
         var projectOption = new Option<FileInfo?>(
             aliases: new[] { "-p", "--project" },
@@ -77,8 +78,11 @@ internal static class Program
             return 1;
         }
 
+        var workspace = parseResult.GetValueForOption(workspaceOption)
+            ?? new DirectoryInfo(SessionPaths.GetDefaultWorkspaceDirectory());
+
         return await InvokeAsync(
-            parseResult.GetValueForOption(workspaceOption)!,
+            workspace,
             parseResult.GetValueForOption(projectOption),
             parseResult.GetValueForOption(startupProjectOption),
             parseResult.GetValueForOption(contextOption),
@@ -112,9 +116,9 @@ internal static class Program
 
         var oneShotExpression = ResolveOneShotExpression(expressionOptionValue, expressionArgumentTokens);
 
-        var sessionDirectory = SessionPaths.EnsureSessionDirectory(workspace.FullName);
+        var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
         var searchDirectory = ProjectPathResolver.ResolveSearchDirectory(
-            sessionDirectory,
+            workspaceRoot,
             projectPath?.FullName,
             startupProjectPath?.FullName);
 
@@ -147,17 +151,19 @@ internal static class Program
         var projectLabel = Path.GetRelativePath(searchDirectory, resolvedProject.FullName);
         var startupLabel = Path.GetRelativePath(searchDirectory, resolvedStartup.FullName);
 
-        AnsiConsole.MarkupLine($"[dim]Session directory:[/] [cyan]{Markup.Escape(sessionDirectory)}[/]");
+        AnsiConsole.MarkupLine($"[dim]Workspace root:[/] [cyan]{Markup.Escape(workspaceRoot)}[/]");
         AnsiConsole.MarkupLine($"[dim]EF project:[/] [cyan]{Markup.Escape(projectLabel)}[/]");
 
         if (!string.Equals(resolvedStartup.FullName, resolvedProject.FullName, StringComparison.OrdinalIgnoreCase))
             AnsiConsole.MarkupLine($"[dim]Startup project (config):[/] [cyan]{Markup.Escape(startupLabel)}[/]");
 
+        var pendingSessionDirectory = SessionPaths.EnsurePendingSessionDirectory(workspaceRoot);
+
         try
         {
             workspaceBuild = CliUi.RunWithStatus(
                 "Building EF project…",
-                () => WorkspaceBuilder.BuildResolvedProject(sessionDirectory, resolvedProject, resolvedStartup));
+                () => WorkspaceBuilder.BuildResolvedProject(pendingSessionDirectory, resolvedProject, resolvedStartup));
         }
         catch (WorkspaceException workspaceFailure)
         {
@@ -168,6 +174,27 @@ internal static class Program
         AnsiConsole.MarkupLine($"[green]✓[/] Built [cyan]{Markup.Escape(projectLabel)}[/]");
 
         using var host = WorkspaceHost.Load(workspaceBuild);
+
+        Type dbContextType;
+
+        try
+        {
+            dbContextType = DbContextActivator.ResolveContextType(
+                host,
+                contextFullName,
+                allowInteractiveSelection: string.IsNullOrWhiteSpace(oneShotExpression));
+        }
+        catch (InvalidOperationException resolutionFailure)
+        {
+            CliUi.WriteErrorPanel("DbContext resolution failed", resolutionFailure.Message);
+            return 14;
+        }
+
+        var sessionDirectory = SessionPaths.EnsureDbContextSessionDirectory(workspaceRoot, dbContextType.Name);
+        host.SetSessionDirectory(sessionDirectory);
+
+        AnsiConsole.MarkupLine($"[dim]DbContext:[/] [cyan]{Markup.Escape(dbContextType.Name)}[/]");
+        AnsiConsole.MarkupLine($"[dim]Session directory:[/] [cyan]{Markup.Escape(sessionDirectory)}[/]");
 
         object dbContextInstance;
 

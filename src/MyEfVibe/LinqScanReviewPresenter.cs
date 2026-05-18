@@ -18,6 +18,10 @@ internal static class LinqScanReviewPresenter
         body.AddRow("[grey]Line[/]", $"[white]{finding.Line}[/]");
         body.AddRow("[grey]Rule[/]", $"[dim]{Markup.Escape(finding.RuleId)}[/]");
         body.AddRow("[grey]Message[/]", Markup.Escape(finding.Message));
+
+        if (!string.IsNullOrWhiteSpace(finding.SavedNote))
+            body.AddRow("[grey]Note[/]", $"[bold yellow]{Markup.Escape(finding.SavedNote)}[/]");
+
         body.AddRow("[grey]Fix[/]", Markup.Escape(finding.ResolvedRecommendation));
         body.AddRow("[grey]Code[/]", $"[dim]{Markup.Escape(finding.Code)}[/]");
 
@@ -45,6 +49,8 @@ internal static class LinqScanReviewPresenter
             $"[grey]Saved to[/] [cyan]{Markup.Escape(savedPath)}[/]");
         AnsiConsole.MarkupLine(
             "[grey]:next[/] or [grey]→[/] next · [grey]:prev[/] or [grey]←[/] previous · "
+            + "[grey]:dismiss[/] or [grey]Del[/] skip in future scans · "
+            + "[grey]:note[/] save note · "
             + "[grey]:repeat[/] restart · [grey]:end[/] exit review");
         AnsiConsole.WriteLine();
     }

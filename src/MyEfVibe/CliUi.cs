@@ -120,6 +120,8 @@ internal static class CliUi
         table.AddRow("[cyan]:scan lite[/]", "Static LINQ performance scan of EF project sources");
         table.AddRow("[cyan]:scan deep[/]", "Lite scan plus ToQueryString SQL per call site (live db)");
         table.AddRow("[cyan]:next[/] · [cyan]:prev[/]", "Step through scan findings (also → / ← on empty prompt)");
+        table.AddRow("[cyan]:dismiss[/] [[note]]", "Skip finding in future scans; Del on empty prompt during scan review");
+        table.AddRow("[cyan]:note[/] text…", "Save a required note on the current finding (shown on next scan)");
         table.AddRow("[cyan]:repeat[/] · [cyan]:end[/]", "Restart scan review queue · exit scan review");
         table.AddRow("[cyan]:plan[/]", "EXPLAIN last translated SQL");
         table.AddRow("[cyan]:compare set[/]", "Save baseline · [cyan]:compare[/] diff last run");

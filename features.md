@@ -6,7 +6,7 @@ Licensed under [Apache 2.0](LICENSE).
 
 ## Core workflow
 
-1. Choose a **session directory** (`-w`) for exports, scan results (`myefvibe-scan-lite.json`), and other session artifacts.
+1. Use the default workspace root (`~/.efvibe` or `%APPDATA%\efvibe`) or pass **`-w`**. Session files live in a **subfolder named after the DbContext** (e.g. `~/.efvibe/AdventureWorksDbContext/`).
 2. MyEfVibe resolves the **EF project** to build (`-p`, auto-select, or prompt) and the **startup project** for configuration (`-s` / `--startup-project`, auto-inferred from project references, or same as EF project).
 3. It runs `dotnet build` on the EF project and loads assemblies from the output folder and `.deps.json` (including NuGet package paths and RID-specific runtimes such as `runtimes/unix/...` on macOS).
 4. It locates a concrete `DbContext` type and constructs an instance when possible.
@@ -58,7 +58,7 @@ db.JsonBlobDocuments
 
 | Option | Description |
 |--------|-------------|
-| `-w`, `--workspace` | Session directory for `:export` output and artifacts (required) |
+| `-w`, `--workspace` | Workspace root; per-DbContext session subfolder; default `~/.efvibe` or `%APPDATA%\efvibe` |
 | `-p`, `--project` | EF Core `.csproj` to build (DbContext assembly) |
 | `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--sql` or `:sql`. |
 | `-c`, `--context` | Fully qualified `DbContext` type name |
@@ -142,15 +142,16 @@ Re-show with `:warnings`.
 | `:describe <entity>`, `:desc` | Entity property sheet (see below) |
 | `:scan lite` | Static Roslyn scan of EF project sources for slow-query patterns (see below) |
 | `:scan deep` | Lite scan plus `ToQueryString()` SQL per call site using live `db` |
-| `:next`, `:prev` | Step through `:scan lite` review queue (also **→** / **←** on empty prompt) |
-| `:repeat`, `:end` | Restart scan review at first finding · exit scan review |
+| `:next`, `:prev` | Step through scan review (also **→** / **←** on empty prompt) |
+| `:dismiss`, `:note` | Skip finding in future scans · save a note (**Del** = dismiss on empty prompt) |
+| `:repeat`, `:end` | Restart scan review · exit scan review |
 | `:plan` | Execution plan for last translated SQL — `EXPLAIN` (PostgreSQL), `EXPLAIN QUERY PLAN` (SQLite), `SET SHOWPLAN_ALL` (SQL Server, separate batches) |
 | `:compare set` | Set baseline for comparison |
 | `:compare` | Diff baseline vs last run (timings, rows, SQL) |
 | `:compare clear` | Clear comparison baseline |
 | `:history stats` | Input history with per-snippet timings |
 | `:benchmark N` | Run last snippet `N` times (default 5) |
-| `:export csv\|json [path]` | Export last tabular result to the session directory (`-w`); optional path is relative to `-w` |
+| `:export csv\|json [path]` | Export last tabular result to the DbContext session folder; optional path is relative to that folder |
 | `:warnings` | Warnings for last evaluation |
 | `:chart`, `:viz` | Terminal charts (see below) |
 | `:quit`, `:q`, `:exit` | Exit |
@@ -181,17 +182,21 @@ Re-show with `:warnings`.
 Output:
 
 1. Summary panel — finding count, files scanned, project count (deep also shows SQL translated / failed counts)
-2. Findings saved to `myefvibe-scan-lite.json` or `myefvibe-scan-deep.json` in the session directory (`-w`)
+2. Findings saved to `myefvibe-scan-lite.json` or `myefvibe-scan-deep.json` in the session directory (`-w`); dismissals in `myefvibe-scan-dismissals.json`, notes in `myefvibe-scan-notes.json`
 3. **Review queue** — one finding at a time; step through with:
 
 | Command | Action |
 |---------|--------|
 | `:next` or **→** (empty prompt) | Next finding |
 | `:prev` or **←** (empty prompt) | Previous finding |
+| `:dismiss` or **Del** (empty prompt) | Dismiss current finding — excluded from future scans (optional note with `:dismiss …`) |
+| `:note` text… | Save a required note (shown in **yellow** on next scan) |
 | `:repeat` | Back to the first finding |
 | `:end` | Exit review mode |
 
 At the last finding, `:next` reports that the queue is complete.
+
+Dismissals and notes are keyed by file, line, and rule id (`myefvibe-scan-dismissals.json`, `myefvibe-scan-notes.json` under the DbContext session folder).
 
 Each finding includes a **Fix** section with concrete remediation hints (e.g. `AsSplitQuery()` for cartesian includes, `OrderBy` before `Take`, batching for N+1). Deep findings may also show a **Translated SQL** panel.
 

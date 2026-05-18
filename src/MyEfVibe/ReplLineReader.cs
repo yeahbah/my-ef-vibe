@@ -115,6 +115,9 @@ internal sealed class ReplLineReader
                     break;
 
                 case ConsoleKey.Delete:
+                    if (TryScanReviewDismiss(prompt, buffer, ref cursor))
+                        break;
+
                     if (cursor >= buffer.Length)
                         break;
 
@@ -211,6 +214,17 @@ internal sealed class ReplLineReader
             return false;
 
         _scanReview.TryPrevious();
+        RenderMultiline(ResolvePrompt(prompt), buffer, cursor);
+
+        return true;
+    }
+
+    private bool TryScanReviewDismiss(string prompt, StringBuilder buffer, ref int cursor)
+    {
+        if (_scanReview?.IsActive != true || buffer.Length > 0 || cursor > 0)
+            return false;
+
+        _scanReview.TryDismiss(note: null);
         RenderMultiline(ResolvePrompt(prompt), buffer, cursor);
 
         return true;

@@ -4,10 +4,22 @@ namespace MyEfVibe;
 
 internal static class LinqScanPresenter
 {
-    internal static void WriteLiteSummary(LinqLiteScanResult result, string displayRootDirectory, string savedPath)
+    internal static void WriteLiteSummary(
+        LinqLiteScanResult result,
+        string displayRootDirectory,
+        string savedPath,
+        int dismissedSkippedCount = 0)
     {
         if (result.Findings.Count == 0)
         {
+            if (dismissedSkippedCount > 0)
+            {
+                CliUi.WriteSuccess(
+                    $"Scanned {result.FilesScanned} file(s) across {result.ProjectsScanned} project(s) — "
+                    + $"{dismissedSkippedCount} finding(s) skipped (previously dismissed).");
+                return;
+            }
+
             CliUi.WriteSuccess(
                 $"Scanned {result.FilesScanned} file(s) across {result.ProjectsScanned} project(s) — no LINQ performance warnings.");
             return;
@@ -18,19 +30,36 @@ internal static class LinqScanPresenter
             result,
             savedPath,
             "static heuristics only",
-            "Results saved — review one finding at a time below");
+            "Results saved — review one finding at a time below",
+            dismissedSkippedCount);
     }
 
     internal static void WriteDeepSummary(
         LinqLiteScanResult result,
         string displayRootDirectory,
         string savedPath,
-        LinqDeepScanStats? deepStats)
+        LinqDeepScanStats? deepStats,
+        int dismissedSkippedCount = 0)
     {
         if (result.Findings.Count == 0 && deepStats is { QuerySitesVisited: 0 })
         {
+            if (dismissedSkippedCount > 0)
+            {
+                CliUi.WriteSuccess(
+                    $"Scanned {result.FilesScanned} file(s) across {result.ProjectsScanned} project(s) — "
+                    + $"{dismissedSkippedCount} finding(s) skipped (previously dismissed).");
+                return;
+            }
+
             CliUi.WriteSuccess(
                 $"Scanned {result.FilesScanned} file(s) across {result.ProjectsScanned} project(s) — no query sites found.");
+            return;
+        }
+
+        if (result.Findings.Count == 0 && dismissedSkippedCount > 0)
+        {
+            CliUi.WriteSuccess(
+                $"Scan complete — {dismissedSkippedCount} finding(s) skipped (previously dismissed).");
             return;
         }
 
@@ -46,7 +75,8 @@ internal static class LinqScanPresenter
             result,
             savedPath,
             sqlLine,
-            "Heuristics + ToQueryString per call site — review queue below");
+            "Heuristics + ToQueryString per call site — review queue below",
+            dismissedSkippedCount);
     }
 
     internal static void WriteUsage()
@@ -61,12 +91,17 @@ internal static class LinqScanPresenter
         LinqLiteScanResult result,
         string savedPath,
         string detailLine,
-        string footerLine)
+        string footerLine,
+        int dismissedSkippedCount)
     {
         var fileCount = result.Findings
             .Select(static finding => finding.FilePath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
+
+        var dismissedLine = dismissedSkippedCount > 0
+            ? $"\n[grey]{dismissedSkippedCount} previously dismissed finding(s) excluded[/]"
+            : string.Empty;
 
         AnsiConsole.WriteLine();
 
@@ -75,8 +110,9 @@ internal static class LinqScanPresenter
                 new Markup(
                     $"[bold]{title}[/] — [yellow]{result.Findings.Count}[/] finding(s) in "
                     + $"[cyan]{fileCount}[/] file(s)\n"
-                    + $"[grey]{result.FilesScanned} source file(s) · {result.ProjectsScanned} project(s) · {detailLine}[/]\n"
-                    + $"[grey]{footerLine}[/]"))
+                    + $"[grey]{result.FilesScanned} source file(s) · {result.ProjectsScanned} project(s) · {detailLine}[/]"
+                    + dismissedLine
+                    + $"\n[grey]{footerLine}[/]"))
             {
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(Color.Grey),

@@ -52,12 +52,18 @@ Update [`.config/dotnet-tools.json`](.config/dotnet-tools.json) when releasing a
 Run from your solution root (where `.csproj` files live):
 
 ```bash
-efvibe -w ./myefvibe-session
+efvibe
+```
+
+Session artifacts default to a **per-DbContext folder** under `~/.efvibe/<DbContextName>/` (macOS/Linux) or `%APPDATA%\efvibe\<DbContextName>\` (Windows). Override the root with `-w`:
+
+```bash
+efvibe -w ./myefvibe-session   # → ./myefvibe-session/AdventureWorksDbContext/
 ```
 
 | Flag | Role |
 |------|------|
-| `-w`, `--workspace` | **Session directory** — `:export` CSV/JSON and other artifacts (created if missing) |
+| `-w`, `--workspace` | **Workspace root** — each DbContext gets its own subfolder (optional; default `~/.efvibe` or `%APPDATA%\efvibe`) |
 | `-p`, `--project` | **EF project** to build — the `.csproj` that contains (or references) the `DbContext` |
 | `-s`, `--startup-project` | **Config project** — user secrets and `appsettings` (like `dotnet ef --startup-project`) |
 
@@ -73,7 +79,8 @@ In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). End 
 | `:describe Product` | Entity properties (types, PK/FK, columns) |
 | `:dbinfo` | Provider, connection string, server version |
 | `:tracked` | Change tracker summary |
-| `:scan lite` | Static scan of project LINQ for slow-query patterns; review findings one at a time |
+| `:scan lite` | Static LINQ scan; step through findings in a review queue |
+| `:scan deep` | Lite scan + translated SQL per call site (live `db`) |
 
 One-shot:
 
@@ -134,7 +141,19 @@ DbContext construction (in order):
 
 User secrets use flat keys such as `ConnectionStrings:DefaultConnection` in `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json`.
 
-`:export csv` / `:export json` writes under `-w` by default; optional paths are relative to the session directory.
+`:export csv` / `:export json` writes under the DbContext session folder; optional paths are relative to that directory.
+
+### Session files (per DbContext)
+
+| File | Purpose |
+|------|---------|
+| `myefvibe-scan-lite.json` | Last `:scan lite` results |
+| `myefvibe-scan-deep.json` | Last `:scan deep` results (includes SQL where available) |
+| `myefvibe-scan-dismissals.json` | Dismissed findings (skipped on future scans) |
+| `myefvibe-scan-notes.json` | Saved notes on findings (shown on next scan, highlighted in yellow) |
+| `myefvibe-export-*.csv/json` | `:export` output |
+
+During **scan review**, on an empty prompt: **→** / **←** next/prev, **Del** dismiss, plus `:dismiss`, `:note <text>`, `:repeat`, `:end`.
 
 ## REPL reference
 
@@ -145,8 +164,8 @@ Highlights:
 - **`:describe <entity>`** (`:desc`) — property sheet for an entity (`Product`, `AddressEntity`, DbSet name `Products`, or full type name). Shows CLR types (including arrays such as `byte[]`); adds PK, FK, column name, and max length when EF model metadata is available.
 - **`:dbinfo`** — DbContext type, EF/Core version, provider, connection state, connection string, and server version.
 - **`:plan`** — execution plan for the last translated SQL (provider-specific).
-- **`:scan lite`** — Roslyn scan of EF project sources for LINQ smells; review queue with **Fix** hints (`myefvibe-scan-lite.json` under `-w`).
-- **`:scan deep`** — lite scan plus `ToQueryString()` SQL per call site via live `db` (adapts `if`/terminal calls like `AnyAsync(ct)`); saved to `myefvibe-scan-deep.json`.
+- **`:scan lite`** / **`:scan deep`** — project-wide LINQ scan with a review queue, **Fix** hints, optional **Translated SQL** (deep), `:dismiss`, and `:note`.
+- **`:about`** — tool version, license, and session paths.
 
 ## License
 

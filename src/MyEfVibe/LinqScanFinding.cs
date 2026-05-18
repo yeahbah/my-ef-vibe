@@ -8,12 +8,20 @@ internal sealed record LinqScanFinding(
     string Message,
     string? Recommendation = null,
     string? TranslatedSql = null,
-    string? SqlTranslationNote = null)
+    string? SqlTranslationNote = null,
+    string? SavedNote = null)
 {
     internal string ResolvedRecommendation =>
         string.IsNullOrWhiteSpace(Recommendation)
             ? LinqScanRecommendations.Get(RuleId)
             : Recommendation;
+
+    internal string GetDismissalKey()
+    {
+        var fullPath = Path.GetFullPath(FilePath);
+
+        return $"{fullPath}|{Line}|{RuleId}";
+    }
 }
 
 internal sealed record LinqLiteScanResult(
