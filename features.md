@@ -131,6 +131,7 @@ Re-show with `:warnings`.
 | Command | Description |
 |---------|-------------|
 | `:help`, `:h`, `:?` | Command list and examples |
+| `:about` | Tool version, license, repository, and current session summary |
 | `:clear`, `:cls` | Clear the terminal |
 | `:reset` | Clear script variables (`db` unchanged) |
 | `:sql` | Toggle SQL output |

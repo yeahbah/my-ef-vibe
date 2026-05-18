@@ -108,6 +108,7 @@ internal static class CliUi
             .AddColumn("[grey]Description[/]");
 
         table.AddRow("[cyan]:help[/]", "Show this help");
+        table.AddRow("[cyan]:about[/]", "Tool version, license, and current session info");
         table.AddRow("[cyan]:clear[/]", "Clear the terminal screen");
         table.AddRow("[cyan]:reset[/]", "Clear script variables ([grey]db[/] stays)");
         table.AddRow("[cyan]:sql[/]", "Toggle SQL output");

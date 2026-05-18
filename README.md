@@ -63,7 +63,7 @@ efvibe -w ./myefvibe-session
 
 If `-p` is omitted, projects are discovered under the **current directory** (not `-w`). If `-s` / `--startup-project` is omitted, `efvibe` infers a project that references the EF project and has user secrets or appsettings.
 
-In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). End input with `;` to run. Use `:help` for all commands.
+In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). End input with `;` to run. Use `:help` for all commands, `:about` for version and session info.
 
 **Explore the model**
 

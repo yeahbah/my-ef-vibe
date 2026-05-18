@@ -52,6 +52,10 @@ internal sealed class ReplCommandHandler
                 await DbInfoReporter.WriteAsync(_dbContext, _host, cancellationToken);
                 return true;
 
+            case "about":
+                AboutReporter.Write(_dbContext, _host);
+                return true;
+
             case "describe":
             case "desc":
                 EntityDescriptor.Write(_dbContext, string.Join(' ', parts.Skip(1)));
