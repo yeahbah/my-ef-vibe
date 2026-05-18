@@ -89,12 +89,29 @@ internal static class LinqDeepExpressionAdapter
         return rhs;
     }
 
-    private static string ReplaceContextAliases(string code) =>
+    private static string ReplaceContextAliases(string code)
+    {
+        try
+        {
+            return DbContextAliasSyntaxRewriter.Rewrite(code);
+        }
+        catch (Exception)
+        {
+            return ReplaceContextAliasesFallback(code);
+        }
+    }
+
+    private static string ReplaceContextAliasesFallback(string code) =>
         code
+            .Replace("this.dbContext.", "db.", StringComparison.Ordinal)
             .Replace("this.DbContext.", "db.", StringComparison.Ordinal)
             .Replace("this._dbContext.", "db.", StringComparison.Ordinal)
             .Replace("this._context.", "db.", StringComparison.Ordinal)
+            .Replace("this.context.", "db.", StringComparison.Ordinal)
+            .Replace("dbContext.", "db.", StringComparison.Ordinal)
             .Replace("DbContext.", "db.", StringComparison.Ordinal)
             .Replace("_dbContext.", "db.", StringComparison.Ordinal)
-            .Replace("_context.", "db.", StringComparison.Ordinal);
+            .Replace("_context.", "db.", StringComparison.Ordinal)
+            .Replace("applicationDbContext.", "db.", StringComparison.Ordinal)
+            .Replace("_applicationDbContext.", "db.", StringComparison.Ordinal);
 }

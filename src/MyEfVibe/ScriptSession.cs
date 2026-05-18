@@ -95,7 +95,7 @@ internal sealed class ScriptSession
 
         foreach (var submission in _submissionHistory)
         {
-            foreach (var submissionLine in submission.Split('\n'))
+            foreach (var submissionLine in InputLineUtilities.SplitLines(submission))
             {
                 builder.Append(submissionIndent);
                 builder.AppendLine(submissionLine);

@@ -170,23 +170,16 @@ internal sealed class QueryRepl
     }
 
     private static bool EndsWithSubmitSemicolon(string line) =>
-        line.TrimEnd().EndsWith(';');
+        InputLineUtilities.TrimLineEnd(line).EndsWith(';');
 
     private static string[] SplitInputLines(string input) =>
-        input.Split('\n', StringSplitOptions.None);
+        InputLineUtilities.SplitLines(input);
 
     private static string JoinSnippetLines(IEnumerable<string> lines) =>
-        string.Join(Environment.NewLine, lines.Select(NormalizeInputLine)).Trim();
+        InputLineUtilities.JoinLines(lines);
 
-    private static string NormalizeInputLine(string line)
-    {
-        var trimmed = line.TrimEnd();
-
-        if (trimmed.EndsWith('\\'))
-            trimmed = trimmed[..^1].TrimEnd();
-
-        return trimmed;
-    }
+    private static string NormalizeInputLine(string line) =>
+        InputLineUtilities.TrimLineEnd(line);
 
     private void WriteBanner()
     {

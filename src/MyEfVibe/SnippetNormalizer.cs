@@ -13,7 +13,7 @@ internal static class SnippetNormalizer
         if (string.IsNullOrEmpty(trimmed))
             return trimmed;
 
-        var lines = trimmed.Split('\n', StringSplitOptions.None);
+        var lines = InputLineUtilities.SplitLines(trimmed);
         var lastNonEmptyIndex = IndexOfLastNonEmptyLine(lines);
 
         if (lastNonEmptyIndex < 0)
@@ -26,7 +26,7 @@ internal static class SnippetNormalizer
 
         for (var index = 0; index < lines.Length; index++)
         {
-            var line = lines[index].TrimEnd();
+            var line = InputLineUtilities.TrimLineEnd(lines[index]);
 
             if (string.IsNullOrWhiteSpace(line))
             {
@@ -40,7 +40,7 @@ internal static class SnippetNormalizer
                 : line;
         }
 
-        return string.Join(Environment.NewLine, normalized).Trim();
+        return InputLineUtilities.JoinLines(normalized);
     }
 
     private static int IndexOfLastNonEmptyLine(string[] lines)

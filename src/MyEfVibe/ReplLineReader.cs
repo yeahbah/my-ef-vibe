@@ -49,7 +49,10 @@ internal sealed class ReplLineReader
         if (Console.IsInputRedirected)
         {
             CliUi.WritePrompt(prompt);
-            return Console.ReadLine();
+
+            var line = Console.ReadLine();
+
+            return line is null ? null : InputLineUtilities.NormalizeNewlines(line);
         }
 
         return ReadLineInteractive(prompt);
@@ -85,7 +88,7 @@ internal sealed class ReplLineReader
 
                     Console.WriteLine();
 
-                    return buffer.ToString();
+                    return InputLineUtilities.NormalizeNewlines(buffer.ToString());
 
                 case ConsoleKey.UpArrow:
                     if (_history.TryNavigateUp(out var upEntry))
@@ -185,7 +188,16 @@ internal sealed class ReplLineReader
 
                 default:
                     if (char.IsControl(key.KeyChar))
+                    {
+                        if (key.KeyChar == '\r')
+                        {
+                            buffer.Insert(cursor, '\n');
+                            cursor++;
+                            RenderMultiline(prompt, buffer, cursor);
+                        }
+
                         break;
+                    }
 
                     buffer.Insert(cursor, key.KeyChar);
                     cursor++;
@@ -235,7 +247,7 @@ internal sealed class ReplLineReader
 
     private void ApplyRecalledEntry(string entry, string prompt, StringBuilder buffer, ref int cursor)
     {
-        var lines = entry.Split('\n', StringSplitOptions.None);
+        var lines = InputLineUtilities.SplitLines(entry);
 
         ReplaceBuffer(prompt, buffer, lines[0], ref cursor);
 
@@ -403,7 +415,7 @@ internal sealed class ReplLineReader
     private static void RenderMultiline(string primaryPrompt, StringBuilder buffer, int cursor)
     {
         var text = buffer.ToString();
-        var lines = text.Length == 0 ? new[] { string.Empty } : text.Split('\n');
+        var lines = text.Length == 0 ? new[] { string.Empty } : InputLineUtilities.SplitLines(text);
 
         var lineIndex = 0;
         var column = 0;

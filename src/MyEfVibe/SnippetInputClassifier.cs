@@ -19,13 +19,10 @@ internal static class SnippetInputClassifier
     }
 
     internal static bool IsSubmitOnlyLine(string line)
-        => line.Trim() == ";";
+        => InputLineUtilities.TrimLineEnd(line).Trim() == ";";
 
     private static bool EndsWithContinuationToken(string line)
     {
-        if (line.EndsWith("\\", StringComparison.Ordinal))
-            return true;
-
         if (line.EndsWith("?.", StringComparison.Ordinal))
             return true;
 
