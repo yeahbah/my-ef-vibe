@@ -141,6 +141,7 @@ Re-show with `:warnings`.
 | `:dbinfo` | DbContext type, provider, connection string, server version, and related metadata |
 | `:describe <entity>`, `:desc` | Entity property sheet (see below) |
 | `:scan lite` | Static Roslyn scan of EF project sources for slow-query patterns (see below) |
+| `:scan deep` | Lite scan plus `ToQueryString()` SQL per call site using live `db` |
 | `:next`, `:prev` | Step through `:scan lite` review queue (also **→** / **←** on empty prompt) |
 | `:repeat`, `:end` | Restart scan review at first finding · exit scan review |
 | `:plan` | Execution plan for last translated SQL — `EXPLAIN` (PostgreSQL), `EXPLAIN QUERY PLAN` (SQLite), `SET SHOWPLAN_ALL` (SQL Server, separate batches) |
@@ -166,18 +167,21 @@ Re-show with `:warnings`.
 
 `:benchmark` also shows an iteration timing chart.
 
-### Static LINQ scan (`:scan lite`)
+### Static LINQ scan (`:scan lite`, `:scan deep`)
 
 **`:scan lite`** walks `.cs` files in the built EF project and its referenced projects (test projects skipped). It uses Roslyn syntax analysis and the same heuristics as snippet `:warnings` — no database, no SQL generation.
 
+**`:scan deep`** runs the lite heuristics, then attempts **`ToQueryString()`** for each query call site using the live REPL `db` context (requires a working connection). Source is adapted for the REPL: `DbContext` → `db`, conditions extracted from `if` / `while` / `switch`, and terminal operators removed (including `AnyAsync(ct)`, `ToListAsync(cancellationToken)`, etc.). Expressions that still depend on method parameters, locals, or other runtime-only values may fail translation — the note is shown on the finding.
+
 ```text
 :scan lite
+:scan deep
 ```
 
 Output:
 
-1. Summary panel — finding count, files scanned, project count
-2. Findings saved to `myefvibe-scan-lite.json` in the session directory (`-w`)
+1. Summary panel — finding count, files scanned, project count (deep also shows SQL translated / failed counts)
+2. Findings saved to `myefvibe-scan-lite.json` or `myefvibe-scan-deep.json` in the session directory (`-w`)
 3. **Review queue** — one finding at a time; step through with:
 
 | Command | Action |
@@ -189,11 +193,9 @@ Output:
 
 At the last finding, `:next` reports that the queue is complete.
 
-Each finding includes a **Fix** section with concrete remediation hints (e.g. `AsSplitQuery()` for cartesian includes, `OrderBy` before `Take`, batching for N+1).
+Each finding includes a **Fix** section with concrete remediation hints (e.g. `AsSplitQuery()` for cartesian includes, `OrderBy` before `Take`, batching for N+1). Deep findings may also show a **Translated SQL** panel.
 
-Rules include: client-side `AsEnumerable()`, unbounded materialization, multiple `Include`/`ThenInclude`, `Take` without `OrderBy`, raw SQL, and possible N+1 inside loops.
-
-**`:scan deep`** (future) may resolve expressions and show translated SQL per call site.
+Rules include: client-side `AsEnumerable()`, unbounded materialization, multiple `Include`/`ThenInclude`, `Take` without `OrderBy`, raw SQL, possible N+1 inside loops, and (deep only) `query-site` entries for call sites with SQL but no heuristic warning.
 
 ### Schema and connection (`:tables`, `:describe`, `:dbinfo`)
 

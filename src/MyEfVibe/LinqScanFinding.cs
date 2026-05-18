@@ -6,7 +6,9 @@ internal sealed record LinqScanFinding(
     string Code,
     string RuleId,
     string Message,
-    string? Recommendation = null)
+    string? Recommendation = null,
+    string? TranslatedSql = null,
+    string? SqlTranslationNote = null)
 {
     internal string ResolvedRecommendation =>
         string.IsNullOrWhiteSpace(Recommendation)

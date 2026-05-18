@@ -21,6 +21,9 @@ internal static class LinqScanReviewPresenter
         body.AddRow("[grey]Fix[/]", Markup.Escape(finding.ResolvedRecommendation));
         body.AddRow("[grey]Code[/]", $"[dim]{Markup.Escape(finding.Code)}[/]");
 
+        if (!string.IsNullOrWhiteSpace(finding.SqlTranslationNote) && string.IsNullOrWhiteSpace(finding.TranslatedSql))
+            body.AddRow("[grey]SQL[/]", $"[yellow]{Markup.Escape(finding.SqlTranslationNote)}[/]");
+
         AnsiConsole.Write(
             new Panel(body)
             {
@@ -30,7 +33,10 @@ internal static class LinqScanReviewPresenter
                 Padding = new Padding(1, 0, 1, 0),
             });
 
-        AnsiConsole.WriteLine();
+        if (!string.IsNullOrWhiteSpace(finding.TranslatedSql))
+            CliUi.WriteSqlBlock("Translated SQL", finding.TranslatedSql);
+        else
+            AnsiConsole.WriteLine();
     }
 
     internal static void WriteNavigationHint(string savedPath)

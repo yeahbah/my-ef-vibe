@@ -1,3 +1,5 @@
+using Spectre.Console;
+
 namespace MyEfVibe;
 
 internal sealed class ReplCommandHandler
@@ -62,7 +64,7 @@ internal sealed class ReplCommandHandler
                 return true;
 
             case "scan":
-                HandleScan(parts);
+                await HandleScanAsync(parts, cancellationToken);
                 return true;
 
             case "next":
@@ -134,7 +136,7 @@ internal sealed class ReplCommandHandler
         }
     }
 
-    private void HandleScan(string[] parts)
+    private async Task HandleScanAsync(string[] parts, CancellationToken cancellationToken)
     {
         if (parts.Length < 2)
         {
@@ -143,18 +145,29 @@ internal sealed class ReplCommandHandler
         }
 
         var mode = parts[1].ToLowerInvariant();
+        var displayRoot = Path.GetDirectoryName(_host.ProjectPath)!;
 
-        if (mode != "lite")
+        switch (mode)
         {
-            CliUi.WriteWarning("Unknown scan mode. Usage: :scan lite (`:scan deep` is not implemented yet).");
-            return;
-        }
+            case "lite":
+                HandleScanLite(displayRoot);
+                break;
 
+            case "deep":
+                await HandleScanDeepAsync(displayRoot, cancellationToken);
+                break;
+
+            default:
+                LinqScanPresenter.WriteUsage();
+                break;
+        }
+    }
+
+    private void HandleScanLite(string displayRoot)
+    {
         var result = CliUi.RunWithStatus(
             "Scanning project sources for LINQ patterns…",
             () => LinqLiteScanner.Scan(_host.ProjectPath));
-
-        var displayRoot = Path.GetDirectoryName(_host.ProjectPath)!;
 
         if (result.Findings.Count == 0)
         {
@@ -163,6 +176,47 @@ internal sealed class ReplCommandHandler
         }
 
         _scanReview.Begin(result, _host.SessionDirectory, displayRoot);
+    }
+
+    private async Task HandleScanDeepAsync(string displayRoot, CancellationToken cancellationToken)
+    {
+        LinqLiteScanResult? result = null;
+        LinqDeepScanStats? stats = null;
+
+        await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots2)
+            .SpinnerStyle(Style.Parse("cyan"))
+            .StartAsync(
+                "Scanning project sources and translating SQL…",
+                async context =>
+                {
+                    var progress = new Progress<(int Completed, int Total)>(update =>
+                    {
+                        if (update.Total == 0)
+                            return;
+
+                        context.Status(
+                            $"Translating SQL ({update.Completed}/{update.Total})…");
+                    });
+
+                    (result, stats) = await LinqDeepScanner.ScanAsync(
+                        _host.ProjectPath,
+                        _session,
+                        _host,
+                        progress,
+                        cancellationToken);
+                });
+
+        if (result is null)
+            return;
+
+        if (result.Findings.Count == 0)
+        {
+            LinqScanPresenter.WriteDeepSummary(result, displayRoot, string.Empty, stats);
+            return;
+        }
+
+        _scanReview.Begin(result, _host.SessionDirectory, displayRoot, LinqScanMode.Deep, stats);
     }
 
     private void HandleCompare(string[] parts)

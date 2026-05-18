@@ -35,6 +35,10 @@ internal static class LinqScanRecommendations
                 + "Inside the loop, read from an in-memory dictionary built from that batch — not the database.\n"
                 + "If multiple collection includes are needed, combine with AsSplitQuery() to limit join explosion.",
 
+            "query-site" =>
+                "Compare translated SQL to intent — check filters, joins, and row multiplication.\n"
+                + "Paste the expression in the REPL to run, benchmark, or use :plan on the live query.",
+
             _ =>
                 "Run the query with SQL logging (:sql) or :plan to inspect the generated SQL and row counts.",
         };

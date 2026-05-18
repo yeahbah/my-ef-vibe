@@ -38,13 +38,13 @@ internal static class LinqLiteScanner
     {
         var findings = new List<LinqScanFinding>();
         var filesScanned = 0;
-        var projectPaths = CollectProjectPaths(efProjectPath);
+        var projectPaths = LinqProjectSourceWalker.CollectProjectPaths(efProjectPath);
 
         foreach (var projectPath in projectPaths)
         {
             var projectDirectory = Path.GetDirectoryName(projectPath)!;
 
-            foreach (var sourcePath in EnumerateSourceFiles(projectDirectory))
+            foreach (var sourcePath in LinqProjectSourceWalker.EnumerateSourceFiles(projectDirectory))
             {
                 filesScanned++;
                 findings.AddRange(ScanSourceFile(sourcePath));
@@ -59,42 +59,6 @@ internal static class LinqLiteScanner
                 .ThenBy(static finding => finding.RuleId, StringComparer.Ordinal)
                 .ToArray());
     }
-
-    private static IReadOnlyList<string> CollectProjectPaths(string entryCsprojPath)
-    {
-        var discovered = new List<string>();
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var queue = new Queue<string>();
-        queue.Enqueue(entryCsprojPath);
-
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
-
-            if (!visited.Add(current))
-                continue;
-
-            if (CsprojInspector.IsTestProject(current))
-                continue;
-
-            discovered.Add(current);
-
-            foreach (var referencePath in CsprojInspector.GetProjectReferencePaths(current))
-            {
-                if (visited.Contains(referencePath))
-                    continue;
-
-                queue.Enqueue(referencePath);
-            }
-        }
-
-        return discovered;
-    }
-
-    private static IEnumerable<string> EnumerateSourceFiles(string projectDirectory)
-        =>
-        Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
-            .Where(static path => !IsUnderBuildArtifacts(path));
 
     private static IEnumerable<LinqScanFinding> ScanSourceFile(string absolutePath)
     {
@@ -151,14 +115,10 @@ internal static class LinqLiteScanner
         }
 
         foreach (var loop in root.DescendantNodes().OfType<ForEachStatementSyntax>())
-        {
             AnalyzeLoop(absolutePath, loop, findings, reported);
-        }
 
         foreach (var loop in root.DescendantNodes().OfType<ForStatementSyntax>())
-        {
             AnalyzeLoop(absolutePath, loop, findings, reported);
-        }
 
         return findings;
     }
@@ -207,14 +167,13 @@ internal static class LinqLiteScanner
                || bodyText.Contains("Set<", StringComparison.Ordinal);
     }
 
-    private static string? GetSimpleMethodName(ExpressionSyntax expression)
-        =>
-            expression switch
-            {
-                MemberAccessExpressionSyntax member => member.Name.Identifier.Text,
-                IdentifierNameSyntax identifier => identifier.Identifier.Text,
-                _ => null,
-            };
+    private static string? GetSimpleMethodName(ExpressionSyntax expression) =>
+        expression switch
+        {
+            MemberAccessExpressionSyntax member => member.Name.Identifier.Text,
+            IdentifierNameSyntax identifier => identifier.Identifier.Text,
+            _ => null,
+        };
 
     private static string GetStatementText(SyntaxNode node)
     {
@@ -231,11 +190,4 @@ internal static class LinqLiteScanner
             ? singleLine
             : singleLine[..117] + "...";
     }
-
-    private static bool IsUnderBuildArtifacts(string absolutePath)
-        =>
-        absolutePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            .Any(static segment =>
-                string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
 }

@@ -145,7 +145,8 @@ Highlights:
 - **`:describe <entity>`** (`:desc`) — property sheet for an entity (`Product`, `AddressEntity`, DbSet name `Products`, or full type name). Shows CLR types (including arrays such as `byte[]`); adds PK, FK, column name, and max length when EF model metadata is available.
 - **`:dbinfo`** — DbContext type, EF/Core version, provider, connection state, connection string, and server version.
 - **`:plan`** — execution plan for the last translated SQL (provider-specific).
-- **`:scan lite`** — Roslyn scan of EF project sources (and referenced projects) for LINQ smells; saves `myefvibe-scan-lite.json` under `-w` and walks a review queue (`:next` / `→`, `:prev` / `←`, `:repeat`, `:end`) with per-rule **Fix** recommendations.
+- **`:scan lite`** — Roslyn scan of EF project sources for LINQ smells; review queue with **Fix** hints (`myefvibe-scan-lite.json` under `-w`).
+- **`:scan deep`** — lite scan plus `ToQueryString()` SQL per call site via live `db` (adapts `if`/terminal calls like `AnyAsync(ct)`); saved to `myefvibe-scan-deep.json`.
 
 ## License
 
