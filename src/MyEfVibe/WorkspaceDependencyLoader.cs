@@ -6,6 +6,51 @@ namespace MyEfVibe;
 
 internal static class WorkspaceDependencyLoader
 {
+    internal static void PreloadCorePackages(
+        AssemblyLoadContext loadContext,
+        WorkspaceDepsManifest depsManifest)
+    {
+        PreloadEfReferenceAssemblies(loadContext, depsManifest);
+
+        foreach (var bootstrap in new[]
+                 {
+                     "System.Configuration.ConfigurationManager",
+                     "Microsoft.Data.SqlClient",
+                     "Microsoft.EntityFrameworkCore.Abstractions",
+                     "Microsoft.EntityFrameworkCore",
+                     "Microsoft.EntityFrameworkCore.Relational",
+                     "Microsoft.EntityFrameworkCore.SqlServer",
+                     "Npgsql.EntityFrameworkCore.PostgreSQL",
+                     "Microsoft.EntityFrameworkCore.Sqlite",
+                     "Oracle.EntityFrameworkCore",
+                     "Pomelo.EntityFrameworkCore.MySql",
+                     "MySql.EntityFrameworkCore",
+                 })
+        {
+            if (depsManifest.TryResolve(bootstrap, out var bootstrapPath))
+                TryLoad(loadContext, bootstrapPath);
+        }
+    }
+
+    internal static void PreloadStartupReferenceClosure(
+        AssemblyLoadContext loadContext,
+        WorkspaceDepsManifest depsManifest,
+        string startupAssemblyPath,
+        string entryAssemblyPath)
+    {
+        if (!File.Exists(startupAssemblyPath)
+            || string.Equals(startupAssemblyPath, entryAssemblyPath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var entrySimpleName = Path.GetFileNameWithoutExtension(entryAssemblyPath);
+
+        PreloadAssemblyReferenceClosure(
+            loadContext,
+            depsManifest,
+            startupAssemblyPath,
+            excludedSimpleName: entrySimpleName);
+    }
+
     internal static void Preload(
         AssemblyLoadContext loadContext,
         AssemblyDependencyResolver resolver,
@@ -17,38 +62,15 @@ internal static class WorkspaceDependencyLoader
 
         if (depsManifest is not null)
         {
-            PreloadEfReferenceAssemblies(loadContext, depsManifest);
+            PreloadCorePackages(loadContext, depsManifest);
 
-            if (!string.IsNullOrWhiteSpace(additionalReferenceClosureAssemblyPath)
-                && File.Exists(additionalReferenceClosureAssemblyPath)
-                && !string.Equals(
-                    additionalReferenceClosureAssemblyPath,
-                    entryAssemblyPath,
-                    StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(additionalReferenceClosureAssemblyPath))
             {
-                PreloadAssemblyReferenceClosure(
+                PreloadStartupReferenceClosure(
                     loadContext,
                     depsManifest,
-                    additionalReferenceClosureAssemblyPath);
-            }
-
-            foreach (var bootstrap in new[]
-                     {
-                         "System.Configuration.ConfigurationManager",
-                         "Microsoft.Data.SqlClient",
-                         "Microsoft.EntityFrameworkCore.Abstractions",
-                         "Microsoft.EntityFrameworkCore",
-                         "Microsoft.EntityFrameworkCore.Relational",
-                         "Microsoft.EntityFrameworkCore.SqlServer",
-                         "Npgsql.EntityFrameworkCore.PostgreSQL",
-                         "Microsoft.EntityFrameworkCore.Sqlite",
-                         "Oracle.EntityFrameworkCore",
-                         "Pomelo.EntityFrameworkCore.MySql",
-                         "MySql.EntityFrameworkCore",
-                     })
-            {
-                if (depsManifest.TryResolve(bootstrap, out var bootstrapPath))
-                    TryLoad(loadContext, bootstrapPath);
+                    additionalReferenceClosureAssemblyPath,
+                    entryAssemblyPath);
             }
 
             return;
@@ -165,7 +187,8 @@ internal static class WorkspaceDependencyLoader
         WorkspaceDepsManifest depsManifest,
         string rootAssemblyPath,
         HashSet<string>? sharedVisited = null,
-        HashSet<string>? sharedVisiting = null)
+        HashSet<string>? sharedVisiting = null,
+        string? excludedSimpleName = null)
     {
         var visiting = sharedVisiting ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var visited = sharedVisited ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -174,6 +197,13 @@ internal static class WorkspaceDependencyLoader
 
         void Visit(string assemblyPath)
         {
+            if (!string.IsNullOrEmpty(excludedSimpleName)
+                && string.Equals(
+                    Path.GetFileNameWithoutExtension(assemblyPath),
+                    excludedSimpleName,
+                    StringComparison.OrdinalIgnoreCase))
+                return;
+
             if (visited.Contains(assemblyPath))
                 return;
 
@@ -207,7 +237,7 @@ internal static class WorkspaceDependencyLoader
     {
         try
         {
-            loadContext.LoadFromAssemblyPath(absolutePath);
+            AssemblyResolutionHelpers.LoadFromPath(loadContext, absolutePath);
         }
         catch (BadImageFormatException)
         {

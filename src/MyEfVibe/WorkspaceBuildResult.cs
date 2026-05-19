@@ -71,6 +71,8 @@ internal sealed record WorkspaceBuildResult(
 
     private static bool TryLocateBuiltAssembly(string binRoot, string assemblyName, out string dllPath)
     {
+        var preferredTfm = HostRuntimeFramework.PreferredOutputFolderName();
+
         foreach (var configuration in new[] { "Release", "Debug" })
         {
             var configurationRoot = Path.Combine(binRoot, configuration);
@@ -78,26 +80,42 @@ internal sealed record WorkspaceBuildResult(
             if (!Directory.Exists(configurationRoot))
                 continue;
 
+            if (!string.IsNullOrEmpty(preferredTfm))
+            {
+                var preferredCandidate = Path.Combine(configurationRoot, preferredTfm, $"{assemblyName}.dll");
+
+                if (File.Exists(preferredCandidate))
+                {
+                    dllPath = preferredCandidate;
+                    return true;
+                }
+            }
+
             var tfmDirectoriesDescending =
                 Directory.EnumerateDirectories(configurationRoot)
                     .OrderByDescending(static tfmPath => TfmRankingScore.DescendingScore(tfmPath));
 
             foreach (var tfmFolder in tfmDirectoriesDescending)
             {
+                if (!string.IsNullOrEmpty(preferredTfm)
+                    && string.Equals(
+                        Path.GetFileName(tfmFolder),
+                        preferredTfm,
+                        StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 var candidate = Path.Combine(tfmFolder, $"{assemblyName}.dll");
 
                 if (!File.Exists(candidate))
                     continue;
 
-                dllPath =
-                    candidate;
+                dllPath = candidate;
 
                 return true;
             }
         }
 
-        dllPath =
-            string.Empty;
+        dllPath = string.Empty;
 
         return false;
     }

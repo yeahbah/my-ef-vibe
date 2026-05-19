@@ -60,13 +60,21 @@ internal sealed class WorkspaceHost : IDisposable
 
         var startupAssemblyDll = ResolveStartupAssemblyDll(workspaceBuild);
 
-        assemblyResolver.PreloadDependencies(
-            workspaceBuild.PrimaryAssemblyDll,
-            startupAssemblyDll);
-
-        EnsureWorkspaceConfigurationManagerLoaded(assemblyResolver);
+        // Preload EF packages first, then the entry assembly, then startup-only references.
+        // Preloading the startup copy of the EF project DLL before LoadEntryAssembly causes
+        // "Assembly with the same name is already loaded" (different paths, same simple name).
+        assemblyResolver.PreloadCorePackages();
 
         var primaryAssembly = assemblyResolver.LoadEntryAssembly(workspaceBuild.PrimaryAssemblyDll);
+
+        if (!string.IsNullOrEmpty(startupAssemblyDll))
+        {
+            assemblyResolver.PreloadStartupReferenceClosure(
+                startupAssemblyDll,
+                workspaceBuild.PrimaryAssemblyDll);
+        }
+
+        EnsureWorkspaceConfigurationManagerLoaded(assemblyResolver);
 
         var assemblyLoader = new InteractiveAssemblyLoader();
 
@@ -120,7 +128,7 @@ internal sealed class WorkspaceHost : IDisposable
 
         try
         {
-            AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+            AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, path);
         }
         catch (Exception failure)
         {
@@ -319,13 +327,40 @@ internal sealed class WorkspaceHost : IDisposable
         string primaryAssemblyDll,
         WorkspaceDepsManifest? depsManifest)
     {
-        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { primaryAssemblyDll };
+        var paths = new List<string> { primaryAssemblyDll };
+        var seenSimpleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            AssemblyName.GetAssemblyName(primaryAssemblyDll).Name ?? string.Empty,
+        };
 
         if (depsManifest is null)
             return paths;
 
         foreach (var projectPath in depsManifest.EnumerateProjectAssemblyPaths())
+        {
+            if (!File.Exists(projectPath))
+                continue;
+
+            string simpleName;
+
+            try
+            {
+                simpleName = AssemblyName.GetAssemblyName(projectPath).Name ?? projectPath;
+            }
+            catch (BadImageFormatException)
+            {
+                continue;
+            }
+            catch (FileLoadException)
+            {
+                continue;
+            }
+
+            if (!seenSimpleNames.Add(simpleName))
+                continue;
+
             paths.Add(projectPath);
+        }
 
         return paths;
     }
@@ -360,12 +395,7 @@ internal sealed class WorkspaceHost : IDisposable
     }
 
     private static Assembly LoadOrGetAssembly(string absolutePath)
-    {
-        var assemblyName = AssemblyName.GetAssemblyName(absolutePath);
-
-        return AssemblyResolutionHelpers.FindLoadedAssembly(assemblyName)
-            ?? AssemblyLoadContext.Default.LoadFromAssemblyPath(absolutePath);
-    }
+        => AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, absolutePath);
 
     internal IEnumerable<Assembly> EnumerateLoadedAssemblies()
         => AppDomain.CurrentDomain.GetAssemblies();

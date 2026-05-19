@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.Loader;
 
 namespace MyEfVibe;
 
@@ -58,6 +59,69 @@ internal static class AssemblyResolutionHelpers
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Returns an already-loaded assembly for <paramref name="absolutePath"/> when the same simple name
+    /// was loaded from another path (common when EF and startup projects both copy the same dependency).
+    /// </summary>
+    internal static Assembly? GetLoadedAssembly(AssemblyName requestedFromPath, string absolutePath)
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (string.IsNullOrEmpty(assembly.Location))
+                continue;
+
+            if (string.Equals(assembly.Location, absolutePath, StringComparison.OrdinalIgnoreCase))
+                return assembly;
+        }
+
+        var versionMatched = FindLoadedAssembly(requestedFromPath);
+
+        if (versionMatched is not null)
+            return versionMatched;
+
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (!string.Equals(assembly.GetName().Name, requestedFromPath.Name, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (VersionMatches(requestedFromPath, assembly))
+                return assembly;
+        }
+
+        // Default ALC cannot load the same assembly simple name twice (even from another path).
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (string.Equals(assembly.GetName().Name, requestedFromPath.Name, StringComparison.OrdinalIgnoreCase))
+                return assembly;
+        }
+
+        return null;
+    }
+
+    internal static Assembly LoadFromPath(AssemblyLoadContext context, string absolutePath)
+    {
+        var assemblyName = AssemblyName.GetAssemblyName(absolutePath);
+
+        var existing = GetLoadedAssembly(assemblyName, absolutePath);
+
+        if (existing is not null)
+            return existing;
+
+        try
+        {
+            return context.LoadFromAssemblyPath(absolutePath);
+        }
+        catch (FileLoadException)
+        {
+            var loaded = GetLoadedAssembly(assemblyName, absolutePath);
+
+            if (loaded is not null)
+                return loaded;
+
+            throw;
+        }
     }
 
     internal static bool IsCompatibleWithRequestedVersion(AssemblyName requested, string absolutePath)

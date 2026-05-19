@@ -37,7 +37,27 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         => new(entryAssemblyPath, sharedFrameworkCatalog, depsManifest);
 
     internal Assembly LoadEntryAssembly(string entryAssemblyPath)
-        => AssemblyLoadContext.Default.LoadFromAssemblyPath(entryAssemblyPath);
+        => AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, entryAssemblyPath);
+
+    internal void PreloadCorePackages()
+    {
+        if (_depsManifest is null)
+            return;
+
+        WorkspaceDependencyLoader.PreloadCorePackages(AssemblyLoadContext.Default, _depsManifest);
+    }
+
+    internal void PreloadStartupReferenceClosure(string startupAssemblyPath, string entryAssemblyPath)
+    {
+        if (_depsManifest is null)
+            return;
+
+        WorkspaceDependencyLoader.PreloadStartupReferenceClosure(
+            AssemblyLoadContext.Default,
+            _depsManifest,
+            startupAssemblyPath,
+            entryAssemblyPath);
+    }
 
     internal void PreloadDependencies(
         string entryAssemblyPath,
@@ -123,7 +143,7 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
     {
         try
         {
-            return context.LoadFromAssemblyPath(absolutePath);
+            return AssemblyResolutionHelpers.LoadFromPath(context, absolutePath);
         }
         catch (BadImageFormatException)
         {
@@ -131,7 +151,9 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         }
         catch (FileLoadException)
         {
-            return null;
+            return AssemblyResolutionHelpers.GetLoadedAssembly(
+                AssemblyName.GetAssemblyName(absolutePath),
+                absolutePath);
         }
     }
 

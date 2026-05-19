@@ -34,10 +34,14 @@ internal static class WorkspaceBuilder
 
     internal static void RunDotnetBuild(string csprojFullPath)
     {
+        var frameworkArg = HostRuntimeFramework.PreferredOutputFolderName() is { } tfm
+            ? $" -f {tfm}"
+            : string.Empty;
+
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"build \"{csprojFullPath}\" -c Release --nologo -v q",
+            Arguments = $"build \"{csprojFullPath}\" -c Release --nologo -v q{frameworkArg}",
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
