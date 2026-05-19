@@ -23,6 +23,12 @@ internal static class WorkspaceBuilder
     {
         RunDotnetBuild(projectFile.FullName);
 
+        if (!string.Equals(projectFile.FullName, startupProject.FullName, StringComparison.OrdinalIgnoreCase)
+            && !WorkspaceBuildResult.TryLocateStartupOutput(startupProject.FullName, out _))
+        {
+            RunDotnetBuild(startupProject.FullName);
+        }
+
         return WorkspaceBuildResult.RequirePrimaryAssembly(sessionDirectory, projectFile, startupProject);
     }
 
@@ -42,18 +48,29 @@ internal static class WorkspaceBuilder
         if (buildProcess is null)
             throw new WorkspaceException("Unable to launch the `dotnet` CLI. Ensure the .NET SDK is installed.");
 
+        // Start draining pipes before WaitForExit — otherwise MSBuild/dotnet can fill the 4 KB buffer
+        // and block while the parent waits for exit (classic Process redirect deadlock).
+        var stdoutTask = buildProcess.StandardOutput.ReadToEndAsync();
+        var stderrTask = buildProcess.StandardError.ReadToEndAsync();
+
         if (!buildProcess.WaitForExit((int)TimeSpan.FromMinutes(10).TotalMilliseconds))
         {
-            buildProcess.Kill(entireProcessTree: true);
+            try
+            {
+                buildProcess.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
 
             throw new WorkspaceException("`dotnet build` timed out after 10 minutes.");
         }
 
+        var stdout = stdoutTask.GetAwaiter().GetResult();
+        var stderr = stderrTask.GetAwaiter().GetResult();
+
         if (buildProcess.ExitCode == 0)
             return;
-
-        var stderr = buildProcess.StandardError.ReadToEnd();
-        var stdout = buildProcess.StandardOutput.ReadToEnd();
 
         throw new WorkspaceException(
             $"`dotnet build` failed (exit code {buildProcess.ExitCode}).{Environment.NewLine}{stderr}{stdout}");

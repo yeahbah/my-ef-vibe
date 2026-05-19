@@ -129,6 +129,9 @@ internal static class WorkspaceDependencyLoader
         AssemblyLoadContext loadContext,
         WorkspaceDepsManifest depsManifest)
     {
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var visiting = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var rootAssembly in new[]
                  {
                      "Microsoft.EntityFrameworkCore",
@@ -142,7 +145,14 @@ internal static class WorkspaceDependencyLoader
                  })
         {
             if (depsManifest.TryResolve(rootAssembly, out var rootPath))
-                PreloadAssemblyReferenceClosure(loadContext, depsManifest, rootPath);
+            {
+                PreloadAssemblyReferenceClosure(
+                    loadContext,
+                    depsManifest,
+                    rootPath,
+                    visited,
+                    visiting);
+            }
         }
     }
 
@@ -153,10 +163,12 @@ internal static class WorkspaceDependencyLoader
     internal static void PreloadAssemblyReferenceClosure(
         AssemblyLoadContext loadContext,
         WorkspaceDepsManifest depsManifest,
-        string rootAssemblyPath)
+        string rootAssemblyPath,
+        HashSet<string>? sharedVisited = null,
+        HashSet<string>? sharedVisiting = null)
     {
-        var visiting = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var visiting = sharedVisiting ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var visited = sharedVisited ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         Visit(rootAssemblyPath);
 
