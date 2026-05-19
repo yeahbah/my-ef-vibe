@@ -112,16 +112,54 @@ internal static class WorkspaceDependencyLoader
         AssemblyLoadContext loadContext,
         WorkspaceDepsManifest depsManifest)
     {
-        if (!depsManifest.TryResolve("Microsoft.EntityFrameworkCore", out var efPath))
-            return;
-
-        foreach (var reference in AssemblyReferenceReader.Read(efPath))
+        foreach (var rootAssembly in new[]
+                 {
+                     "Microsoft.EntityFrameworkCore",
+                     "Microsoft.EntityFrameworkCore.Relational",
+                     "Microsoft.EntityFrameworkCore.SqlServer",
+                     "Npgsql.EntityFrameworkCore.PostgreSQL",
+                     "Microsoft.EntityFrameworkCore.Sqlite",
+                 })
         {
-            if (string.IsNullOrEmpty(reference.Name))
-                continue;
+            if (depsManifest.TryResolve(rootAssembly, out var rootPath))
+                PreloadAssemblyReferenceClosure(loadContext, depsManifest, rootPath);
+        }
+    }
 
-            if (depsManifest.TryResolve(reference, out var referencePath))
-                TryLoad(loadContext, referencePath);
+    /// <summary>
+    /// Loads an assembly and its reference closure in dependency-first order so transitive
+    /// packages (e.g. Microsoft.Extensions.Caching.Abstractions) are available with correct versions.
+    /// </summary>
+    private static void PreloadAssemblyReferenceClosure(
+        AssemblyLoadContext loadContext,
+        WorkspaceDepsManifest depsManifest,
+        string rootAssemblyPath)
+    {
+        var visiting = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        Visit(rootAssemblyPath);
+
+        void Visit(string assemblyPath)
+        {
+            if (visited.Contains(assemblyPath))
+                return;
+
+            if (!visiting.Add(assemblyPath))
+                return;
+
+            foreach (var reference in AssemblyReferenceReader.Read(assemblyPath))
+            {
+                if (string.IsNullOrEmpty(reference.Name))
+                    continue;
+
+                if (depsManifest.TryResolve(reference, out var referencePath))
+                    Visit(referencePath);
+            }
+
+            visiting.Remove(assemblyPath);
+            visited.Add(assemblyPath);
+            TryLoad(loadContext, assemblyPath);
         }
     }
 

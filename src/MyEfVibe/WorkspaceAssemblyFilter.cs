@@ -8,6 +8,7 @@ internal static class WorkspaceAssemblyFilter
         "Microsoft.Build",
         "Microsoft.EntityFrameworkCore",
         "Microsoft.EntityFrameworkCore.Design",
+        "Microsoft.Extensions.",
         "Humanizer",
         "Mono.TextTemplating",
         "myefvibe",

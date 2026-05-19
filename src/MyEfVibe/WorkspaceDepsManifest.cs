@@ -16,6 +16,9 @@ internal sealed class WorkspaceDepsManifest
     private readonly HashSet<string> _projectAssemblyPaths =
         new(StringComparer.OrdinalIgnoreCase);
 
+    private JsonElement _librariesProperty;
+    private string _nuGetPackagesRoot = string.Empty;
+
     private WorkspaceDepsManifest()
     {
     }
@@ -55,7 +58,11 @@ internal sealed class WorkspaceDepsManifest
                 return null;
 
             var nuGetPackagesRoot = ResolveNuGetPackagesRoot();
-            var manifest = new WorkspaceDepsManifest();
+            var manifest = new WorkspaceDepsManifest
+            {
+                _librariesProperty = librariesProperty,
+                _nuGetPackagesRoot = nuGetPackagesRoot,
+            };
             var runtimeFallbacks = HostRuntimeIdentifier.GetRuntimeFallbacks();
 
             foreach (var library in targetNode.EnumerateObject())
@@ -269,18 +276,86 @@ internal sealed class WorkspaceDepsManifest
 
         var chosen = ChooseBestAsset(requested.Version, assets);
 
-        if (chosen is null)
+        if (chosen is not null)
+        {
+            absolutePath = chosen.Path;
+            return true;
+        }
+
+        return TryResolveFromPackageLib(requested, out absolutePath);
+    }
+
+    private bool TryResolveFromPackageLib(AssemblyName requested, out string absolutePath)
+    {
+        absolutePath = string.Empty;
+
+        if (string.IsNullOrEmpty(requested.Name) || _librariesProperty.ValueKind == JsonValueKind.Undefined)
             return false;
 
-        absolutePath = chosen.Path;
+        foreach (var library in _librariesProperty.EnumerateObject())
+        {
+            if (!library.Name.StartsWith($"{requested.Name}/", StringComparison.OrdinalIgnoreCase))
+                continue;
 
-        return true;
+            var libraryVersion = TryParseVersionFromLibraryName(library.Name);
+
+            if (requested.Version is not null
+                && !AssemblyResolutionHelpers.IsZeroVersion(requested.Version)
+                && libraryVersion is not null
+                && !AssemblyResolutionHelpers.VersionsMatch(requested.Version, libraryVersion))
+                continue;
+
+            var packageFolder = ResolvePackageFolder(_librariesProperty, library.Name, _nuGetPackagesRoot);
+
+            if (packageFolder is null)
+                continue;
+
+            var dllPath = FindAssemblyDllInPackage(packageFolder, requested.Name);
+
+            if (dllPath is null)
+                continue;
+
+            absolutePath = dllPath;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string? FindAssemblyDllInPackage(string packageFolder, string assemblySimpleName)
+    {
+        var libRoot = Path.Combine(packageFolder, "lib");
+
+        if (!Directory.Exists(libRoot))
+            return null;
+
+        foreach (var tfmDirectory in Directory.EnumerateDirectories(libRoot)
+                     .OrderByDescending(static path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            var candidate = Path.Combine(tfmDirectory, $"{assemblySimpleName}.dll");
+
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
     }
 
     private static AssemblyAsset? ChooseBestAsset(Version? requestedVersion, List<AssemblyAsset> assets)
     {
         if (assets.Count == 1)
-            return assets[0];
+        {
+            var only = assets[0];
+
+            if (requestedVersion is null || requestedVersion == new Version(0, 0, 0, 0))
+                return only;
+
+            if (only.Version is null || AssemblyResolutionHelpers.VersionsMatch(requestedVersion, only.Version))
+                return only;
+
+            return null;
+        }
 
         if (requestedVersion is null || requestedVersion == new Version(0, 0, 0, 0))
         {
@@ -295,7 +370,8 @@ internal sealed class WorkspaceDepsManifest
         if (withVersions.Length == 0)
             return assets.OrderByDescending(static asset => asset.Rank).First();
 
-        var exact = withVersions.FirstOrDefault(asset => asset.Version == requestedVersion);
+        var exact = withVersions.FirstOrDefault(asset =>
+            AssemblyResolutionHelpers.VersionsMatch(requestedVersion, asset.Version));
 
         if (exact is not null)
             return exact;

@@ -25,8 +25,26 @@ internal static class AssemblyResolutionHelpers
         if (requestedVersion is null || IsZeroVersion(requestedVersion))
             return true;
 
-        return loaded.GetName().Version == requestedVersion;
+        return VersionsMatch(requestedVersion, loaded.GetName().Version);
     }
+
+    internal static bool VersionsMatch(Version? requested, Version? candidate)
+    {
+        if (requested is null || candidate is null)
+            return requested == candidate;
+
+        if (requested == candidate)
+            return true;
+
+        return requested.Major == candidate.Major
+               && requested.Minor == candidate.Minor
+               && NormalizeBuild(requested) == NormalizeBuild(candidate)
+               && NormalizeRevision(requested) == NormalizeRevision(candidate);
+    }
+
+    private static int NormalizeBuild(Version version) => version.Build == -1 ? 0 : version.Build;
+
+    private static int NormalizeRevision(Version version) => version.Revision == -1 ? 0 : version.Revision;
 
     internal static Assembly? FindLoadedAssembly(AssemblyName requested)
     {
@@ -51,7 +69,7 @@ internal static class AssemblyResolutionHelpers
 
         try
         {
-            return AssemblyName.GetAssemblyName(absolutePath).Version == requestedVersion;
+            return VersionsMatch(requestedVersion, AssemblyName.GetAssemblyName(absolutePath).Version);
         }
         catch (BadImageFormatException)
         {
