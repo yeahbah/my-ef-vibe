@@ -14,7 +14,7 @@
     <Title>MyEfVibe — EF Core LINQ REPL</Title>
     <PackageTags>efcore;entity-framework-core;ef-core;dotnet-tool;global-tool;linq;repl;cli;database;orm;interactive;shell</PackageTags>
     <!-- Published version is set by CI tags; this is the local/dev fallback. -->
-    <Version>0.1.26</Version>
+    <Version>0.1.27</Version>
     <Description>Interactive global .NET tool (efvibe) to run LINQ against an external project's EF Core DbContext with SQL, query plans, and session analytics.</Description>
     <Authors>Arnold Diaz</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
