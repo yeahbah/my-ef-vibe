@@ -26,7 +26,7 @@ internal static class Program
 
         var contextOption = new Option<string?>(
             aliases: new[] { "-c", "--context" },
-            description: "Fully qualified DbContext type name when multiple contexts are present.");
+            description: "DbContext type name (e.g. MyDbContext) or fully qualified name when multiple contexts are present.");
 
         var connectionOption = new Option<string?>(
             aliases: new[] { "--connection-string", "-cs" },

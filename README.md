@@ -97,7 +97,7 @@ DbContext in persistence, connection string on the API:
 efvibe -w ./myefvibe-session \
   -p ./apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj \
   -s ./apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj \
-  -c AdventureWorks.Infrastructure.Persistence.DbContexts.AdventureWorksDbContext
+  -c AdventureWorksDbContext
 ```
 
 `-s` / `--startup-project` is often optional when the API references the persistence project.
@@ -109,7 +109,7 @@ dotnet run --project src/MyEfVibe/MyEfVibe.csproj -f net10.0 -- \
   -w ./myefvibe-session \
   -p ./apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj \
   -s ./apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj \
-  -c AdventureWorks.Infrastructure.Persistence.DbContexts.AdventureWorksDbContext
+  -c AdventureWorksDbContext
 ```
 
 ## macOS and SQL Server

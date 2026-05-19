@@ -89,14 +89,22 @@ internal static class DbContextActivator
     {
         if (!string.IsNullOrWhiteSpace(contextFullName))
         {
-            return discoveredDbContextTypes.SingleOrDefault(type =>
-                       string.Equals(type.FullName, contextFullName, StringComparison.Ordinal)
-                       || string.Equals(type.Name, contextFullName, StringComparison.Ordinal))
+            var matches = discoveredDbContextTypes
+                .Where(type => ContextNameMatcher.Matches(type, contextFullName))
+                .ToArray();
 
-                   ?? throw new InvalidOperationException(
-                       $"DbContext `{contextFullName}` was not found. Known contexts:{Environment.NewLine}"
-                       + string.Join(Environment.NewLine,
-                           discoveredDbContextTypes.Select(static ctx => $" - {ctx.FullName}")));
+            return matches switch
+            {
+                [var single] => single,
+                [] => throw new InvalidOperationException(
+                    $"DbContext `{contextFullName}` was not found. Known contexts:{Environment.NewLine}"
+                    + string.Join(Environment.NewLine,
+                        discoveredDbContextTypes.Select(static ctx => $" - {ctx.FullName} ({ctx.Name})"))),
+                _ => throw new InvalidOperationException(
+                    $"DbContext `{contextFullName}` is ambiguous. Specify the full name with `-c`:{Environment.NewLine}"
+                    + string.Join(Environment.NewLine,
+                        matches.Select(static ctx => $" - {ctx.FullName}"))),
+            };
         }
 
         if (discoveredDbContextTypes.Count == 1)
@@ -180,35 +188,73 @@ internal static class DbContextActivator
         }
     }
 
-    private static bool TryResolveContextType(WorkspaceHost host, string contextFullName, out Type resolved)
+    private static bool TryResolveContextType(WorkspaceHost host, string contextName, out Type resolved)
     {
         resolved = null!;
 
+        Type? uniqueMatch = null;
+
         foreach (var assembly in host.EnumerateDiscoveryAssemblies().Prepend(host.PrimaryAssembly))
         {
-            var fromGetType = assembly.GetType(contextFullName, throwOnError: false, ignoreCase: true);
-
-            if (fromGetType is not null && IsConcreteDbContext(fromGetType))
+            if (contextName.Contains('.', StringComparison.Ordinal))
             {
-                resolved = fromGetType;
-                return true;
-            }
+                var fromGetType = assembly.GetType(contextName, throwOnError: false, ignoreCase: true);
 
-            foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
-            {
-                if (!IsConcreteDbContext(exported))
-                    continue;
-
-                if (string.Equals(exported.FullName, contextFullName, StringComparison.Ordinal)
-                    || string.Equals(exported.Name, contextFullName, StringComparison.Ordinal))
+                if (fromGetType is not null && IsConcreteDbContext(fromGetType))
                 {
-                    resolved = exported;
+                    resolved = fromGetType;
                     return true;
                 }
             }
+
+            foreach (var candidate in EnumerateDbContextCandidates(assembly))
+            {
+                if (!ContextNameMatcher.Matches(candidate, contextName))
+                    continue;
+
+                if (uniqueMatch is not null && !ReferenceEquals(uniqueMatch, candidate))
+                    return false;
+
+                uniqueMatch = candidate;
+            }
         }
 
-        return false;
+        if (uniqueMatch is null)
+            return false;
+
+        resolved = uniqueMatch;
+
+        return true;
+    }
+
+    private static IEnumerable<Type> EnumerateDbContextCandidates(Assembly assembly)
+    {
+        var candidates = new List<Type>();
+
+        foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
+        {
+            if (IsConcreteDbContext(exported))
+                candidates.Add(exported);
+        }
+
+        try
+        {
+            foreach (var candidate in assembly.GetTypes())
+            {
+                if (IsConcreteDbContext(candidate))
+                    candidates.Add(candidate);
+            }
+        }
+        catch (ReflectionTypeLoadException loaderFailure)
+        {
+            foreach (var candidate in loaderFailure.Types)
+            {
+                if (candidate is not null && IsConcreteDbContext(candidate))
+                    candidates.Add(candidate);
+            }
+        }
+
+        return candidates;
     }
 
     private static string BuildNoDbContextDiscoveredMessage(WorkspaceHost host, string? requestedContextFullName)

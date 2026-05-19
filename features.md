@@ -22,7 +22,7 @@ When `-p` is omitted, projects are discovered under the **current working direct
 - Project kind (executable / web host preferred over pure class libraries)
 - Whether the project references another candidate that contains a DbContext
 
-Use `-p` for the `.csproj` that contains the `DbContext` (often a persistence/infrastructure library). Use `-c` when multiple `DbContext` types are found.
+Use `-p` for the `.csproj` that contains the `DbContext` (often a persistence/infrastructure library). Use `-c MyDbContext` (short name) or the full type name when multiple `DbContext` types are found.
 
 In CI or piped stdin (non-interactive), specify `-p` when several projects exist and auto-selection is ambiguous.
 
@@ -61,7 +61,7 @@ db.JsonBlobDocuments
 | `-w`, `--workspace` | Workspace root; session path is `<ProjectName>/<DbContextName>/` beneath it; default `~/.efvibe` or `%APPDATA%\efvibe` |
 | `-p`, `--project` | EF Core `.csproj` to build (DbContext assembly) |
 | `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--sql` or `:sql`. |
-| `-c`, `--context` | Fully qualified `DbContext` type name |
+| `-c`, `--context` | `DbContext` type name (e.g. `MyDbContext`) or fully qualified name |
 | `--connection-string`, `-cs` | Connection string for manual `DbContextOptions` construction |
 | `--provider` | Provider with `-cs`: `sqlserver`, `npgsql`, `sqlite` |
 | `-e`, `--expression` | Run one expression and exit |
