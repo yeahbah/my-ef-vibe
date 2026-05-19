@@ -39,12 +39,15 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
     internal Assembly LoadEntryAssembly(string entryAssemblyPath)
         => AssemblyLoadContext.Default.LoadFromAssemblyPath(entryAssemblyPath);
 
-    internal void PreloadDependencies(string entryAssemblyPath)
+    internal void PreloadDependencies(
+        string entryAssemblyPath,
+        string? additionalReferenceClosureAssemblyPath = null)
         => WorkspaceDependencyLoader.Preload(
             AssemblyLoadContext.Default,
             _dependencyResolver,
             entryAssemblyPath,
-            _depsManifest);
+            _depsManifest,
+            additionalReferenceClosureAssemblyPath);
 
     internal bool IsOutputDirectoryAssembly(Assembly assembly)
     {
@@ -106,7 +109,8 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         }
 
         if (loaded is null
-            && _sharedFrameworkCatalog.TryResolve(simpleName, out var sharedPath))
+            && _sharedFrameworkCatalog.TryResolve(simpleName, out var sharedPath)
+            && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, sharedPath))
             loaded = TryLoad(context, sharedPath);
 
         if (loaded is not null)

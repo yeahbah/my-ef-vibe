@@ -10,13 +10,27 @@ internal static class WorkspaceDependencyLoader
         AssemblyLoadContext loadContext,
         AssemblyDependencyResolver resolver,
         string entryAssemblyPath,
-        WorkspaceDepsManifest? depsManifest)
+        WorkspaceDepsManifest? depsManifest,
+        string? additionalReferenceClosureAssemblyPath = null)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         if (depsManifest is not null)
         {
             PreloadEfReferenceAssemblies(loadContext, depsManifest);
+
+            if (!string.IsNullOrWhiteSpace(additionalReferenceClosureAssemblyPath)
+                && File.Exists(additionalReferenceClosureAssemblyPath)
+                && !string.Equals(
+                    additionalReferenceClosureAssemblyPath,
+                    entryAssemblyPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                PreloadAssemblyReferenceClosure(
+                    loadContext,
+                    depsManifest,
+                    additionalReferenceClosureAssemblyPath);
+            }
 
             foreach (var bootstrap in new[]
                      {
@@ -136,7 +150,7 @@ internal static class WorkspaceDependencyLoader
     /// Loads an assembly and its reference closure in dependency-first order so transitive
     /// packages (e.g. Microsoft.Extensions.Caching.Abstractions) are available with correct versions.
     /// </summary>
-    private static void PreloadAssemblyReferenceClosure(
+    internal static void PreloadAssemblyReferenceClosure(
         AssemblyLoadContext loadContext,
         WorkspaceDepsManifest depsManifest,
         string rootAssemblyPath)

@@ -58,7 +58,11 @@ internal sealed class WorkspaceHost : IDisposable
         var assemblyResolver =
             WorkspaceAssemblyResolver.Install(workspaceBuild.PrimaryAssemblyDll, sharedFrameworkCatalog, depsManifest);
 
-        assemblyResolver.PreloadDependencies(workspaceBuild.PrimaryAssemblyDll);
+        var startupAssemblyDll = ResolveStartupAssemblyDll(workspaceBuild);
+
+        assemblyResolver.PreloadDependencies(
+            workspaceBuild.PrimaryAssemblyDll,
+            startupAssemblyDll);
 
         EnsureWorkspaceConfigurationManagerLoaded(assemblyResolver);
 
@@ -142,6 +146,7 @@ internal sealed class WorkspaceHost : IDisposable
 
         if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore", out var corePath) == true)
         {
+            PreloadExactReferencesFromAssembly(corePath);
             LoadOrGetAssembly(corePath);
             return;
         }
@@ -276,6 +281,21 @@ internal sealed class WorkspaceHost : IDisposable
         }
     }
 
+    private static string? ResolveStartupAssemblyDll(WorkspaceBuildResult workspaceBuild)
+    {
+        if (string.IsNullOrEmpty(workspaceBuild.StartupOutputDirectory)
+            || string.Equals(
+                workspaceBuild.OutputDirectory,
+                workspaceBuild.StartupOutputDirectory,
+                StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var startupAssemblyName = CsprojReader.ReadLogicalAssemblyName(workspaceBuild.StartupProjectPath);
+        var startupDll = Path.Combine(workspaceBuild.StartupOutputDirectory, $"{startupAssemblyName}.dll");
+
+        return File.Exists(startupDll) ? startupDll : null;
+    }
+
     private static WorkspaceDepsManifest? MergeStartupDepsManifest(
         WorkspaceBuildResult workspaceBuild,
         WorkspaceDepsManifest? depsManifest)
@@ -287,10 +307,9 @@ internal sealed class WorkspaceHost : IDisposable
                 StringComparison.OrdinalIgnoreCase))
             return depsManifest;
 
-        var startupAssemblyName = CsprojReader.ReadLogicalAssemblyName(workspaceBuild.StartupProjectPath);
-        var startupDll = Path.Combine(workspaceBuild.StartupOutputDirectory, $"{startupAssemblyName}.dll");
+        var startupDll = ResolveStartupAssemblyDll(workspaceBuild);
 
-        if (!File.Exists(startupDll))
+        if (startupDll is null)
             return depsManifest;
 
         return WorkspaceDepsManifest.Merge(depsManifest, WorkspaceDepsManifest.TryLoad(startupDll));
@@ -309,6 +328,35 @@ internal sealed class WorkspaceHost : IDisposable
             paths.Add(projectPath);
 
         return paths;
+    }
+
+    private void PreloadExactReferencesFromAssembly(string assemblyPath)
+    {
+        if (_resolver.DepsManifest is null)
+            return;
+
+        foreach (var reference in AssemblyReferenceReader.Read(assemblyPath))
+        {
+            if (string.IsNullOrEmpty(reference.Name))
+                continue;
+
+            if (AssemblyResolutionHelpers.FindLoadedAssembly(reference) is not null)
+                continue;
+
+            if (!_resolver.DepsManifest.TryResolve(reference, out var referencePath))
+                continue;
+
+            try
+            {
+                LoadOrGetAssembly(referencePath);
+            }
+            catch (BadImageFormatException)
+            {
+            }
+            catch (FileLoadException)
+            {
+            }
+        }
     }
 
     private static Assembly LoadOrGetAssembly(string absolutePath)

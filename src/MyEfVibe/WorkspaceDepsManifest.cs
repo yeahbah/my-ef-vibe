@@ -17,9 +17,11 @@ internal sealed class WorkspaceDepsManifest
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly List<PackageLibrary> _packageLibraries = [];
+    private readonly string _nuGetPackagesRoot;
 
-    private WorkspaceDepsManifest()
+    private WorkspaceDepsManifest(string nuGetPackagesRoot)
     {
+        _nuGetPackagesRoot = nuGetPackagesRoot;
     }
 
     private sealed record AssemblyAsset(Version? Version, string Path, int Rank);
@@ -59,7 +61,7 @@ internal sealed class WorkspaceDepsManifest
                 return null;
 
             var nuGetPackagesRoot = ResolveNuGetPackagesRoot();
-            var manifest = new WorkspaceDepsManifest();
+            var manifest = new WorkspaceDepsManifest(nuGetPackagesRoot);
             manifest.IndexPackageLibraries(librariesProperty, nuGetPackagesRoot);
             var runtimeFallbacks = HostRuntimeIdentifier.GetRuntimeFallbacks();
 
@@ -250,6 +252,16 @@ internal sealed class WorkspaceDepsManifest
         }
 
         _projectAssemblyPaths.UnionWith(other._projectAssemblyPaths);
+
+        foreach (var library in other._packageLibraries)
+        {
+            if (_packageLibraries.Any(existing =>
+                    string.Equals(existing.PackageId, library.PackageId, StringComparison.OrdinalIgnoreCase)
+                    && VersionsEqual(existing.Version, library.Version)))
+                continue;
+
+            _packageLibraries.Add(library);
+        }
     }
 
     internal bool TryResolve(string? assemblySimpleName, out string absolutePath)
@@ -281,7 +293,10 @@ internal sealed class WorkspaceDepsManifest
             }
         }
 
-        return TryResolveFromPackageLib(requested, out absolutePath);
+        if (TryResolveFromPackageLib(requested, out absolutePath))
+            return true;
+
+        return TryResolveFromNuGetPackageFolder(requested, out absolutePath);
     }
 
     private void IndexPackageLibraries(JsonElement librariesProperty, string nuGetPackagesRoot)
@@ -339,6 +354,46 @@ internal sealed class WorkspaceDepsManifest
         }
 
         return false;
+    }
+
+    private bool TryResolveFromNuGetPackageFolder(AssemblyName requested, out string absolutePath)
+    {
+        absolutePath = string.Empty;
+
+        if (string.IsNullOrEmpty(requested.Name)
+            || requested.Version is null
+            || AssemblyResolutionHelpers.IsZeroVersion(requested.Version))
+            return false;
+
+        foreach (var versionFolder in EnumerateNuGetVersionFolderCandidates(requested.Version))
+        {
+            var packageFolder = Path.Combine(
+                _nuGetPackagesRoot,
+                requested.Name.ToLowerInvariant(),
+                versionFolder);
+
+            var dllPath = FindAssemblyDllInPackage(packageFolder, requested.Name);
+
+            if (dllPath is null)
+                continue;
+
+            absolutePath = dllPath;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> EnumerateNuGetVersionFolderCandidates(Version requestedVersion)
+    {
+        var build = requestedVersion.Build == -1 ? 0 : requestedVersion.Build;
+        var revision = requestedVersion.Revision == -1 ? 0 : requestedVersion.Revision;
+
+        yield return $"{requestedVersion.Major}.{requestedVersion.Minor}.{build}";
+
+        if (revision > 0)
+            yield return $"{requestedVersion.Major}.{requestedVersion.Minor}.{build}.{revision}";
     }
 
     private static string? FindAssemblyDllInPackage(string packageFolder, string assemblySimpleName)

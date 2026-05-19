@@ -19,8 +19,13 @@ internal static class WorkspaceReferenceCollector
         {
             foreach (var path in manifest.RuntimeAssemblyPaths)
             {
-                if (File.Exists(path))
-                    paths.Add(path);
+                if (!File.Exists(path))
+                    continue;
+
+                if (!WorkspaceAssemblyFilter.ShouldScanAssembly(path))
+                    continue;
+
+                paths.Add(path);
             }
         }
 
