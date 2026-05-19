@@ -139,6 +139,14 @@ internal static class AppSettingsConnectionResolver
         if (Directory.EnumerateFiles(outputDirectory, "Microsoft.EntityFrameworkCore.Sqlite*.dll").Any())
             return MyEfVibeProvider.Sqlite;
 
+        if (Directory.EnumerateFiles(outputDirectory, "Oracle.EntityFrameworkCore*.dll").Any()
+            || Directory.EnumerateFiles(outputDirectory, "Oracle.ManagedDataAccess*.dll").Any())
+            return MyEfVibeProvider.Oracle;
+
+        if (Directory.EnumerateFiles(outputDirectory, "Pomelo.EntityFrameworkCore.MySql*.dll").Any()
+            || Directory.EnumerateFiles(outputDirectory, "MySql.EntityFrameworkCore*.dll").Any())
+            return MyEfVibeProvider.MySql;
+
         if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase)
             || connectionString.Contains("Username=", StringComparison.OrdinalIgnoreCase))
             return MyEfVibeProvider.Npgsql;
@@ -150,6 +158,14 @@ internal static class AppSettingsConnectionResolver
         if (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
             || connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase))
             return MyEfVibeProvider.SqlServer;
+
+        if (connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
+            && connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.Oracle;
+
+        if (connectionString.Contains("Uid=", StringComparison.OrdinalIgnoreCase)
+            || connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.MySql;
 
         return null;
     }

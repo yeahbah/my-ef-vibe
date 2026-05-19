@@ -72,7 +72,7 @@ internal static class DbContextActivator
             + $"{Environment.NewLine}"
             + " - Add a public parameterless constructor on the DbContext."
             + $"{Environment.NewLine}"
-            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite) to build `DbContextOptions<TContext>`."
+            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite | oracle | mysql) to build `DbContextOptions<TContext>`."
             + $"{Environment.NewLine}"
             + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.";
 
@@ -89,7 +89,7 @@ internal static class DbContextActivator
             if (string.IsNullOrWhiteSpace(connectionString))
                 failureMessage += ", but no connection string was found.";
             else if (!provider.HasValue)
-                failureMessage += ", but the database provider could not be inferred. Pass `--provider` (sqlserver | npgsql | sqlite).";
+                failureMessage += ", but the database provider could not be inferred. Pass `--provider` (sqlserver | npgsql | sqlite | oracle | mysql).";
             else
                 failureMessage +=
                     ", but constructing `DbContextOptions` failed."
@@ -682,36 +682,56 @@ internal static class DbContextActivator
     private static Assembly? LoadWorkspaceAssembly(WorkspaceHost host, string assemblyName)
         => host.LoadAssembly(assemblyName);
 
-    private static readonly IReadOnlyDictionary<MyEfVibeProvider, string> ProviderExtensionAssemblyNames =
-        new Dictionary<MyEfVibeProvider, string>
+    private readonly record struct ProviderExtensionSpec(string AssemblyName, string MethodName);
+
+    private static readonly IReadOnlyDictionary<MyEfVibeProvider, ProviderExtensionSpec[]> ProviderExtensionSpecs =
+        new Dictionary<MyEfVibeProvider, ProviderExtensionSpec[]>
         {
-            [MyEfVibeProvider.SqlServer] = "Microsoft.EntityFrameworkCore.SqlServer",
-            [MyEfVibeProvider.Npgsql] = "Npgsql.EntityFrameworkCore.PostgreSQL",
-            [MyEfVibeProvider.Sqlite] = "Microsoft.EntityFrameworkCore.Sqlite",
+            [MyEfVibeProvider.SqlServer] =
+                [new("Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer")],
+            [MyEfVibeProvider.Npgsql] =
+                [new("Npgsql.EntityFrameworkCore.PostgreSQL", "UseNpgsql")],
+            [MyEfVibeProvider.Sqlite] =
+                [new("Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite")],
+            [MyEfVibeProvider.Oracle] =
+                [new("Oracle.EntityFrameworkCore", "UseOracle")],
+            [MyEfVibeProvider.MySql] =
+            [
+                new("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
+                new("MySql.EntityFrameworkCore", "UseMySQL"),
+            ],
         };
 
     private static bool TryInvokeUseProviderExtension(WorkspaceHost host, object closedBuilderInstance,
         string connectionString, MyEfVibeProvider providerKey)
     {
-        var methodName = providerKey switch
+        if (!ProviderExtensionSpecs.TryGetValue(providerKey, out var specs))
+            return false;
+
+        foreach (var spec in specs)
         {
-            MyEfVibeProvider.SqlServer => "UseSqlServer",
-            MyEfVibeProvider.Npgsql => "UseNpgsql",
-            MyEfVibeProvider.Sqlite => "UseSqlite",
-            _ => string.Empty,
-        };
+            var providerAssembly = ResolveProviderAssembly(host, spec.AssemblyName);
 
-        if (string.IsNullOrEmpty(methodName))
-            return false;
+            if (providerAssembly is null)
+                continue;
 
-        if (!ProviderExtensionAssemblyNames.TryGetValue(providerKey, out var providerAssemblyName))
-            return false;
+            if (TryInvokeUseProviderExtensionMethod(
+                    providerAssembly,
+                    closedBuilderInstance,
+                    connectionString,
+                    spec.MethodName))
+                return true;
+        }
 
-        var providerAssembly = ResolveProviderAssembly(host, providerAssemblyName);
+        return false;
+    }
 
-        if (providerAssembly is null)
-            return false;
-
+    private static bool TryInvokeUseProviderExtensionMethod(
+        Assembly providerAssembly,
+        object closedBuilderInstance,
+        string connectionString,
+        string methodName)
+    {
         foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(providerAssembly))
         foreach (var staticMethodCandidate in exported.GetMethods(BindingFlags.Static | BindingFlags.Public
                                                                    | BindingFlags.NonPublic))

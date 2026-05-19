@@ -112,6 +112,8 @@ internal static partial class QueryPlanRunner
         {
             MyEfVibeProvider.Npgsql => $"EXPLAIN {trimmed}",
             MyEfVibeProvider.Sqlite => $"EXPLAIN QUERY PLAN {trimmed}",
+            MyEfVibeProvider.MySql => $"EXPLAIN {trimmed}",
+            MyEfVibeProvider.Oracle => $"EXPLAIN PLAN FOR {trimmed}",
             _ => $"EXPLAIN {trimmed}",
         };
     }
@@ -156,6 +158,13 @@ internal static partial class QueryPlanRunner
 
         if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
             return MyEfVibeProvider.SqlServer;
+
+        if (providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.Oracle;
+
+        if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
+            || providerName.Contains("MySQL", StringComparison.Ordinal))
+            return MyEfVibeProvider.MySql;
 
         return null;
     }

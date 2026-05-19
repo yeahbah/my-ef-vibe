@@ -7,6 +7,8 @@ internal static class ConnectionStringKeys
         "DefaultConnection",
         "Postgres",
         "Sqlite",
+        "MySql",
+        "Oracle",
         "Database",
     ];
 

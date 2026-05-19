@@ -139,7 +139,7 @@ DbContext construction (in order):
 1. `IDesignTimeDbContextFactory<T>`
 2. Parameterless constructor
 3. User secrets on the startup project, then `appsettings*.json` next to that project
-4. `--connection-string` + `--provider` (`sqlserver` \| `npgsql` \| `sqlite`)
+4. `--connection-string` + `--provider` (`sqlserver` \| `npgsql` \| `sqlite` \| `oracle` \| `mysql`)
 
 User secrets use flat keys such as `ConnectionStrings:DefaultConnection` in `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json`.
 

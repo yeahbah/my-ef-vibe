@@ -63,7 +63,7 @@ db.JsonBlobDocuments
 | `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--sql` or `:sql`. |
 | `-c`, `--context` | `DbContext` type name (e.g. `MyDbContext`) or fully qualified name |
 | `--connection-string`, `-cs` | Connection string for manual `DbContextOptions` construction |
-| `--provider` | Provider with `-cs`: `sqlserver`, `npgsql`, `sqlite` |
+| `--provider` | Provider with `-cs`: `sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql` |
 | `-e`, `--expression` | Run one expression and exit |
 | `expression` (positional) | Same as `-e` when passed as trailing arguments |
 | `--sql` | Show SQL (default: **on**; toggle in REPL with `:sql`) |
@@ -279,6 +279,8 @@ efvibe -w ./myefvibe-session -p ./src/MyApp.Api/MyApp.Api.csproj db.Products.Cou
 | SQL Server | `sqlserver` | Use Docker on macOS/Linux; requires workspace `Microsoft.Data.SqlClient` + `Microsoft.EntityFrameworkCore.SqlServer` |
 | PostgreSQL | `npgsql` | `EXPLAIN` for `:plan` |
 | SQLite | `sqlite` | `EXPLAIN QUERY PLAN` for `:plan`; good for local files |
+| Oracle | `oracle` | Requires `Oracle.EntityFrameworkCore` in the workspace; `EXPLAIN PLAN FOR` for `:plan` |
+| MySQL / MariaDB | `mysql` | Pomelo (`Pomelo.EntityFrameworkCore.MySql`) or Oracle provider (`MySql.EntityFrameworkCore`); `EXPLAIN` for `:plan` |
 
 Pass `--connection-string` (or rely on the startup project). `--provider` is required when using `-cs` explicitly.
 
@@ -289,7 +291,7 @@ When you do not pass `--connection-string`, and the DbContext cannot be created 
 1. **User secrets** — `UserSecretsId` on the startup `.csproj`, then `~/.microsoft/usersecrets/<id>/secrets.json` (macOS/Linux).
 2. **`appsettings.json` / `appsettings.Development.json`** — next to the startup project (and its `bin` output if present).
 
-Preferred keys: `ConnectionStrings:DefaultConnection`, then `Postgres`, `Sqlite`, `Database`, then any other `ConnectionStrings:*` entry. Provider is inferred from EF assemblies in the **built EF project** output.
+Preferred keys: `ConnectionStrings:DefaultConnection`, then `Postgres`, `Sqlite`, `MySql`, `Oracle`, `Database`, then any other `ConnectionStrings:*` entry. Provider is inferred from EF assemblies in the **built EF project** output.
 
 Use `-p` for the persistence/library project and `-s` for the API (or rely on auto-inference when the API references the library).
 

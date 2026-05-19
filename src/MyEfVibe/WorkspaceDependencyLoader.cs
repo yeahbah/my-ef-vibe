@@ -28,6 +28,9 @@ internal static class WorkspaceDependencyLoader
                          "Microsoft.EntityFrameworkCore.SqlServer",
                          "Npgsql.EntityFrameworkCore.PostgreSQL",
                          "Microsoft.EntityFrameworkCore.Sqlite",
+                         "Oracle.EntityFrameworkCore",
+                         "Pomelo.EntityFrameworkCore.MySql",
+                         "MySql.EntityFrameworkCore",
                      })
             {
                 if (depsManifest.TryResolve(bootstrap, out var bootstrapPath))
@@ -119,6 +122,9 @@ internal static class WorkspaceDependencyLoader
                      "Microsoft.EntityFrameworkCore.SqlServer",
                      "Npgsql.EntityFrameworkCore.PostgreSQL",
                      "Microsoft.EntityFrameworkCore.Sqlite",
+                     "Oracle.EntityFrameworkCore",
+                     "Pomelo.EntityFrameworkCore.MySql",
+                     "MySql.EntityFrameworkCore",
                  })
         {
             if (depsManifest.TryResolve(rootAssembly, out var rootPath))

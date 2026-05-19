@@ -18,6 +18,10 @@ internal static class ProviderParser
 
             "sqlite" or "sqlitedb" => MyEfVibeProvider.Sqlite,
 
+            "oracle" or "ora" or "odb" => MyEfVibeProvider.Oracle,
+
+            "mysql" or "mariadb" or "pomelo" => MyEfVibeProvider.MySql,
+
             _ => null,
 
         };
