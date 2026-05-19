@@ -16,14 +16,15 @@ internal sealed class WorkspaceDepsManifest
     private readonly HashSet<string> _projectAssemblyPaths =
         new(StringComparer.OrdinalIgnoreCase);
 
-    private JsonElement _librariesProperty;
-    private string _nuGetPackagesRoot = string.Empty;
+    private readonly List<PackageLibrary> _packageLibraries = [];
 
     private WorkspaceDepsManifest()
     {
     }
 
     private sealed record AssemblyAsset(Version? Version, string Path, int Rank);
+
+    private sealed record PackageLibrary(string PackageId, Version? Version, string PackageFolder);
 
     internal static WorkspaceDepsManifest? TryLoad(string entryAssemblyPath)
     {
@@ -58,11 +59,8 @@ internal sealed class WorkspaceDepsManifest
                 return null;
 
             var nuGetPackagesRoot = ResolveNuGetPackagesRoot();
-            var manifest = new WorkspaceDepsManifest
-            {
-                _librariesProperty = librariesProperty,
-                _nuGetPackagesRoot = nuGetPackagesRoot,
-            };
+            var manifest = new WorkspaceDepsManifest();
+            manifest.IndexPackageLibraries(librariesProperty, nuGetPackagesRoot);
             var runtimeFallbacks = HostRuntimeIdentifier.GetRuntimeFallbacks();
 
             foreach (var library in targetNode.EnumerateObject())
@@ -269,48 +267,68 @@ internal sealed class WorkspaceDepsManifest
     {
         absolutePath = string.Empty;
 
-        if (string.IsNullOrEmpty(requested.Name)
-            || !_assetsBySimpleName.TryGetValue(requested.Name, out var assets)
-            || assets.Count == 0)
+        if (string.IsNullOrEmpty(requested.Name))
             return false;
 
-        var chosen = ChooseBestAsset(requested.Version, assets);
-
-        if (chosen is not null)
+        if (_assetsBySimpleName.TryGetValue(requested.Name, out var assets) && assets.Count > 0)
         {
-            absolutePath = chosen.Path;
-            return true;
+            var chosen = ChooseBestAsset(requested.Version, assets);
+
+            if (chosen is not null)
+            {
+                absolutePath = chosen.Path;
+                return true;
+            }
         }
 
         return TryResolveFromPackageLib(requested, out absolutePath);
+    }
+
+    private void IndexPackageLibraries(JsonElement librariesProperty, string nuGetPackagesRoot)
+    {
+        foreach (var library in librariesProperty.EnumerateObject())
+        {
+            if (!library.Value.TryGetProperty("type", out var typeProperty)
+                || !string.Equals(typeProperty.GetString(), "package", StringComparison.Ordinal))
+                continue;
+
+            if (!library.Value.TryGetProperty("path", out var packagePathProperty))
+                continue;
+
+            var slashIndex = library.Name.LastIndexOf('/');
+
+            if (slashIndex <= 0 || slashIndex >= library.Name.Length - 1)
+                continue;
+
+            var packageId = library.Name[..slashIndex];
+            var packageFolder = Path.Combine(nuGetPackagesRoot, packagePathProperty.GetString()!);
+
+            _packageLibraries.Add(new PackageLibrary(
+                packageId,
+                TryParseVersionFromLibraryName(library.Name),
+                packageFolder));
+        }
     }
 
     private bool TryResolveFromPackageLib(AssemblyName requested, out string absolutePath)
     {
         absolutePath = string.Empty;
 
-        if (string.IsNullOrEmpty(requested.Name) || _librariesProperty.ValueKind == JsonValueKind.Undefined)
+        if (string.IsNullOrEmpty(requested.Name))
             return false;
 
-        foreach (var library in _librariesProperty.EnumerateObject())
+        foreach (var library in _packageLibraries)
         {
-            if (!library.Name.StartsWith($"{requested.Name}/", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(library.PackageId, requested.Name, StringComparison.OrdinalIgnoreCase))
                 continue;
-
-            var libraryVersion = TryParseVersionFromLibraryName(library.Name);
 
             if (requested.Version is not null
                 && !AssemblyResolutionHelpers.IsZeroVersion(requested.Version)
-                && libraryVersion is not null
-                && !AssemblyResolutionHelpers.VersionsMatch(requested.Version, libraryVersion))
+                && library.Version is not null
+                && !AssemblyResolutionHelpers.VersionsMatch(requested.Version, library.Version))
                 continue;
 
-            var packageFolder = ResolvePackageFolder(_librariesProperty, library.Name, _nuGetPackagesRoot);
-
-            if (packageFolder is null)
-                continue;
-
-            var dllPath = FindAssemblyDllInPackage(packageFolder, requested.Name);
+            var dllPath = FindAssemblyDllInPackage(library.PackageFolder, requested.Name);
 
             if (dllPath is null)
                 continue;
