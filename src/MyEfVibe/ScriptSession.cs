@@ -174,6 +174,45 @@ internal sealed class ScriptSession
         return _state.ReturnValue;
     }
 
+    /// <summary>
+    /// Evaluates a one-off expression without advancing REPL submission state or history.
+    /// Used for SQL translation probes before the user's query runs.
+    /// </summary>
+    internal async Task<object?> EvaluateProbeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        var trimmed = SnippetNormalizer.ForEvaluation(code);
+
+        if (string.IsNullOrEmpty(trimmed))
+            return null;
+
+        var script = CSharpScript.Create(trimmed, _options, _globalsType, _assemblyLoader);
+
+        ScriptState state;
+
+        try
+        {
+            state = await script.RunAsync(_globals, cancellationToken);
+        }
+        catch (CompilationErrorException compilationFailure)
+        {
+            var messages = compilationFailure.Diagnostics
+                .Where(static diagnostic => diagnostic.Severity != DiagnosticSeverity.Hidden)
+                .Select(static diagnostic => diagnostic.ToString())
+                .ToArray();
+
+            throw messages.Length == 0
+                ? new CompilationEvaluationException(compilationFailure.Message)
+                : new CompilationEvaluationException(string.Join(Environment.NewLine, messages));
+        }
+
+        if (state.Exception is not null)
+            throw state.Exception is Exception concrete
+                ? concrete
+                : new Exception(state.Exception.ToString());
+
+        return state.ReturnValue;
+    }
+
     internal void RecordSubmission(string snippet)
     {
         var normalized = snippet.Trim();

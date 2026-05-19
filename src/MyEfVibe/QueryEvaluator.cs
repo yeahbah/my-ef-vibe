@@ -19,6 +19,8 @@ internal static class QueryEvaluator
         if (sqlSettings.ShowSql)
             translatedSql = await TryGetProbeTranslatedSqlAsync(session, snippet, host, cancellationToken);
 
+        var sqlFormatterAssemblies = host.EnumerateDiscoveryAssemblies().ToArray();
+
         using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance);
 
         var stopwatch = Stopwatch.StartNew();
@@ -33,7 +35,7 @@ internal static class QueryEvaluator
             {
                 RelationalQueryableSqlFormatter.TryGetSql(
                     result,
-                    host.EnumerateLoadedAssemblies(),
+                    sqlFormatterAssemblies,
                     out translatedSql);
             }
 
@@ -85,13 +87,22 @@ internal static class QueryEvaluator
         if (probeExpression is null)
             return null;
 
+        var formatterAssemblies = host.EnumerateDiscoveryAssemblies().ToArray();
+
         try
         {
-            var queryable = await session.EvaluateAsync(probeExpression, cancellationToken);
+            var sqlLiteral = await session.EvaluateProbeAsync(
+                $"{probeExpression.TrimEnd()}.ToQueryString()",
+                cancellationToken);
+
+            if (sqlLiteral is string sqlFromScript && !string.IsNullOrWhiteSpace(sqlFromScript))
+                return sqlFromScript;
+
+            var queryable = await session.EvaluateProbeAsync(probeExpression, cancellationToken);
 
             return RelationalQueryableSqlFormatter.TryGetSql(
                 queryable,
-                host.EnumerateLoadedAssemblies(),
+                formatterAssemblies,
                 out var sql)
                 ? sql
                 : null;

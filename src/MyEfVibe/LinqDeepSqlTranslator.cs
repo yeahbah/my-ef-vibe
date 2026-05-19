@@ -19,13 +19,22 @@ internal static class LinqDeepSqlTranslator
                 "Could not derive an IQueryable probe (unsupported syntax or terminal operator).");
         }
 
+        var formatterAssemblies = host.EnumerateDiscoveryAssemblies().ToArray();
+
         try
         {
-            var queryable = await session.EvaluateAsync(probe, cancellationToken);
+            var sqlLiteral = await session.EvaluateProbeAsync(
+                $"{probe.TrimEnd()}.ToQueryString()",
+                cancellationToken);
+
+            if (sqlLiteral is string sqlFromScript && !string.IsNullOrWhiteSpace(sqlFromScript))
+                return new LinqSqlTranslationResult(sqlFromScript, null);
+
+            var queryable = await session.EvaluateProbeAsync(probe, cancellationToken);
 
             if (RelationalQueryableSqlFormatter.TryGetSql(
                     queryable,
-                    host.EnumerateLoadedAssemblies(),
+                    formatterAssemblies,
                     out var sql))
             {
                 return new LinqSqlTranslationResult(sql, null);

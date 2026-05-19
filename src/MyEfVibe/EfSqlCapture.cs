@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace MyEfVibe;
@@ -9,6 +8,7 @@ internal sealed class EfSqlCapture : IDisposable
 {
     private readonly List<SqlCommandEntry> _entries = new();
     private readonly Stopwatch _sessionStopwatch = Stopwatch.StartNew();
+    private IDisposable? _logSubscription;
     private long _lastCommandStartedMs;
 
     private EfSqlCapture()
@@ -22,14 +22,14 @@ internal sealed class EfSqlCapture : IDisposable
         if (databaseFacade is null)
             return null;
 
-        if (!TryLocateLogToMethod(databaseFacade, out var logToMethod, out var logLevelValue, out var commandCategory))
+        var binding = EntityFrameworkReflectionCache.ResolveLogTo(databaseFacade);
+
+        if (binding is null)
             return null;
 
         var capture = new EfSqlCapture();
 
-        Action<string> logAction = capture.OnLog;
-
-        if (!TryInvokeLogTo(logToMethod, databaseFacade, logAction, logLevelValue, commandCategory))
+        if (!TryInvokeLogTo(binding, databaseFacade, capture.OnLog, capture.OnDbCommand, out capture._logSubscription))
             return null;
 
         return capture;
@@ -82,6 +82,7 @@ internal sealed class EfSqlCapture : IDisposable
 
     public void Dispose()
     {
+        _logSubscription?.Dispose();
         _entries.Clear();
     }
 
@@ -93,8 +94,21 @@ internal sealed class EfSqlCapture : IDisposable
         if (!LooksLikeDatabaseCommandLog(message))
             return;
 
-        var normalized = NormalizeLogMessage(message);
+        RecordCommand(NormalizeLogMessage(message));
+    }
 
+    private void OnDbCommand(object dbCommand)
+    {
+        var commandText = dbCommand.GetType().GetProperty("CommandText")?.GetValue(dbCommand) as string;
+
+        if (string.IsNullOrWhiteSpace(commandText))
+            return;
+
+        RecordCommand(commandText.Trim());
+    }
+
+    private void RecordCommand(string normalized)
+    {
         if (string.IsNullOrWhiteSpace(normalized))
             return;
 
@@ -147,38 +161,78 @@ internal sealed class EfSqlCapture : IDisposable
     }
 
     private static bool TryInvokeLogTo(
-        MethodInfo logToMethod,
+        LogToBinding binding,
         object databaseFacade,
-        Action<string> logAction,
-        object logLevelValue,
-        string commandCategory)
+        Action<string> stringLogAction,
+        Action<object> commandLogAction,
+        out IDisposable? subscription)
     {
-        var parameters = logToMethod.GetParameters();
+        subscription = null;
+        var parameters = binding.Method.GetParameters();
 
         try
         {
+            var logAction = ResolveLogAction(binding.Method, stringLogAction, commandLogAction);
+
+            if (logAction is null)
+                return false;
+
             if (parameters.Length == 2)
             {
-                logToMethod.Invoke(null, new object?[] { databaseFacade, logAction });
+                subscription = binding.Method.Invoke(null, new object?[] { databaseFacade, logAction }) as IDisposable;
 
-                return true;
+                return subscription is not null;
             }
 
             if (parameters.Length == 3)
             {
-                logToMethod.Invoke(null, new object?[] { databaseFacade, logAction, logLevelValue });
+                subscription = binding.Method.Invoke(
+                    null,
+                    new object?[] { databaseFacade, logAction, binding.LogLevelValue }) as IDisposable;
 
-                return true;
+                return subscription is not null;
             }
 
-            logToMethod.Invoke(null, new object?[] { databaseFacade, logAction, logLevelValue, new[] { commandCategory } });
+            subscription = binding.Method.Invoke(
+                null,
+                new object?[]
+                {
+                    databaseFacade,
+                    logAction,
+                    binding.LogLevelValue,
+                    new[] { binding.CommandCategory },
+                }) as IDisposable;
 
-            return true;
+            return subscription is not null;
         }
         catch
         {
             return false;
         }
+    }
+
+    private static object? ResolveLogAction(
+        MethodInfo logToMethod,
+        Action<string> stringLogAction,
+        Action<object> commandLogAction)
+    {
+        var actionType = logToMethod.GetParameters()[1].ParameterType;
+
+        if (actionType == typeof(Action<string>))
+            return stringLogAction;
+
+        if (!actionType.IsGenericType || actionType.GetGenericTypeDefinition() != typeof(Action<>))
+            return null;
+
+        var argumentType = actionType.GetGenericArguments()[0];
+
+        if (argumentType == typeof(string))
+            return stringLogAction;
+
+        if (!string.Equals(argumentType.Name, "DbCommand", StringComparison.Ordinal))
+            return null;
+
+        return commandLogAction;
     }
 
     private static string NormalizeLogMessage(string message)
@@ -196,73 +250,31 @@ internal sealed class EfSqlCapture : IDisposable
             if (builder.Length > 0)
                 builder.AppendLine();
 
-            builder.Append(line);
-        }
+            var trimmed = line.Trim();
 
-        return builder.ToString();
-    }
+            if (ContainsSqlKeyword(trimmed) || trimmed.StartsWith("@", StringComparison.Ordinal))
+            {
+                builder.Append(trimmed);
+                continue;
+            }
 
-    private static bool TryLocateLogToMethod(
-        object databaseFacade,
-        out MethodInfo logToMethod,
-        out object logLevelValue,
-        out string commandCategory)
-    {
-        logToMethod = null!;
-        logLevelValue = 2;
-        commandCategory = "Microsoft.EntityFrameworkCore.Database.Command";
-
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            if (assembly.FullName?.Contains("EntityFrameworkCore", StringComparison.OrdinalIgnoreCase) != true)
+            if (builder.Length == 0 && !LooksLikeDatabaseCommandLog(trimmed))
                 continue;
 
-            foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
-            foreach (var candidate in exported.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
-            {
-                if (!candidate.IsDefined(typeof(ExtensionAttribute), inherit: false))
-                    continue;
-
-                if (!string.Equals(candidate.Name, "LogTo", StringComparison.Ordinal))
-                    continue;
-
-                var parameters = candidate.GetParameters();
-
-                if (parameters.Length < 2)
-                    continue;
-
-                if (!parameters[0].ParameterType.IsAssignableFrom(databaseFacade.GetType()))
-                    continue;
-
-                if (parameters[1].ParameterType == typeof(Action<string>))
-                {
-                    logToMethod = candidate;
-
-                    if (parameters.Length >= 3 && parameters[2].ParameterType.IsEnum)
-                        logLevelValue = Enum.ToObject(parameters[2].ParameterType, 2);
-
-                    return true;
-                }
-
-                if (parameters[1].ParameterType.IsGenericType
-                    && parameters[1].ParameterType.GetGenericTypeDefinition() == typeof(Action<>))
-                {
-                    var actionGenericArgs = parameters[1].ParameterType.GetGenericArguments();
-
-                    if (actionGenericArgs.Length == 4
-                        && actionGenericArgs[3] == typeof(string))
-                    {
-                        logToMethod = candidate;
-
-                        if (parameters.Length >= 3 && parameters[2].ParameterType.IsEnum)
-                            logLevelValue = Enum.ToObject(parameters[2].ParameterType, 2);
-
-                        return true;
-                    }
-                }
-            }
+            builder.Append(trimmed);
         }
 
-        return false;
+        var normalized = builder.ToString().Trim();
+
+        if (ContainsSqlKeyword(normalized))
+            return normalized;
+
+        foreach (var line in lines)
+        {
+            if (ContainsSqlKeyword(line))
+                return line.Trim();
+        }
+
+        return normalized;
     }
 }
