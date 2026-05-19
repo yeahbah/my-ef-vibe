@@ -211,6 +211,42 @@ internal sealed class WorkspaceDepsManifest
 
     internal IEnumerable<string> EnumerateProjectAssemblyPaths() => _projectAssemblyPaths;
 
+    internal static WorkspaceDepsManifest? Merge(WorkspaceDepsManifest? primary, WorkspaceDepsManifest? secondary)
+    {
+        if (primary is null)
+            return secondary;
+
+        if (secondary is null)
+            return primary;
+
+        primary.ImportFrom(secondary);
+
+        return primary;
+    }
+
+    private void ImportFrom(WorkspaceDepsManifest other)
+    {
+        foreach (var (simpleName, otherAssets) in other._assetsBySimpleName)
+        {
+            if (!_assetsBySimpleName.TryGetValue(simpleName, out var assets))
+            {
+                _assetsBySimpleName[simpleName] = [..otherAssets];
+                continue;
+            }
+
+            foreach (var asset in otherAssets)
+            {
+                if (assets.Any(existing =>
+                        string.Equals(existing.Path, asset.Path, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                assets.Add(asset);
+            }
+        }
+
+        _projectAssemblyPaths.UnionWith(other._projectAssemblyPaths);
+    }
+
     internal bool TryResolve(string? assemblySimpleName, out string absolutePath)
     {
         if (string.IsNullOrEmpty(assemblySimpleName))
@@ -273,10 +309,8 @@ internal sealed class WorkspaceDepsManifest
         if (notHigherThanRequested is not null)
             return notHigherThanRequested;
 
-        return withVersions
-            .OrderBy(asset => asset.Version)
-            .ThenByDescending(asset => asset.Rank)
-            .First();
+        // Never bind a higher assembly version to a lower reference (e.g. DiagnosticSource 10 for a 9.0.0.0 request).
+        return null;
     }
 
     internal ImmutableArray<string> RuntimeAssemblyPaths

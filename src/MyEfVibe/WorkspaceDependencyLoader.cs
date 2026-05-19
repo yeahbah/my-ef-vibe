@@ -16,6 +16,8 @@ internal static class WorkspaceDependencyLoader
 
         if (depsManifest is not null)
         {
+            PreloadEfReferenceAssemblies(loadContext, depsManifest);
+
             foreach (var bootstrap in new[]
                      {
                          "System.Configuration.ConfigurationManager",
@@ -103,6 +105,23 @@ internal static class WorkspaceDependencyLoader
 
                 yield return Path.GetFileNameWithoutExtension(fileName);
             }
+        }
+    }
+
+    private static void PreloadEfReferenceAssemblies(
+        AssemblyLoadContext loadContext,
+        WorkspaceDepsManifest depsManifest)
+    {
+        if (!depsManifest.TryResolve("Microsoft.EntityFrameworkCore", out var efPath))
+            return;
+
+        foreach (var reference in AssemblyReferenceReader.Read(efPath))
+        {
+            if (string.IsNullOrEmpty(reference.Name))
+                continue;
+
+            if (depsManifest.TryResolve(reference, out var referencePath))
+                TryLoad(loadContext, referencePath);
         }
     }
 

@@ -13,11 +13,20 @@ internal static class WorkspaceAssemblyFilter
         "myefvibe",
     ];
 
+    private static readonly string[] ExcludedAssemblyNames =
+    [
+        "System.Diagnostics.DiagnosticSource",
+    ];
+
     internal static bool ShouldScanAssembly(string dllPath)
     {
         var simpleName = Path.GetFileNameWithoutExtension(dllPath);
 
         if (string.IsNullOrEmpty(simpleName))
+            return false;
+
+        if (ExcludedAssemblyNames.Any(name =>
+                string.Equals(simpleName, name, StringComparison.OrdinalIgnoreCase)))
             return false;
 
         return !ExcludedNamePrefixes.Any(prefix =>

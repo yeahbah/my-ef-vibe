@@ -53,6 +53,7 @@ internal sealed class WorkspaceHost : IDisposable
             SharedFrameworkCatalog.Load(workspaceBuild.OutputDirectory, workspaceBuild.PrimaryAssemblyDll);
 
         var depsManifest = WorkspaceDepsManifest.TryLoad(workspaceBuild.PrimaryAssemblyDll);
+        depsManifest = MergeStartupDepsManifest(workspaceBuild, depsManifest);
 
         var assemblyResolver =
             WorkspaceAssemblyResolver.Install(workspaceBuild.PrimaryAssemblyDll, sharedFrameworkCatalog, depsManifest);
@@ -262,7 +263,7 @@ internal sealed class WorkspaceHost : IDisposable
         if (_resolver.DepsManifest is null)
             yield break;
 
-        foreach (var dllPath in _resolver.DepsManifest.RuntimeAssemblyPaths)
+        foreach (var dllPath in _resolver.DepsManifest.EnumerateProjectAssemblyPaths())
         {
             if (!File.Exists(dllPath))
                 continue;
@@ -273,6 +274,26 @@ internal sealed class WorkspaceHost : IDisposable
             if (seen.Add(dllPath))
                 yield return dllPath;
         }
+    }
+
+    private static WorkspaceDepsManifest? MergeStartupDepsManifest(
+        WorkspaceBuildResult workspaceBuild,
+        WorkspaceDepsManifest? depsManifest)
+    {
+        if (string.IsNullOrEmpty(workspaceBuild.StartupOutputDirectory)
+            || string.Equals(
+                workspaceBuild.OutputDirectory,
+                workspaceBuild.StartupOutputDirectory,
+                StringComparison.OrdinalIgnoreCase))
+            return depsManifest;
+
+        var startupAssemblyName = CsprojReader.ReadLogicalAssemblyName(workspaceBuild.StartupProjectPath);
+        var startupDll = Path.Combine(workspaceBuild.StartupOutputDirectory, $"{startupAssemblyName}.dll");
+
+        if (!File.Exists(startupDll))
+            return depsManifest;
+
+        return WorkspaceDepsManifest.Merge(depsManifest, WorkspaceDepsManifest.TryLoad(startupDll));
     }
 
     private static IEnumerable<string> CollectStartupRegistrationAssemblyPaths(
