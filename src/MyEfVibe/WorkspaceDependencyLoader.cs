@@ -29,19 +29,6 @@ internal static class WorkspaceDependencyLoader
                     TryLoad(loadContext, bootstrapPath);
             }
 
-            foreach (var absolutePath in depsManifest.RuntimeAssemblyPaths)
-            {
-                var assemblySimpleName = Path.GetFileNameWithoutExtension(absolutePath);
-
-                if (!seen.Add(assemblySimpleName))
-                    continue;
-
-                if (IsDesignTimeOrToolingAssembly(assemblySimpleName))
-                    continue;
-
-                TryLoad(loadContext, absolutePath);
-            }
-
             return;
         }
 

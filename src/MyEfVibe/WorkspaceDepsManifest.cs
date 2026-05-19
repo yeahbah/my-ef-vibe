@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using System.Text.Json;
 
 namespace MyEfVibe;
@@ -9,15 +10,14 @@ namespace MyEfVibe;
 /// </summary>
 internal sealed class WorkspaceDepsManifest
 {
-    private readonly Dictionary<string, string> _simpleNameToPath =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    private readonly Dictionary<string, int> _simpleNameRank =
+    private readonly Dictionary<string, List<AssemblyAsset>> _assetsBySimpleName =
         new(StringComparer.OrdinalIgnoreCase);
 
     private WorkspaceDepsManifest()
     {
     }
+
+    private sealed record AssemblyAsset(Version? Version, string Path, int Rank);
 
     internal static WorkspaceDepsManifest? TryLoad(string entryAssemblyPath)
     {
@@ -95,6 +95,7 @@ internal sealed class WorkspaceDepsManifest
         IReadOnlyList<string> runtimeFallbacks)
     {
         var packageFolder = ResolvePackageFolder(librariesProperty, libraryName, nuGetPackagesRoot);
+        var libraryVersion = TryParseVersionFromLibraryName(libraryName);
 
         foreach (var runtimeAsset in runtimeAssets.EnumerateObject())
         {
@@ -106,6 +107,7 @@ internal sealed class WorkspaceDepsManifest
                 runtimeAsset.Name,
                 packageFolder,
                 outputDirectory,
+                libraryVersion,
                 rank);
         }
     }
@@ -119,6 +121,7 @@ internal sealed class WorkspaceDepsManifest
         IReadOnlyList<string> runtimeFallbacks)
     {
         var packageFolder = ResolvePackageFolder(librariesProperty, libraryName, nuGetPackagesRoot);
+        var libraryVersion = TryParseVersionFromLibraryName(libraryName);
 
         foreach (var runtimeAsset in runtimeTargetAssets.EnumerateObject())
         {
@@ -135,7 +138,7 @@ internal sealed class WorkspaceDepsManifest
             if (rank == int.MaxValue)
                 continue;
 
-            TryAddAsset(runtimeAsset.Name, packageFolder, outputDirectory, rank);
+            TryAddAsset(runtimeAsset.Name, packageFolder, outputDirectory, libraryVersion, rank);
         }
     }
 
@@ -143,6 +146,7 @@ internal sealed class WorkspaceDepsManifest
         string relativeAssetPath,
         string? packageFolder,
         string outputDirectory,
+        Version? libraryVersion,
         int rank)
     {
         var normalizedRelativePath = relativeAssetPath.Replace('/', Path.DirectorySeparatorChar);
@@ -159,12 +163,165 @@ internal sealed class WorkspaceDepsManifest
             return;
 
         var simpleName = Path.GetFileNameWithoutExtension(fileName);
+        var assemblyVersion = TryReadAssemblyVersion(absolutePath) ?? libraryVersion;
 
-        if (_simpleNameRank.TryGetValue(simpleName, out var existingRank) && existingRank <= rank)
-            return;
+        if (!_assetsBySimpleName.TryGetValue(simpleName, out var assets))
+        {
+            assets = [];
+            _assetsBySimpleName[simpleName] = assets;
+        }
 
-        _simpleNameToPath[simpleName] = absolutePath;
-        _simpleNameRank[simpleName] = rank;
+        var duplicatePath = assets.FindIndex(asset =>
+            string.Equals(asset.Path, absolutePath, StringComparison.OrdinalIgnoreCase));
+
+        if (duplicatePath >= 0)
+        {
+            var existing = assets[duplicatePath];
+
+            if (existing.Rank <= rank)
+                return;
+
+            assets.RemoveAt(duplicatePath);
+        }
+
+        var sameVersionIndex = assets.FindIndex(asset => VersionsEqual(asset.Version, assemblyVersion));
+
+        if (sameVersionIndex >= 0)
+        {
+            var existing = assets[sameVersionIndex];
+
+            if (existing.Rank <= rank)
+                return;
+
+            assets.RemoveAt(sameVersionIndex);
+        }
+
+        assets.Add(new AssemblyAsset(assemblyVersion, absolutePath, rank));
+    }
+
+    internal bool TryResolve(string? assemblySimpleName, out string absolutePath)
+    {
+        if (string.IsNullOrEmpty(assemblySimpleName))
+        {
+            absolutePath = string.Empty;
+            return false;
+        }
+
+        return TryResolve(new AssemblyName(assemblySimpleName), out absolutePath);
+    }
+
+    internal bool TryResolve(AssemblyName requested, out string absolutePath)
+    {
+        absolutePath = string.Empty;
+
+        if (string.IsNullOrEmpty(requested.Name)
+            || !_assetsBySimpleName.TryGetValue(requested.Name, out var assets)
+            || assets.Count == 0)
+            return false;
+
+        var chosen = ChooseBestAsset(requested.Version, assets);
+
+        if (chosen is null)
+            return false;
+
+        absolutePath = chosen.Path;
+
+        return true;
+    }
+
+    private static AssemblyAsset? ChooseBestAsset(Version? requestedVersion, List<AssemblyAsset> assets)
+    {
+        if (assets.Count == 1)
+            return assets[0];
+
+        if (requestedVersion is null || requestedVersion == new Version(0, 0, 0, 0))
+        {
+            return assets
+                .OrderByDescending(static asset => asset.Rank)
+                .ThenByDescending(static asset => asset.Version ?? new Version(0, 0))
+                .First();
+        }
+
+        var withVersions = assets.Where(static asset => asset.Version is not null).ToArray();
+
+        if (withVersions.Length == 0)
+            return assets.OrderByDescending(static asset => asset.Rank).First();
+
+        var exact = withVersions.FirstOrDefault(asset => asset.Version == requestedVersion);
+
+        if (exact is not null)
+            return exact;
+
+        var notHigherThanRequested = withVersions
+            .Where(asset => asset.Version! <= requestedVersion)
+            .OrderByDescending(asset => asset.Version)
+            .ThenByDescending(asset => asset.Rank)
+            .FirstOrDefault();
+
+        if (notHigherThanRequested is not null)
+            return notHigherThanRequested;
+
+        return withVersions
+            .OrderBy(asset => asset.Version)
+            .ThenByDescending(asset => asset.Rank)
+            .First();
+    }
+
+    internal ImmutableArray<string> RuntimeAssemblyPaths
+    {
+        get
+        {
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var assets in _assetsBySimpleName.Values)
+            {
+                var preferred = ChooseBestAsset(requestedVersion: null, assets);
+
+                if (preferred is not null)
+                    paths.Add(preferred.Path);
+            }
+
+            return paths.ToImmutableArray();
+        }
+    }
+
+    private static bool VersionsEqual(Version? left, Version? right)
+    {
+        if (left is null && right is null)
+            return true;
+
+        if (left is null || right is null)
+            return false;
+
+        return left == right;
+    }
+
+    private static Version? TryParseVersionFromLibraryName(string libraryName)
+    {
+        var slashIndex = libraryName.LastIndexOf('/');
+
+        if (slashIndex < 0 || slashIndex >= libraryName.Length - 1)
+            return null;
+
+        return Version.TryParse(libraryName[(slashIndex + 1)..], out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private static Version? TryReadAssemblyVersion(string absolutePath)
+    {
+        try
+        {
+            return AssemblyName.GetAssemblyName(absolutePath).Version;
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+        catch (FileLoadException)
+        {
+            return null;
+        }
     }
 
     private static string? ResolvePackageFolder(
@@ -178,20 +335,6 @@ internal sealed class WorkspaceDepsManifest
 
         return Path.Combine(nuGetPackagesRoot, packagePathProperty.GetString()!);
     }
-
-    internal bool TryResolve(string? assemblySimpleName, out string absolutePath)
-    {
-        if (string.IsNullOrEmpty(assemblySimpleName))
-        {
-            absolutePath = string.Empty;
-            return false;
-        }
-
-        return _simpleNameToPath.TryGetValue(assemblySimpleName, out absolutePath!);
-    }
-
-    internal ImmutableArray<string> RuntimeAssemblyPaths
-        => _simpleNameToPath.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToImmutableArray();
 
     private static string ResolveNuGetPackagesRoot()
     {

@@ -124,6 +124,7 @@ Typical issues:
 | `SqlClient is not supported on this platform` | Old `efvibe` build; use a current build with RID-aware dependency loading. |
 | `LocalAppContextSwitches` / `ConfigurationManager` errors | Host/tool vs workspace assembly conflict; fixed in recent builds (workspace deps preload). |
 | `:plan` — `SET SHOWPLAN` batch error | SQL Server requires `SET SHOWPLAN_ALL` in its own batch; fixed in recent builds. |
+| `System.Diagnostics.DiagnosticSource` version 9.0.0 / 10.0.0 not found | Transitive NuGet pulls multiple versions; use a current `efvibe` build (version-aware `.deps.json` loading). If it persists, run the tool on the same band as your app, e.g. `dotnet efvibe -f net8.0` from a repo with `dotnet-tools.json`. |
 
 For greenfield Mac work without Docker, use `--provider sqlite` or `npgsql` on a project that targets those providers.
 

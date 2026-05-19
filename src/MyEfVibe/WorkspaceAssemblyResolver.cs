@@ -54,13 +54,21 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
 
     private Assembly? OnResolving(AssemblyLoadContext context, AssemblyName assemblyName)
     {
-        if (_depsManifest?.TryResolve(assemblyName.Name, out var depsPath) == true)
-            return context.LoadFromAssemblyPath(depsPath);
+        var alreadyLoaded = AppDomain.CurrentDomain
+            .GetAssemblies()
+            .FirstOrDefault(assembly =>
+                string.Equals(assembly.GetName().Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase));
+
+        if (alreadyLoaded is not null)
+            return alreadyLoaded;
 
         var resolvedPath = _dependencyResolver.ResolveAssemblyToPath(assemblyName);
 
         if (resolvedPath is not null)
             return context.LoadFromAssemblyPath(resolvedPath);
+
+        if (_depsManifest?.TryResolve(assemblyName, out var depsPath) == true)
+            return context.LoadFromAssemblyPath(depsPath);
 
         var outputCandidate = Path.Combine(_outputDirectory, $"{assemblyName.Name}.dll");
 
