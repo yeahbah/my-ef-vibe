@@ -36,18 +36,9 @@ internal sealed record WorkspaceBuildResult(
         if (!string.Equals(
                 csprojFile.FullName,
                 startupProject.FullName,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            var startupProjectDirectory =
-                startupProject.Directory!.FullName.TrimEnd(Path.DirectorySeparatorChar);
-
-            var startupAssemblyName =
-                CsprojReader.ReadLogicalAssemblyName(startupProject.FullName);
-
-            if (TryLocateBuiltAssembly(Path.Combine(startupProjectDirectory, "bin"), startupAssemblyName,
-                    out var startupDll))
-                startupOutputDirectory = Path.GetDirectoryName(startupDll);
-        }
+                StringComparison.OrdinalIgnoreCase)
+            && TryLocateStartupOutput(startupProject.FullName, out var locatedStartupOutput))
+            startupOutputDirectory = locatedStartupOutput;
 
         return new WorkspaceBuildResult(
             SessionDirectory: Path.GetFullPath(sessionDirectory.TrimEnd(Path.DirectorySeparatorChar)),
@@ -56,6 +47,26 @@ internal sealed record WorkspaceBuildResult(
             OutputDirectory: outputDirectory,
             PrimaryAssemblyDll: dll,
             StartupOutputDirectory: startupOutputDirectory);
+    }
+
+    internal static bool TryLocateStartupOutput(string startupProjectPath, out string? outputDirectory)
+    {
+        outputDirectory = null;
+
+        var startupProjectDirectory =
+            Path.GetDirectoryName(startupProjectPath);
+
+        if (string.IsNullOrEmpty(startupProjectDirectory))
+            return false;
+
+        var startupAssemblyName = CsprojReader.ReadLogicalAssemblyName(startupProjectPath);
+
+        if (!TryLocateBuiltAssembly(Path.Combine(startupProjectDirectory, "bin"), startupAssemblyName, out var startupDll))
+            return false;
+
+        outputDirectory = Path.GetDirectoryName(startupDll);
+
+        return true;
     }
 
     private static bool TryLocateBuiltAssembly(string binRoot, string assemblyName, out string dllPath)

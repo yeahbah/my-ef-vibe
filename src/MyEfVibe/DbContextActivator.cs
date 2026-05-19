@@ -155,68 +155,55 @@ internal static class DbContextActivator
 
     private static void AddDbContextTypesFromAssembly(Assembly assembly, HashSet<Type> distinctConcreteContexts)
     {
-        foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
-        {
-            if (!IsConcreteDbContext(exported))
-                continue;
-
-            distinctConcreteContexts.Add(exported);
-        }
-
-        if (distinctConcreteContexts.Count > 0)
-            return;
-
-        try
-        {
-            foreach (var candidate in assembly.GetTypes())
-            {
-                if (!IsConcreteDbContext(candidate))
-                    continue;
-
-                distinctConcreteContexts.Add(candidate);
-            }
-        }
-        catch (ReflectionTypeLoadException loaderFailure)
-        {
-            foreach (var candidate in loaderFailure.Types)
-            {
-                if (candidate is null || !IsConcreteDbContext(candidate))
-                    continue;
-
-                distinctConcreteContexts.Add(candidate);
-            }
-        }
+        foreach (var candidate in EnumerateDbContextCandidates(assembly))
+            distinctConcreteContexts.Add(candidate);
     }
 
     private static bool TryResolveContextType(WorkspaceHost host, string contextName, out Type resolved)
     {
         resolved = null!;
 
+        if (TryResolveContextTypeInAssembly(host.PrimaryAssembly, contextName, out resolved))
+            return true;
+
+        foreach (var assembly in host.EnumerateDiscoveryAssemblies())
+        {
+            if (ReferenceEquals(assembly, host.PrimaryAssembly))
+                continue;
+
+            if (TryResolveContextTypeInAssembly(assembly, contextName, out resolved))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveContextTypeInAssembly(Assembly assembly, string contextName, out Type resolved)
+    {
+        resolved = null!;
+
+        if (contextName.Contains('.', StringComparison.Ordinal))
+        {
+            var fromGetType = assembly.GetType(contextName, throwOnError: false, ignoreCase: true);
+
+            if (fromGetType is not null && SafeIsConcreteDbContext(fromGetType))
+            {
+                resolved = fromGetType;
+                return true;
+            }
+        }
+
         Type? uniqueMatch = null;
 
-        foreach (var assembly in host.EnumerateDiscoveryAssemblies().Prepend(host.PrimaryAssembly))
+        foreach (var candidate in EnumerateDbContextCandidates(assembly))
         {
-            if (contextName.Contains('.', StringComparison.Ordinal))
-            {
-                var fromGetType = assembly.GetType(contextName, throwOnError: false, ignoreCase: true);
+            if (!ContextNameMatcher.Matches(candidate, contextName))
+                continue;
 
-                if (fromGetType is not null && IsConcreteDbContext(fromGetType))
-                {
-                    resolved = fromGetType;
-                    return true;
-                }
-            }
+            if (uniqueMatch is not null && !ReferenceEquals(uniqueMatch, candidate))
+                return false;
 
-            foreach (var candidate in EnumerateDbContextCandidates(assembly))
-            {
-                if (!ContextNameMatcher.Matches(candidate, contextName))
-                    continue;
-
-                if (uniqueMatch is not null && !ReferenceEquals(uniqueMatch, candidate))
-                    return false;
-
-                uniqueMatch = candidate;
-            }
+            uniqueMatch = candidate;
         }
 
         if (uniqueMatch is null)
@@ -230,31 +217,51 @@ internal static class DbContextActivator
     private static IEnumerable<Type> EnumerateDbContextCandidates(Assembly assembly)
     {
         var candidates = new List<Type>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
+        foreach (var candidate in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
         {
-            if (IsConcreteDbContext(exported))
-                candidates.Add(exported);
+            if (!SafeIsConcreteDbContext(candidate))
+                continue;
+
+            if (seen.Add(candidate.FullName ?? candidate.Name))
+                candidates.Add(candidate);
         }
 
-        try
+        foreach (var candidate in ReflectionToolkit.EnumerateLoadableTypes(assembly))
         {
-            foreach (var candidate in assembly.GetTypes())
-            {
-                if (IsConcreteDbContext(candidate))
-                    candidates.Add(candidate);
-            }
-        }
-        catch (ReflectionTypeLoadException loaderFailure)
-        {
-            foreach (var candidate in loaderFailure.Types)
-            {
-                if (candidate is not null && IsConcreteDbContext(candidate))
-                    candidates.Add(candidate);
-            }
+            if (!SafeIsConcreteDbContext(candidate))
+                continue;
+
+            if (seen.Add(candidate.FullName ?? candidate.Name))
+                candidates.Add(candidate);
         }
 
         return candidates;
+    }
+
+    private static bool SafeIsConcreteDbContext(Type candidate)
+    {
+        try
+        {
+            return IsConcreteDbContext(candidate);
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (FileLoadException)
+        {
+            return false;
+        }
+        catch (TypeLoadException)
+        {
+            return false;
+        }
+        catch (BadImageFormatException)
+        {
+            return false;
+        }
     }
 
     private static string BuildNoDbContextDiscoveredMessage(WorkspaceHost host, string? requestedContextFullName)
@@ -292,7 +299,22 @@ internal static class DbContextActivator
         if (string.Equals(candidate.FullName, "Microsoft.EntityFrameworkCore.DbContext", StringComparison.Ordinal))
             return false;
 
-        if (candidate.Namespace?.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal) == true)
+        string? namespaceName;
+
+        try
+        {
+            namespaceName = candidate.Namespace;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (TypeLoadException)
+        {
+            return false;
+        }
+
+        if (namespaceName?.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal) == true)
             return false;
 
         var dbContextBase = ResolveDbContextBaseType(candidate.Assembly);
@@ -349,7 +371,7 @@ internal static class DbContextActivator
 
         var seenFactoryTypes = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var assembly in host.EnumerateDiscoveryAssemblies())
+        foreach (var assembly in host.EnumerateDesignTimeDiscoveryAssemblies())
         foreach (var candidate in EnumerateFactoryCandidateTypes(assembly))
         {
             var factoryKey = candidate.AssemblyQualifiedName ?? candidate.FullName ?? candidate.Name;
@@ -385,21 +407,15 @@ internal static class DbContextActivator
     private static IEnumerable<Type> EnumerateFactoryCandidateTypes(Assembly assembly)
     {
         var candidates = new List<Type>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
-            candidates.Add(exported);
+        foreach (var candidate in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly)
+                     .Concat(ReflectionToolkit.EnumerateLoadableTypes(assembly)))
+        {
+            var key = candidate.FullName ?? candidate.Name;
 
-        try
-        {
-            candidates.AddRange(assembly.GetTypes());
-        }
-        catch (ReflectionTypeLoadException loaderFailure)
-        {
-            foreach (var candidate in loaderFailure.Types)
-            {
-                if (candidate is not null)
-                    candidates.Add(candidate);
-            }
+            if (seen.Add(key))
+                candidates.Add(candidate);
         }
 
         return candidates;

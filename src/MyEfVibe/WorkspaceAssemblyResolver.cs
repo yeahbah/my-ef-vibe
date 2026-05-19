@@ -9,6 +9,8 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
     private readonly WorkspaceDepsManifest? _depsManifest;
     private readonly SharedFrameworkCatalog _sharedFrameworkCatalog;
     private readonly string _outputDirectory;
+    private readonly Dictionary<string, Assembly> _resolvedBySimpleName =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<AssemblyLoadContext, AssemblyName, Assembly?> _resolveHandler;
 
     private WorkspaceAssemblyResolver(
@@ -54,31 +56,56 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
 
     private Assembly? OnResolving(AssemblyLoadContext context, AssemblyName assemblyName)
     {
-        var alreadyLoaded = AppDomain.CurrentDomain
-            .GetAssemblies()
-            .FirstOrDefault(assembly =>
-                string.Equals(assembly.GetName().Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase));
+        var simpleName = assemblyName.Name;
 
-        if (alreadyLoaded is not null)
-            return alreadyLoaded;
+        if (string.IsNullOrEmpty(simpleName))
+            return null;
+
+        if (_resolvedBySimpleName.TryGetValue(simpleName, out var cached))
+            return cached;
+
+        Assembly? loaded = null;
 
         var resolvedPath = _dependencyResolver.ResolveAssemblyToPath(assemblyName);
 
         if (resolvedPath is not null)
-            return context.LoadFromAssemblyPath(resolvedPath);
+            loaded = TryLoad(context, resolvedPath);
 
-        if (_depsManifest?.TryResolve(assemblyName, out var depsPath) == true)
-            return context.LoadFromAssemblyPath(depsPath);
+        if (loaded is null && _depsManifest?.TryResolve(assemblyName, out var depsPath) == true)
+            loaded = TryLoad(context, depsPath);
 
-        var outputCandidate = Path.Combine(_outputDirectory, $"{assemblyName.Name}.dll");
+        if (loaded is null)
+        {
+            var outputCandidate = Path.Combine(_outputDirectory, $"{simpleName}.dll");
 
-        if (File.Exists(outputCandidate))
-            return context.LoadFromAssemblyPath(outputCandidate);
+            if (File.Exists(outputCandidate))
+                loaded = TryLoad(context, outputCandidate);
+        }
 
-        if (_sharedFrameworkCatalog.TryResolve(assemblyName.Name!, out var sharedPath))
-            return context.LoadFromAssemblyPath(sharedPath);
+        if (loaded is null
+            && _sharedFrameworkCatalog.TryResolve(simpleName, out var sharedPath))
+            loaded = TryLoad(context, sharedPath);
 
-        return null;
+        if (loaded is not null)
+            _resolvedBySimpleName[simpleName] = loaded;
+
+        return loaded;
+    }
+
+    private static Assembly? TryLoad(AssemblyLoadContext context, string absolutePath)
+    {
+        try
+        {
+            return context.LoadFromAssemblyPath(absolutePath);
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+        catch (FileLoadException)
+        {
+            return null;
+        }
     }
 
     public void Dispose()

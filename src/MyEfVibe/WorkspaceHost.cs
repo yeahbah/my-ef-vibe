@@ -7,6 +7,8 @@ namespace MyEfVibe;
 internal sealed class WorkspaceHost : IDisposable
 {
     private readonly WorkspaceAssemblyResolver _resolver;
+    private string? _startupOutputDirectory;
+    private bool _startupBuildAttempted;
 
     private WorkspaceHost(
         WorkspaceAssemblyResolver resolver,
@@ -24,7 +26,7 @@ internal sealed class WorkspaceHost : IDisposable
         ProjectPath = projectPath;
         StartupProjectPath = startupProjectPath;
         OutputDirectory = outputDirectory;
-        StartupOutputDirectory = startupOutputDirectory;
+        _startupOutputDirectory = startupOutputDirectory;
         SessionDirectory = sessionDirectory;
     }
 
@@ -41,7 +43,7 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal string OutputDirectory { get; }
 
-    internal string? StartupOutputDirectory { get; }
+    internal string? StartupOutputDirectory => _startupOutputDirectory;
 
     internal string SessionDirectory { get; private set; }
 
@@ -151,10 +153,16 @@ internal sealed class WorkspaceHost : IDisposable
     }
 
     internal IEnumerable<Assembly> EnumerateDiscoveryAssemblies()
+        => EnumerateAssembliesFromPaths(EnumerateEfDiscoveryAssemblyPaths());
+
+    internal IEnumerable<Assembly> EnumerateDesignTimeDiscoveryAssemblies()
+        => EnumerateAssembliesFromPaths(EnumerateDesignTimeDiscoveryAssemblyPaths());
+
+    private IEnumerable<Assembly> EnumerateAssembliesFromPaths(IEnumerable<string> assemblyPaths)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var assemblyPath in EnumerateDiscoveryAssemblyPaths())
+        foreach (var assemblyPath in assemblyPaths)
         {
             Assembly assembly;
 
@@ -183,32 +191,65 @@ internal sealed class WorkspaceHost : IDisposable
         }
     }
 
-    private IEnumerable<string> EnumerateOutputDirectoriesToScan()
-    {
-        yield return OutputDirectory;
+    private IEnumerable<string> EnumerateEfDiscoveryAssemblyPaths()
+        => EnumerateDiscoveryAssemblyPaths(OutputDirectory);
 
-        if (!string.IsNullOrEmpty(StartupOutputDirectory)
-            && !string.Equals(StartupOutputDirectory, OutputDirectory, StringComparison.OrdinalIgnoreCase))
-            yield return StartupOutputDirectory;
+    private IEnumerable<string> EnumerateDesignTimeDiscoveryAssemblyPaths()
+    {
+        foreach (var path in EnumerateEfDiscoveryAssemblyPaths())
+            yield return path;
+
+        var startupOutputDirectory = EnsureStartupOutputDirectory();
+
+        if (string.IsNullOrEmpty(startupOutputDirectory)
+            || string.Equals(startupOutputDirectory, OutputDirectory, StringComparison.OrdinalIgnoreCase))
+            yield break;
+
+        foreach (var path in EnumerateDiscoveryAssemblyPaths(startupOutputDirectory))
+            yield return path;
     }
 
-    private IEnumerable<string> EnumerateDiscoveryAssemblyPaths()
+    private string? EnsureStartupOutputDirectory()
+    {
+        if (!string.IsNullOrEmpty(_startupOutputDirectory))
+            return _startupOutputDirectory;
+
+        if (string.Equals(ProjectPath, StartupProjectPath, StringComparison.OrdinalIgnoreCase))
+            return _startupOutputDirectory = OutputDirectory;
+
+        if (_startupBuildAttempted)
+            return null;
+
+        _startupBuildAttempted = true;
+
+        if (WorkspaceBuildResult.TryLocateStartupOutput(StartupProjectPath, out var startupOutputDirectory))
+        {
+            _startupOutputDirectory = startupOutputDirectory;
+            return _startupOutputDirectory;
+        }
+
+        WorkspaceBuilder.RunDotnetBuild(StartupProjectPath);
+
+        if (WorkspaceBuildResult.TryLocateStartupOutput(StartupProjectPath, out startupOutputDirectory))
+            _startupOutputDirectory = startupOutputDirectory;
+
+        return _startupOutputDirectory;
+    }
+
+    private IEnumerable<string> EnumerateDiscoveryAssemblyPaths(string outputDirectory)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var scanDirectory in EnumerateOutputDirectoriesToScan())
+        if (!Directory.Exists(outputDirectory))
+            yield break;
+
+        foreach (var dllPath in Directory.EnumerateFiles(outputDirectory, "*.dll", SearchOption.TopDirectoryOnly))
         {
-            if (!Directory.Exists(scanDirectory))
+            if (!WorkspaceAssemblyFilter.ShouldScanAssembly(dllPath))
                 continue;
 
-            foreach (var dllPath in Directory.EnumerateFiles(scanDirectory, "*.dll", SearchOption.TopDirectoryOnly))
-            {
-                if (!WorkspaceAssemblyFilter.ShouldScanAssembly(dllPath))
-                    continue;
-
-                if (seen.Add(dllPath))
-                    yield return dllPath;
-            }
+            if (seen.Add(dllPath))
+                yield return dllPath;
         }
 
         if (_resolver.DepsManifest is null)

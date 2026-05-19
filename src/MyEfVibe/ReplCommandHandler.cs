@@ -172,7 +172,10 @@ internal sealed class ReplCommandHandler
         }
 
         var mode = parts[1].ToLowerInvariant();
-        var displayRoot = Path.GetDirectoryName(_host.ProjectPath)!;
+        var displayRoot = Path.GetDirectoryName(
+            string.Equals(_host.ProjectPath, _host.StartupProjectPath, StringComparison.OrdinalIgnoreCase)
+                ? _host.ProjectPath
+                : _host.StartupProjectPath)!;
 
         switch (mode)
         {
@@ -194,7 +197,7 @@ internal sealed class ReplCommandHandler
     {
         var result = CliUi.RunWithStatus(
             "Scanning project sources for LINQ patterns…",
-            () => LinqLiteScanner.Scan(_host.ProjectPath));
+            () => LinqLiteScanner.Scan(_host.ProjectPath, _host.StartupProjectPath));
 
         var (filteredFindings, dismissedSkipped) = LinqScanDismissalStore.FilterFindings(
             result.Findings,
@@ -239,6 +242,7 @@ internal sealed class ReplCommandHandler
 
                     (result, stats) = await LinqDeepScanner.ScanAsync(
                         _host.ProjectPath,
+                        _host.StartupProjectPath,
                         _session,
                         _host,
                         progress,

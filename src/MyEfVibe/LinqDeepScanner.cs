@@ -9,13 +9,14 @@ internal static class LinqDeepScanner
 {
     internal static async Task<(LinqLiteScanResult Result, LinqDeepScanStats Stats)> ScanAsync(
         string efProjectPath,
+        string startupProjectPath,
         ScriptSession session,
         WorkspaceHost host,
         IProgress<(int Completed, int Total)>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var lite = LinqLiteScanner.Scan(efProjectPath);
-        var sites = LinqQuerySiteCollector.Collect(efProjectPath);
+        var lite = LinqLiteScanner.Scan(efProjectPath, startupProjectPath);
+        var sites = LinqQuerySiteCollector.Collect(efProjectPath, startupProjectPath);
 
         var uniqueSites = sites
             .GroupBy(static site => $"{site.FilePath}|{site.Line}", StringComparer.OrdinalIgnoreCase)

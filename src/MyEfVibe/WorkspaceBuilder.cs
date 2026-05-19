@@ -23,16 +23,10 @@ internal static class WorkspaceBuilder
     {
         RunDotnetBuild(projectFile.FullName);
 
-        if (!string.Equals(
-                projectFile.FullName,
-                startupProject.FullName,
-                StringComparison.OrdinalIgnoreCase))
-            RunDotnetBuild(startupProject.FullName);
-
         return WorkspaceBuildResult.RequirePrimaryAssembly(sessionDirectory, projectFile, startupProject);
     }
 
-    private static void RunDotnetBuild(string csprojFullPath)
+    internal static void RunDotnetBuild(string csprojFullPath)
     {
         var startInfo = new ProcessStartInfo
         {

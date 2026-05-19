@@ -31,7 +31,7 @@ internal static class StartupProjectResolver
             .Where(static path => !IsUnderBuildArtifacts(path))
             .Where(path => !string.Equals(path, efProjectPath, StringComparison.OrdinalIgnoreCase))
             .Where(path => !CsprojInspector.IsTestProject(path))
-            .Where(path => ReferencesProject(path, efProjectPath))
+            .Where(path => ProjectReferenceWalker.ReferencesProject(path, efProjectPath))
             .Select(path => new RankedStartup(path, ScoreStartupCandidate(path), BuildLabel(path)))
             .Where(static candidate => candidate.Score > 0)
             .OrderByDescending(static candidate => candidate.Score)
@@ -100,32 +100,6 @@ internal static class StartupProjectResolver
         return traits.Count == 0
             ? name
             : $"{name} [grey]({string.Join(", ", traits)})[/]";
-    }
-
-    private static bool ReferencesProject(string csprojPath, string targetProjectPath, int maxDepth = 6)
-    {
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var queue = new Queue<(string Path, int Depth)>();
-        queue.Enqueue((csprojPath, 0));
-
-        while (queue.Count > 0)
-        {
-            var (current, depth) = queue.Dequeue();
-
-            if (depth > maxDepth)
-                continue;
-
-            foreach (var referencePath in CsprojInspector.GetProjectReferencePaths(current))
-            {
-                if (string.Equals(referencePath, targetProjectPath, StringComparison.OrdinalIgnoreCase))
-                    return true;
-
-                if (visited.Add(referencePath))
-                    queue.Enqueue((referencePath, depth + 1));
-            }
-        }
-
-        return false;
     }
 
     private static bool IsUnderBuildArtifacts(string absolutePathCandidate)

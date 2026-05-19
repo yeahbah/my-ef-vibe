@@ -17,6 +17,8 @@ Session artifacts live under `~/.efvibe/<ProjectName>/<DbContextName>/` (or `%AP
 
 **`:scan lite`** does not use the database. **`:scan deep`** uses the connected `DbContext` to call `ToQueryString()` — it does not execute the full materializing query.
 
+Scans include sources from **both** `-p` (EF/persistence) and `-s` (startup/API when different), so query code in the API is included even when `-p` only contains the `DbContext`.
+
 ## Rules detected
 
 - `AsEnumerable()` / client-side evaluation risk (`client-eval`)

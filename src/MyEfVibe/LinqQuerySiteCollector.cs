@@ -34,10 +34,10 @@ internal static class LinqQuerySiteCollector
         "AllAsync",
     };
 
-    internal static IReadOnlyList<LinqQuerySite> Collect(string efProjectPath)
+    internal static IReadOnlyList<LinqQuerySite> Collect(string efProjectPath, string startupProjectPath)
     {
         var sites = new List<LinqQuerySite>();
-        var projectPaths = LinqProjectSourceWalker.CollectProjectPaths(efProjectPath);
+        var projectPaths = LinqProjectSourceWalker.CollectScanProjectPaths(efProjectPath, startupProjectPath);
 
         foreach (var projectPath in projectPaths)
         {

@@ -170,7 +170,13 @@ Re-show with `:warnings`.
 
 ### Static LINQ scan (`:scan lite`, `:scan deep`)
 
-**`:scan lite`** walks `.cs` files in the built EF project and its referenced projects (test projects skipped). It uses Roslyn syntax analysis and the same heuristics as snippet `:warnings` — no database, no SQL generation.
+**`:scan lite`** walks `.cs` files in:
+
+1. The **EF project** (`-p`) and everything it references (e.g. domain), and  
+2. When different, the **startup project** (`-s`, usually the API) and everything *it* references, and  
+3. Any other project in the solution that **references** `-p` (e.g. **Application** when API → Application → Persistence, even if the API has no LINQ in its own `.cs` files).
+
+Test projects are skipped. This covers persistence + API + application-layer repositories. It uses Roslyn syntax analysis and the same heuristics as snippet `:warnings` — no database, no SQL generation.
 
 **`:scan deep`** runs the lite heuristics, then attempts **`ToQueryString()`** for each query call site using the live REPL `db` context (requires a working connection). Source is adapted for the REPL: `DbContext` → `db`, conditions extracted from `if` / `while` / `switch`, and terminal operators removed (including `AnyAsync(ct)`, `ToListAsync(cancellationToken)`, etc.). Expressions that still depend on method parameters, locals, or other runtime-only values may fail translation — the note is shown on the finding.
 

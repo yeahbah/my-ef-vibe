@@ -34,11 +34,11 @@ internal static class LinqLiteScanner
         "AllAsync",
     };
 
-    internal static LinqLiteScanResult Scan(string efProjectPath)
+    internal static LinqLiteScanResult Scan(string efProjectPath, string startupProjectPath)
     {
         var findings = new List<LinqScanFinding>();
         var filesScanned = 0;
-        var projectPaths = LinqProjectSourceWalker.CollectProjectPaths(efProjectPath);
+        var projectPaths = LinqProjectSourceWalker.CollectScanProjectPaths(efProjectPath, startupProjectPath);
 
         foreach (var projectPath in projectPaths)
         {
