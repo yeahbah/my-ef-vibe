@@ -67,9 +67,11 @@ internal sealed class WorkspaceHost : IDisposable
 
         assemblyLoader.RegisterDependency(primaryAssembly);
 
-        // Register only project output DLLs at startup. NuGet dependencies are resolved on demand
-        // with version-aware .deps.json handling (avoids pinning e.g. DiagnosticSource 10 when 9 is needed).
-        foreach (var referencePath in ArtifactResolver.CollectReferencePaths(workspaceBuild.OutputDirectory))
+        // Register only project-built assemblies at startup. Copied NuGet DLLs in bin/ (e.g.
+        // DiagnosticSource 10) are resolved on demand with version-aware .deps.json handling.
+        foreach (var referencePath in CollectStartupRegistrationAssemblyPaths(
+                     workspaceBuild.PrimaryAssemblyDll,
+                     depsManifest))
         {
             if (!File.Exists(referencePath))
                 continue;
@@ -271,6 +273,21 @@ internal sealed class WorkspaceHost : IDisposable
             if (seen.Add(dllPath))
                 yield return dllPath;
         }
+    }
+
+    private static IEnumerable<string> CollectStartupRegistrationAssemblyPaths(
+        string primaryAssemblyDll,
+        WorkspaceDepsManifest? depsManifest)
+    {
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { primaryAssemblyDll };
+
+        if (depsManifest is null)
+            return paths;
+
+        foreach (var projectPath in depsManifest.EnumerateProjectAssemblyPaths())
+            paths.Add(projectPath);
+
+        return paths;
     }
 
     private static Assembly LoadOrGetAssembly(string absolutePath)

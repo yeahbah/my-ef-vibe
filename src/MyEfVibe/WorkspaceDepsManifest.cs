@@ -13,6 +13,9 @@ internal sealed class WorkspaceDepsManifest
     private readonly Dictionary<string, List<AssemblyAsset>> _assetsBySimpleName =
         new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly HashSet<string> _projectAssemblyPaths =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private WorkspaceDepsManifest()
     {
     }
@@ -96,6 +99,7 @@ internal sealed class WorkspaceDepsManifest
     {
         var packageFolder = ResolvePackageFolder(librariesProperty, libraryName, nuGetPackagesRoot);
         var libraryVersion = TryParseVersionFromLibraryName(libraryName);
+        var isProjectLibrary = IsProjectLibrary(librariesProperty, libraryName);
 
         foreach (var runtimeAsset in runtimeAssets.EnumerateObject())
         {
@@ -108,7 +112,8 @@ internal sealed class WorkspaceDepsManifest
                 packageFolder,
                 outputDirectory,
                 libraryVersion,
-                rank);
+                rank,
+                isProjectLibrary);
         }
     }
 
@@ -122,6 +127,7 @@ internal sealed class WorkspaceDepsManifest
     {
         var packageFolder = ResolvePackageFolder(librariesProperty, libraryName, nuGetPackagesRoot);
         var libraryVersion = TryParseVersionFromLibraryName(libraryName);
+        var isProjectLibrary = IsProjectLibrary(librariesProperty, libraryName);
 
         foreach (var runtimeAsset in runtimeTargetAssets.EnumerateObject())
         {
@@ -138,7 +144,7 @@ internal sealed class WorkspaceDepsManifest
             if (rank == int.MaxValue)
                 continue;
 
-            TryAddAsset(runtimeAsset.Name, packageFolder, outputDirectory, libraryVersion, rank);
+            TryAddAsset(runtimeAsset.Name, packageFolder, outputDirectory, libraryVersion, rank, isProjectLibrary);
         }
     }
 
@@ -147,7 +153,8 @@ internal sealed class WorkspaceDepsManifest
         string? packageFolder,
         string outputDirectory,
         Version? libraryVersion,
-        int rank)
+        int rank,
+        bool isProjectLibrary)
     {
         var normalizedRelativePath = relativeAssetPath.Replace('/', Path.DirectorySeparatorChar);
         var fileName = Path.GetFileName(normalizedRelativePath);
@@ -197,7 +204,12 @@ internal sealed class WorkspaceDepsManifest
         }
 
         assets.Add(new AssemblyAsset(assemblyVersion, absolutePath, rank));
+
+        if (isProjectLibrary)
+            _projectAssemblyPaths.Add(absolutePath);
     }
+
+    internal IEnumerable<string> EnumerateProjectAssemblyPaths() => _projectAssemblyPaths;
 
     internal bool TryResolve(string? assemblySimpleName, out string absolutePath)
     {
@@ -322,6 +334,15 @@ internal sealed class WorkspaceDepsManifest
         {
             return null;
         }
+    }
+
+    private static bool IsProjectLibrary(JsonElement librariesProperty, string libraryName)
+    {
+        if (!librariesProperty.TryGetProperty(libraryName, out var libraryMetadata)
+            || !libraryMetadata.TryGetProperty("type", out var typeProperty))
+            return false;
+
+        return string.Equals(typeProperty.GetString(), "project", StringComparison.Ordinal);
     }
 
     private static string? ResolvePackageFolder(

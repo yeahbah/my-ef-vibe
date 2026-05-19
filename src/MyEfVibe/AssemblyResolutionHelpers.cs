@@ -41,4 +41,25 @@ internal static class AssemblyResolutionHelpers
 
         return null;
     }
+
+    internal static bool IsCompatibleWithRequestedVersion(AssemblyName requested, string absolutePath)
+    {
+        var requestedVersion = requested.Version;
+
+        if (requestedVersion is null || IsZeroVersion(requestedVersion))
+            return true;
+
+        try
+        {
+            return AssemblyName.GetAssemblyName(absolutePath).Version == requestedVersion;
+        }
+        catch (BadImageFormatException)
+        {
+            return false;
+        }
+        catch (FileLoadException)
+        {
+            return false;
+        }
+    }
 }

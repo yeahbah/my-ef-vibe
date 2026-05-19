@@ -77,10 +77,21 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
 
         Assembly? loaded = null;
 
-        var resolvedPath = _dependencyResolver.ResolveAssemblyToPath(assemblyName);
+        var hasExplicitVersion = assemblyName.Version is not null
+                                 && !AssemblyResolutionHelpers.IsZeroVersion(assemblyName.Version);
 
-        if (resolvedPath is not null)
-            loaded = TryLoad(context, resolvedPath);
+        // Prefer version-aware .deps.json resolution when a specific version is requested (e.g. DiagnosticSource 9 for EF 9).
+        if (hasExplicitVersion && _depsManifest?.TryResolve(assemblyName, out var versionedDepsPath) == true)
+            loaded = TryLoad(context, versionedDepsPath);
+
+        if (loaded is null)
+        {
+            var resolvedPath = _dependencyResolver.ResolveAssemblyToPath(assemblyName);
+
+            if (resolvedPath is not null
+                && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, resolvedPath))
+                loaded = TryLoad(context, resolvedPath);
+        }
 
         if (loaded is null && _depsManifest?.TryResolve(assemblyName, out var depsPath) == true)
             loaded = TryLoad(context, depsPath);
@@ -89,7 +100,8 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         {
             var outputCandidate = Path.Combine(_outputDirectory, $"{simpleName}.dll");
 
-            if (File.Exists(outputCandidate))
+            if (File.Exists(outputCandidate)
+                && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, outputCandidate))
                 loaded = TryLoad(context, outputCandidate);
         }
 
