@@ -63,8 +63,12 @@ internal sealed class ScriptSession
             "Microsoft.EntityFrameworkCore.Infrastructure",
         };
 
-        importNamespaces.AddRange(CollectWorkspaceNamespaces(workspaceAssemblyPaths));
-        _importNamespaces = importNamespaces.ToImmutableArray();
+        importNamespaces.AddRange(
+            ScriptNamespaceImports.FilterWorkspaceNamespaces(CollectWorkspaceNamespaces(workspaceAssemblyPaths)));
+
+        _importNamespaces = importNamespaces
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
 
         _options = ScriptOptions.Default
             .AddReferences(MetadataReferences)
@@ -196,7 +200,8 @@ internal sealed class ScriptSession
             if (!File.Exists(assemblyPath))
                 continue;
 
-            if (assemblyPath.Contains("Microsoft.", StringComparison.OrdinalIgnoreCase))
+            if (assemblyPath.Contains("Microsoft.", StringComparison.OrdinalIgnoreCase)
+                || assemblyPath.Contains("System.Linq.Dynamic", StringComparison.OrdinalIgnoreCase))
                 continue;
 
             try
