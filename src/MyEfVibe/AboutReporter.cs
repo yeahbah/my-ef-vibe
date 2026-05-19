@@ -18,7 +18,7 @@ internal static class AboutReporter
         tool.AddColumn();
         tool.AddColumn();
         tool.AddRow("[bold]Command[/]", "[cyan]efvibe[/] [grey](MyEfVibe)[/]");
-        tool.AddRow("[grey]Version[/]", Markup.Escape(GetVersion(assembly)));
+        tool.AddRow("[grey]Version[/]", Markup.Escape(ToolInfo.GetVersion()));
         tool.AddRow("[grey]Description[/]", Markup.Escape(GetDescription(assembly)));
         tool.AddRow("[grey]Author[/]", Markup.Escape(GetAuthors(assembly)));
         tool.AddRow("[grey]License[/]", "Apache-2.0");
@@ -65,20 +65,6 @@ internal static class AboutReporter
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[grey]Type :help for commands.[/]");
         AnsiConsole.WriteLine();
-    }
-
-    private static string GetVersion(Assembly assembly)
-    {
-        var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-
-        if (!string.IsNullOrWhiteSpace(informational))
-        {
-            var plus = informational.IndexOf('+', StringComparison.Ordinal);
-
-            return plus >= 0 ? informational[..plus] : informational;
-        }
-
-        return assembly.GetName().Version?.ToString(3) ?? "unknown";
     }
 
     private static string GetDescription(Assembly assembly) =>

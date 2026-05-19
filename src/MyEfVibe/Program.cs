@@ -8,6 +8,12 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        if (IsVersionRequest(args))
+        {
+            Console.WriteLine(ToolInfo.GetVersion());
+            return 0;
+        }
+
         CliUi.Configure();
 
         var workspaceOption = new Option<DirectoryInfo?>(
@@ -45,6 +51,10 @@ internal static class Program
             description: "Show generated SQL (executed commands and translated IQueryable SQL).",
             getDefaultValue: () => true);
 
+        var versionOption = new Option<bool>(
+            aliases: new[] { "--version", "-V" },
+            description: "Show tool version and exit.");
+
         var expressionArgument = new Argument<string[]>("expression")
 
         {
@@ -63,6 +73,7 @@ internal static class Program
             providerOption,
             expressionOption,
             sqlOption,
+            versionOption,
             expressionArgument,
         };
 
@@ -76,6 +87,12 @@ internal static class Program
                 AnsiConsole.MarkupLine($"[red]{Markup.Escape(error.Message)}[/]");
 
             return 1;
+        }
+
+        if (parseResult.GetValueForOption(versionOption))
+        {
+            Console.WriteLine(ToolInfo.GetVersion());
+            return 0;
         }
 
         var workspace = parseResult.GetValueForOption(workspaceOption)
@@ -241,5 +258,23 @@ internal static class Program
             return null;
 
         return string.Join(' ', expressionArgumentTokens).Trim();
+    }
+
+    private static bool IsVersionRequest(string[] args)
+    {
+        if (args.Length is 0 or > 2)
+            return false;
+
+        foreach (var arg in args)
+        {
+            if (string.Equals(arg, "--version", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(arg, "-V", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(arg, "-v", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            return false;
+        }
+
+        return args.Length > 0;
     }
 }
