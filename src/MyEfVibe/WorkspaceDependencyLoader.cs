@@ -23,6 +23,9 @@ internal static class WorkspaceDependencyLoader
                          "Microsoft.EntityFrameworkCore.Abstractions",
                          "Microsoft.EntityFrameworkCore",
                          "Microsoft.EntityFrameworkCore.Relational",
+                         "Microsoft.EntityFrameworkCore.SqlServer",
+                         "Npgsql.EntityFrameworkCore.PostgreSQL",
+                         "Microsoft.EntityFrameworkCore.Sqlite",
                      })
             {
                 if (depsManifest.TryResolve(bootstrap, out var bootstrapPath))

@@ -43,6 +43,8 @@ internal static class DbContextActivator
         if (TryCreateUsingParameterlessConstructor(selectedDbContextType, out var parameterlessInstance))
             return parameterlessInstance;
 
+        var resolvedConnectionFromConfiguration = false;
+
         if (string.IsNullOrWhiteSpace(connectionString)
             && AppSettingsConnectionResolver.TryResolve(
                 host.StartupProjectPath,
@@ -52,6 +54,7 @@ internal static class DbContextActivator
         {
             connectionString = fromConfiguration;
             provider ??= inferredProvider;
+            resolvedConnectionFromConfiguration = true;
         }
 
         if (!string.IsNullOrWhiteSpace(connectionString) && provider.HasValue
@@ -78,6 +81,20 @@ internal static class DbContextActivator
                 $"{Environment.NewLine}{Environment.NewLine}Design-time factory attempts:"
                 + $"{Environment.NewLine}"
                 + string.Join(Environment.NewLine, designTimeFactoryErrors.Select(static line => $" - {line}"));
+
+        if (resolvedConnectionFromConfiguration)
+        {
+            failureMessage += $"{Environment.NewLine}{Environment.NewLine}Configuration was read from the startup project";
+
+            if (string.IsNullOrWhiteSpace(connectionString))
+                failureMessage += ", but no connection string was found.";
+            else if (!provider.HasValue)
+                failureMessage += ", but the database provider could not be inferred. Pass `--provider` (sqlserver | npgsql | sqlite).";
+            else
+                failureMessage +=
+                    ", but constructing `DbContextOptions` failed."
+                    + " Ensure EF provider packages are referenced by the `-p` project and restore/build succeeded.";
+        }
 
         throw new InvalidOperationException(failureMessage);
     }
@@ -663,20 +680,7 @@ internal static class DbContextActivator
     }
 
     private static Assembly? LoadWorkspaceAssembly(WorkspaceHost host, string assemblyName)
-    {
-        var alreadyLoaded = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(assembly =>
-            string.Equals(assembly.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase));
-
-        if (alreadyLoaded is not null)
-            return alreadyLoaded;
-
-        var candidatePath = Path.Combine(host.OutputDirectory, $"{assemblyName}.dll");
-
-        if (!File.Exists(candidatePath))
-            return null;
-
-        return AssemblyLoadContext.Default.LoadFromAssemblyPath(candidatePath);
-    }
+        => host.LoadAssembly(assemblyName);
 
     private static readonly IReadOnlyDictionary<MyEfVibeProvider, string> ProviderExtensionAssemblyNames =
         new Dictionary<MyEfVibeProvider, string>

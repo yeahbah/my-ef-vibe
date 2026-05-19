@@ -11,6 +11,8 @@ internal static class WorkspaceReferenceCollector
         foreach (var path in ArtifactResolver.CollectReferencePaths(outputDirectory))
             paths.Add(path);
 
+        // NuGet paths from .deps.json are metadata references for Roslyn only. Runtime loading uses
+        // WorkspaceAssemblyResolver so multiple versions (e.g. DiagnosticSource 9 and 10) are not pinned early.
         var manifest = WorkspaceDepsManifest.TryLoad(primaryAssemblyDll);
 
         if (manifest is not null)

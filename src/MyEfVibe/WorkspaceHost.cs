@@ -67,14 +67,16 @@ internal sealed class WorkspaceHost : IDisposable
 
         assemblyLoader.RegisterDependency(primaryAssembly);
 
-        foreach (var referencePath in workspaceBuild.ReferenceAssemblyPaths)
+        // Register only project output DLLs at startup. NuGet dependencies are resolved on demand
+        // with version-aware .deps.json handling (avoids pinning e.g. DiagnosticSource 10 when 9 is needed).
+        foreach (var referencePath in ArtifactResolver.CollectReferencePaths(workspaceBuild.OutputDirectory))
         {
             if (!File.Exists(referencePath))
                 continue;
 
             try
             {
-                var loaded = AssemblyLoadContext.Default.LoadFromAssemblyPath(referencePath);
+                var loaded = LoadOrGetAssembly(referencePath);
 
                 assemblyLoader.RegisterDependency(loaded);
             }
@@ -122,6 +124,9 @@ internal sealed class WorkspaceHost : IDisposable
                 failure);
         }
     }
+
+    internal Assembly? LoadAssembly(string assemblySimpleName)
+        => _resolver.ResolveAssembly(assemblySimpleName);
 
     internal void EnsureEntityFrameworkCoreLoaded()
     {
@@ -272,12 +277,8 @@ internal sealed class WorkspaceHost : IDisposable
     {
         var assemblyName = AssemblyName.GetAssemblyName(absolutePath);
 
-        var alreadyLoaded = AppDomain.CurrentDomain
-            .GetAssemblies()
-            .FirstOrDefault(assembly =>
-                string.Equals(assembly.GetName().Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase));
-
-        return alreadyLoaded ?? AssemblyLoadContext.Default.LoadFromAssemblyPath(absolutePath);
+        return AssemblyResolutionHelpers.FindLoadedAssembly(assemblyName)
+            ?? AssemblyLoadContext.Default.LoadFromAssemblyPath(absolutePath);
     }
 
     internal IEnumerable<Assembly> EnumerateLoadedAssemblies()

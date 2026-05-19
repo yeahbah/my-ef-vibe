@@ -9,7 +9,7 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
     private readonly WorkspaceDepsManifest? _depsManifest;
     private readonly SharedFrameworkCatalog _sharedFrameworkCatalog;
     private readonly string _outputDirectory;
-    private readonly Dictionary<string, Assembly> _resolvedBySimpleName =
+    private readonly Dictionary<string, Assembly> _resolvedAssemblies =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<AssemblyLoadContext, AssemblyName, Assembly?> _resolveHandler;
 
@@ -54,6 +54,14 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         return assembly.Location.StartsWith(_outputDirectory, StringComparison.OrdinalIgnoreCase);
     }
 
+    internal Assembly? ResolveAssembly(string assemblySimpleName)
+    {
+        if (string.IsNullOrWhiteSpace(assemblySimpleName))
+            return null;
+
+        return OnResolving(AssemblyLoadContext.Default, new AssemblyName(assemblySimpleName));
+    }
+
     private Assembly? OnResolving(AssemblyLoadContext context, AssemblyName assemblyName)
     {
         var simpleName = assemblyName.Name;
@@ -61,7 +69,10 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         if (string.IsNullOrEmpty(simpleName))
             return null;
 
-        if (_resolvedBySimpleName.TryGetValue(simpleName, out var cached))
+        var cacheKey = AssemblyResolutionHelpers.GetCacheKey(assemblyName);
+
+        if (_resolvedAssemblies.TryGetValue(cacheKey, out var cached)
+            && AssemblyResolutionHelpers.VersionMatches(assemblyName, cached))
             return cached;
 
         Assembly? loaded = null;
@@ -87,7 +98,7 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
             loaded = TryLoad(context, sharedPath);
 
         if (loaded is not null)
-            _resolvedBySimpleName[simpleName] = loaded;
+            _resolvedAssemblies[cacheKey] = loaded;
 
         return loaded;
     }
