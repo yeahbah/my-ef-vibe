@@ -2,33 +2,37 @@ namespace MyEfVibe;
 
 internal static class SqlTranslationProbe
 {
-    private static readonly string[] TerminalMaterializationSuffixes =
+    /// <summary>
+    /// Terminal operators removed before <c>ToQueryString()</c>. For operators that EF translates with
+    /// <c>LIMIT</c>/<c>TOP</c>, the probe keeps an equivalent <c>Take(n)</c> (and <c>Where</c> when needed).
+    /// </summary>
+    private static readonly (string Suffix, int? TakeLimit)[] TerminalMaterializationSuffixes =
     [
-        ".ToListAsync()",
-        ".ToArrayAsync()",
-        ".CountAsync()",
-        ".FirstAsync()",
-        ".FirstOrDefaultAsync()",
-        ".SingleAsync()",
-        ".SingleOrDefaultAsync()",
-        ".AnyAsync()",
-        ".MaxAsync()",
-        ".MinAsync()",
-        ".AverageAsync()",
-        ".SumAsync()",
-        ".ToList()",
-        ".ToArray()",
-        ".Count()",
-        ".First()",
-        ".FirstOrDefault()",
-        ".Single()",
-        ".SingleOrDefault()",
-        ".Any()",
-        ".Max()",
-        ".Min()",
-        ".Average()",
-        ".Sum()",
-        ".AsEnumerable()",
+        (".ToListAsync()", null),
+        (".ToArrayAsync()", null),
+        (".CountAsync()", null),
+        (".FirstOrDefaultAsync()", 1),
+        (".FirstAsync()", 1),
+        (".SingleOrDefaultAsync()", 2),
+        (".SingleAsync()", 2),
+        (".AnyAsync()", null),
+        (".MaxAsync()", null),
+        (".MinAsync()", null),
+        (".AverageAsync()", null),
+        (".SumAsync()", null),
+        (".ToList()", null),
+        (".ToArray()", null),
+        (".Count()", null),
+        (".FirstOrDefault()", 1),
+        (".First()", 1),
+        (".SingleOrDefault()", 2),
+        (".Single()", 2),
+        (".Any()", null),
+        (".Max()", null),
+        (".Min()", null),
+        (".Average()", null),
+        (".Sum()", null),
+        (".AsEnumerable()", null),
     ];
 
     private static readonly string[] TerminalMethodNames =
@@ -36,10 +40,10 @@ internal static class SqlTranslationProbe
         "ToListAsync",
         "ToArrayAsync",
         "CountAsync",
-        "FirstAsync",
         "FirstOrDefaultAsync",
-        "SingleAsync",
+        "FirstAsync",
         "SingleOrDefaultAsync",
+        "SingleAsync",
         "AnyAsync",
         "MaxAsync",
         "MinAsync",
@@ -48,10 +52,10 @@ internal static class SqlTranslationProbe
         "ToList",
         "ToArray",
         "Count",
-        "First",
         "FirstOrDefault",
-        "Single",
+        "First",
         "SingleOrDefault",
+        "Single",
         "Any",
         "Max",
         "Min",
@@ -64,14 +68,14 @@ internal static class SqlTranslationProbe
     {
         var trimmed = snippet.Trim().TrimEnd(';').Trim();
 
-        foreach (var suffix in TerminalMaterializationSuffixes)
+        foreach (var (suffix, takeLimit) in TerminalMaterializationSuffixes)
         {
             if (!trimmed.EndsWith(suffix, StringComparison.Ordinal))
                 continue;
 
             var probe = trimmed[..^suffix.Length].TrimEnd();
 
-            return string.IsNullOrWhiteSpace(probe) ? null : probe;
+            return TryFinalizeProbe(probe, takeLimit);
         }
 
         return TryStripTrailingTerminalCall(trimmed);
@@ -107,13 +111,48 @@ internal static class SqlTranslationProbe
             if (!IsEndOfExpression(expression, closeParenIndex + 1))
                 continue;
 
-            var probe = expression[..index].TrimEnd();
+            var queryable = expression[..index].TrimEnd();
 
-            return string.IsNullOrWhiteSpace(probe) ? null : probe;
+            if (string.IsNullOrWhiteSpace(queryable))
+                return null;
+
+            if (!TryExtractParenthesizedContent(expression, openParenIndex, out var arguments))
+                return null;
+
+            var takeLimit = TryGetTakeLimitForMethod(methodName);
+
+            return TryFinalizeProbe(queryable, takeLimit, arguments);
         }
 
         return null;
     }
+
+    private static string? TryFinalizeProbe(string queryable, int? takeLimit, string? terminalArguments = null)
+    {
+        if (string.IsNullOrWhiteSpace(queryable))
+            return null;
+
+        if (takeLimit is null)
+            return queryable;
+
+        var arguments = terminalArguments?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(arguments) && LooksLikePredicate(arguments))
+            return $"{queryable}.Where({arguments}).Take({takeLimit.Value})";
+
+        return $"{queryable}.Take({takeLimit.Value})";
+    }
+
+    private static bool LooksLikePredicate(string arguments) =>
+        arguments.Contains("=>", StringComparison.Ordinal);
+
+    private static int? TryGetTakeLimitForMethod(string methodName) =>
+        methodName switch
+        {
+            "First" or "FirstAsync" or "FirstOrDefault" or "FirstOrDefaultAsync" => 1,
+            "Single" or "SingleAsync" or "SingleOrDefault" or "SingleOrDefaultAsync" => 2,
+            _ => null,
+        };
 
     private static bool IsEndOfExpression(string expression, int startIndex)
     {
