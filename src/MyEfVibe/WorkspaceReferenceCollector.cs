@@ -22,7 +22,7 @@ internal static class WorkspaceReferenceCollector
                 if (!File.Exists(path))
                     continue;
 
-                if (!WorkspaceAssemblyFilter.ShouldScanAssembly(path))
+                if (!WorkspaceAssemblyFilter.ShouldIncludeRoslynMetadata(path))
                     continue;
 
                 paths.Add(path);
