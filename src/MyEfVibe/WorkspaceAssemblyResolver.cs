@@ -98,6 +98,17 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
             && AssemblyResolutionHelpers.VersionMatches(assemblyName, cached))
             return cached;
 
+        if (IsSystemTextJson(simpleName))
+        {
+            var jsonAssembly = ResolveSystemTextJson(context, assemblyName);
+
+            if (jsonAssembly is not null)
+            {
+                _resolvedAssemblies[cacheKey] = jsonAssembly;
+                return jsonAssembly;
+            }
+        }
+
         Assembly? loaded = null;
 
         var hasExplicitVersion = assemblyName.Version is not null
@@ -124,7 +135,8 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
             var outputCandidate = Path.Combine(_outputDirectory, $"{simpleName}.dll");
 
             if (File.Exists(outputCandidate)
-                && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, outputCandidate))
+                && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, outputCandidate)
+                && (!IsSystemTextJson(simpleName) || SystemTextJsonPathSupportsWeb(outputCandidate)))
                 loaded = TryLoad(context, outputCandidate);
         }
 
@@ -137,6 +149,66 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
             _resolvedAssemblies[cacheKey] = loaded;
 
         return loaded;
+    }
+
+    private Assembly? ResolveSystemTextJson(AssemblyLoadContext context, AssemblyName assemblyName)
+    {
+        if (SystemTextJsonCapabilities.WebPropertySupported(out var existing)
+            && AssemblyResolutionHelpers.VersionMatches(assemblyName, existing))
+            return existing;
+
+        if (_sharedFrameworkCatalog.TryResolve(SystemTextJsonCapabilities.AssemblySimpleName, out var sharedPath)
+            && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, sharedPath))
+        {
+            var shared = TryLoad(context, sharedPath);
+
+            if (shared is not null && SystemTextJsonCapabilities.WebPropertySupported())
+                return shared;
+        }
+
+        if (_depsManifest?.TryResolve(assemblyName, out var depsPath) == true
+            && SystemTextJsonPathSupportsWeb(depsPath))
+        {
+            var fromDeps = TryLoad(context, depsPath);
+
+            if (fromDeps is not null && SystemTextJsonCapabilities.WebPropertySupported())
+                return fromDeps;
+        }
+
+        var outputCandidate = Path.Combine(_outputDirectory, $"{SystemTextJsonCapabilities.AssemblySimpleName}.dll");
+
+        if (File.Exists(outputCandidate)
+            && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, outputCandidate)
+            && SystemTextJsonPathSupportsWeb(outputCandidate))
+        {
+            var fromOutput = TryLoad(context, outputCandidate);
+
+            if (fromOutput is not null && SystemTextJsonCapabilities.WebPropertySupported())
+                return fromOutput;
+        }
+
+        return null;
+    }
+
+    private static bool IsSystemTextJson(string? simpleName)
+        => string.Equals(simpleName, SystemTextJsonCapabilities.AssemblySimpleName, StringComparison.OrdinalIgnoreCase);
+
+    private static bool SystemTextJsonPathSupportsWeb(string absolutePath)
+    {
+        try
+        {
+            var version = AssemblyName.GetAssemblyName(absolutePath).Version;
+
+            return version is not null && version.Major >= 5;
+        }
+        catch (BadImageFormatException)
+        {
+            return false;
+        }
+        catch (FileLoadException)
+        {
+            return false;
+        }
     }
 
     private static Assembly? TryLoad(AssemblyLoadContext context, string absolutePath)

@@ -123,6 +123,7 @@ Typical issues:
 | `The target principal name is incorrect` / `Cannot generate SSPI context` | Wrong config source — use `-s` for the API (not the persistence library). macOS needs SQL auth in user secrets/appsettings, not Windows integrated security. |
 | `SqlClient is not supported on this platform` | Old `efvibe` build; use a current build with RID-aware dependency loading. |
 | `LocalAppContextSwitches` / `ConfigurationManager` errors | Host/tool vs workspace assembly conflict; fixed in recent builds (workspace deps preload). |
+| `Method not found: JsonSerializerOptions.get_Web` | An older `System.Text.Json.dll` from the project `bin` loaded before the target framework copy; fixed by preloading the workspace shared-framework `System.Text.Json` (rebuild efvibe / update the tool). |
 | `:plan` — `SET SHOWPLAN` batch error | SQL Server requires `SET SHOWPLAN_ALL` in its own batch; fixed in recent builds. |
 | `System.Diagnostics.DiagnosticSource` version 9.0.0 / 10.0.0 not found | Transitive NuGet pulls multiple versions; use a current `efvibe` build (version-aware `.deps.json` loading). If it persists, run the tool on the same band as your app, e.g. `dotnet efvibe -f net8.0` from a repo with `dotnet-tools.json`. |
 

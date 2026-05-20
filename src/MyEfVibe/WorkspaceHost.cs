@@ -63,6 +63,8 @@ internal sealed class WorkspaceHost : IDisposable
         var assemblyResolver =
             WorkspaceAssemblyResolver.Install(workspaceBuild.PrimaryAssemblyDll, sharedFrameworkCatalog, depsManifest);
 
+        WorkspaceSystemTextJsonBootstrap.EnsureLoaded(assemblyResolver, sharedFrameworkCatalog);
+
         var startupAssemblyDll = ResolveStartupAssemblyDll(workspaceBuild);
 
         // Preload EF packages first, then the entry assembly, then startup-only references.
