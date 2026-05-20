@@ -28,6 +28,7 @@
 
   <Target Name="RemoveHostConfigurationManager" AfterTargets="Build">
     <Delete Files="$(TargetDir)System.Configuration.ConfigurationManager.dll" ContinueOnError="true" />
+    <Delete Files="$(TargetDir)System.Text.Json.dll" ContinueOnError="true" />
   </Target>
 
   <ItemGroup>

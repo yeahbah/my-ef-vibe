@@ -153,7 +153,8 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
 
     private Assembly? ResolveSystemTextJson(AssemblyLoadContext context, AssemblyName assemblyName)
     {
-        if (SystemTextJsonCapabilities.WebPropertySupported(out var existing)
+        if (SystemTextJsonCapabilities.TryGetLoaded(out var existing)
+            && SystemTextJsonCapabilities.IsCompatible(existing)
             && AssemblyResolutionHelpers.VersionMatches(assemblyName, existing))
             return existing;
 
@@ -162,7 +163,7 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         {
             var shared = TryLoad(context, sharedPath);
 
-            if (shared is not null && SystemTextJsonCapabilities.WebPropertySupported())
+            if (shared is not null && SystemTextJsonCapabilities.IsCompatible(shared))
                 return shared;
         }
 
@@ -171,7 +172,7 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         {
             var fromDeps = TryLoad(context, depsPath);
 
-            if (fromDeps is not null && SystemTextJsonCapabilities.WebPropertySupported())
+            if (fromDeps is not null && SystemTextJsonCapabilities.IsCompatible(fromDeps))
                 return fromDeps;
         }
 
@@ -183,7 +184,7 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         {
             var fromOutput = TryLoad(context, outputCandidate);
 
-            if (fromOutput is not null && SystemTextJsonCapabilities.WebPropertySupported())
+            if (fromOutput is not null && SystemTextJsonCapabilities.IsCompatible(fromOutput))
                 return fromOutput;
         }
 

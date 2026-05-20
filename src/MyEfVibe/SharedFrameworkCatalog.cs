@@ -7,24 +7,87 @@ internal sealed class SharedFrameworkCatalog
     private readonly Dictionary<string, string> _assemblyNameToPath =
         new(StringComparer.OrdinalIgnoreCase);
 
-    internal static SharedFrameworkCatalog Load(string outputDirectory, string primaryAssemblyDll)
+    internal static SharedFrameworkCatalog Create(
+        string targetFrameworkMoniker,
+        string outputDirectory,
+        string primaryAssemblyDll,
+        string? startupOutputDirectory,
+        string? startupAssemblyDll)
     {
         var catalog = new SharedFrameworkCatalog();
 
-        var runtimeConfigPath = Path.Combine(
-            outputDirectory,
-            $"{Path.GetFileNameWithoutExtension(primaryAssemblyDll)}.runtimeconfig.json");
+        catalog.IndexMicrosoftNetCoreAppFromMoniker(targetFrameworkMoniker);
 
+        catalog.TryIndexFromRuntimeConfig(
+            Path.Combine(
+                outputDirectory,
+                $"{Path.GetFileNameWithoutExtension(primaryAssemblyDll)}.runtimeconfig.json"));
+
+        if (!string.IsNullOrEmpty(startupOutputDirectory)
+            && !string.IsNullOrEmpty(startupAssemblyDll)
+            && !string.Equals(startupOutputDirectory, outputDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            catalog.TryIndexFromRuntimeConfig(
+                Path.Combine(
+                    startupOutputDirectory,
+                    $"{Path.GetFileNameWithoutExtension(startupAssemblyDll)}.runtimeconfig.json"));
+        }
+
+        return catalog;
+    }
+
+    private void IndexMicrosoftNetCoreAppFromMoniker(string targetFrameworkMoniker)
+    {
+        var normalized = ProjectTargetFrameworkResolver.NormalizeMoniker(targetFrameworkMoniker);
+
+        if (!normalized.StartsWith("net", StringComparison.OrdinalIgnoreCase)
+            || !decimal.TryParse(
+                normalized.AsSpan()[3..],
+                System.Globalization.NumberStyles.AllowDecimalPoint,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var netMajor))
+            return;
+
+        var dotnetRoot = DotNetInstallRoot.Resolve();
+        var sharedRoot = Path.Combine(dotnetRoot, "shared", "Microsoft.NETCore.App");
+
+        if (!Directory.Exists(sharedRoot))
+            return;
+
+        string? bestDirectory = null;
+        Version? bestVersion = null;
+
+        foreach (var frameworkDirectory in Directory.EnumerateDirectories(sharedRoot))
+        {
+            var folderName = Path.GetFileName(frameworkDirectory);
+
+            if (!Version.TryParse(folderName, out var frameworkVersion)
+                || frameworkVersion.Major != (int)netMajor)
+                continue;
+
+            if (bestVersion is null || frameworkVersion > bestVersion)
+            {
+                bestVersion = frameworkVersion;
+                bestDirectory = frameworkDirectory;
+            }
+        }
+
+        if (bestDirectory is not null)
+            IndexFrameworkDirectory(bestDirectory);
+    }
+
+    private void TryIndexFromRuntimeConfig(string runtimeConfigPath)
+    {
         if (!File.Exists(runtimeConfigPath))
-            return catalog;
+            return;
 
         using var document = JsonDocument.Parse(File.ReadAllText(runtimeConfigPath));
 
         if (!document.RootElement.TryGetProperty("runtimeOptions", out var runtimeOptions))
-            return catalog;
+            return;
 
         if (!runtimeOptions.TryGetProperty("frameworks", out var frameworks))
-            return catalog;
+            return;
 
         var dotnetRoot = DotNetInstallRoot.Resolve();
 
@@ -41,11 +104,9 @@ internal sealed class SharedFrameworkCatalog
             if (string.IsNullOrWhiteSpace(frameworkName) || string.IsNullOrWhiteSpace(frameworkVersion))
                 continue;
 
-            catalog.IndexFrameworkDirectory(
+            IndexFrameworkDirectory(
                 Path.Combine(dotnetRoot, "shared", frameworkName, frameworkVersion));
         }
-
-        return catalog;
     }
 
     private void IndexFrameworkDirectory(string frameworkDirectory)

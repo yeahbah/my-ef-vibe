@@ -14,7 +14,6 @@ internal static class WorkspaceDependencyLoader
 
         foreach (var bootstrap in new[]
                  {
-                     SystemTextJsonCapabilities.AssemblySimpleName,
                      "System.Configuration.ConfigurationManager",
                      "Microsoft.Data.SqlClient",
                      "Microsoft.EntityFrameworkCore.Abstractions",

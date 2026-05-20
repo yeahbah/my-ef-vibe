@@ -54,8 +54,14 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal static WorkspaceHost Load(WorkspaceBuildResult workspaceBuild)
     {
-        var sharedFrameworkCatalog =
-            SharedFrameworkCatalog.Load(workspaceBuild.OutputDirectory, workspaceBuild.PrimaryAssemblyDll);
+        var startupAssemblyDll = ResolveStartupAssemblyDll(workspaceBuild);
+
+        var sharedFrameworkCatalog = SharedFrameworkCatalog.Create(
+            workspaceBuild.TargetFrameworkMoniker,
+            workspaceBuild.OutputDirectory,
+            workspaceBuild.PrimaryAssemblyDll,
+            workspaceBuild.StartupOutputDirectory,
+            startupAssemblyDll);
 
         var depsManifest = WorkspaceDepsManifest.TryLoad(workspaceBuild.PrimaryAssemblyDll);
         depsManifest = MergeStartupDepsManifest(workspaceBuild, depsManifest);
@@ -64,8 +70,6 @@ internal sealed class WorkspaceHost : IDisposable
             WorkspaceAssemblyResolver.Install(workspaceBuild.PrimaryAssemblyDll, sharedFrameworkCatalog, depsManifest);
 
         WorkspaceSystemTextJsonBootstrap.EnsureLoaded(assemblyResolver, sharedFrameworkCatalog);
-
-        var startupAssemblyDll = ResolveStartupAssemblyDll(workspaceBuild);
 
         // Preload EF packages first, then the entry assembly, then startup-only references.
         // Preloading the startup copy of the EF project DLL before LoadEntryAssembly causes
