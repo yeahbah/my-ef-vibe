@@ -82,7 +82,7 @@ internal static class CliUi
             "[grey]Db log[/]",
             dbLogSettings.Enabled
                 ? $"[green]on[/] [grey]({DbLogLevelParser.Format(dbLogSettings.Level)} · {DbLogCommandParser.FormatMode(dbLogSettings)} · :dblog)[/]"
-                : "[grey]off[/] [grey](:dblog on|off [level] [verbose])[/]");
+                : "[grey]off[/] [grey](:dblog on|off [[level]] [[verbose]])[/]");
         grid.AddRow(
             "[grey]Input[/]",
             "[grey]Enter next line · ; run · Shift+Enter newline · Tab complete[/]");
@@ -113,7 +113,7 @@ internal static class CliUi
         table.AddRow("[cyan]:reset[/]", "Clear script variables ([grey]db[/] stays)");
         table.AddRow(
             "[cyan]:dblog[/]",
-            "Database logging (sql-only by default) — :dblog on|off [level] [verbose]");
+            "Database logging (sql-only by default) — :dblog on|off [[level]] [[verbose]]");
         table.AddRow("[cyan]:stats[/]", "Session evaluation statistics");
         table.AddRow("[cyan]:tracked[/]", "Change tracker summary");
         table.AddRow("[cyan]:tables[/]", "List DbSets and row counts");

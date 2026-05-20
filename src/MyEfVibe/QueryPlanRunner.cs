@@ -23,7 +23,7 @@ internal static partial class QueryPlanRunner
         }
 
         var provider = ResolveProvider(dbContext);
-        var executableSql = SanitizeTranslatedSql(translatedSql);
+        var executableSql = SanitizeTranslatedSql(translatedSql, provider);
 
         if (provider is null)
         {
@@ -33,13 +33,24 @@ internal static partial class QueryPlanRunner
 
         try
         {
-            var rows = provider == MyEfVibeProvider.SqlServer
-                ? await ExecuteSqlServerShowPlanAsync(dbContext, executableSql, inspectionAssemblies, cancellationToken)
-                : await ExecuteQueryAsync(
+            var rows = provider switch
+            {
+                MyEfVibeProvider.SqlServer => await ExecuteSqlServerShowPlanAsync(
+                    dbContext,
+                    executableSql,
+                    inspectionAssemblies,
+                    cancellationToken),
+                MyEfVibeProvider.Oracle => await ExecuteOracleExplainPlanAsync(
+                    dbContext,
+                    executableSql,
+                    inspectionAssemblies,
+                    cancellationToken),
+                _ => await ExecuteQueryAsync(
                     dbContext,
                     BuildExplainSql(provider.Value, executableSql),
                     inspectionAssemblies,
-                    cancellationToken);
+                    cancellationToken),
+            };
 
             if (rows.Count == 0)
             {
@@ -58,9 +69,17 @@ internal static partial class QueryPlanRunner
     /// <summary>
     /// Strips parameter/duration comment lines from captured or translated SQL and inlines parameter values.
     /// </summary>
-    private static string SanitizeTranslatedSql(string sql)
+    private static string SanitizeTranslatedSql(string sql, MyEfVibeProvider? provider)
     {
         var executable = DbLogSqlExtractor.ExtractExecutableSql(sql) ?? sql;
+
+        if (provider == MyEfVibeProvider.Oracle)
+        {
+            var oracleSql = OracleSqlExtractor.TryExtractExplainableSql(executable);
+
+            if (!string.IsNullOrWhiteSpace(oracleSql))
+                executable = oracleSql;
+        }
 
         var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
         var sqlLines = new List<string>();
@@ -157,6 +176,22 @@ internal static partial class QueryPlanRunner
             MyEfVibeProvider.Oracle => $"EXPLAIN PLAN FOR {trimmed}",
             _ => $"EXPLAIN {trimmed}",
         };
+    }
+
+    private static async Task<IReadOnlyList<string>> ExecuteOracleExplainPlanAsync(
+        object dbContext,
+        string sql,
+        IEnumerable<Assembly> inspectionAssemblies,
+        CancellationToken cancellationToken)
+    {
+        await using var scope = await OpenConnectionScopeAsync(dbContext, inspectionAssemblies, cancellationToken);
+
+        await ExecuteNonQueryAsync(scope.Connection, $"EXPLAIN PLAN FOR {sql}", cancellationToken);
+
+        return await ReadQueryRowsAsync(
+            scope.Connection,
+            "SELECT PLAN_TABLE_OUTPUT FROM TABLE(DBMS_XPLAN.DISPLAY(NULL, NULL, 'BASIC'))",
+            cancellationToken);
     }
 
     private static async Task<IReadOnlyList<string>> ExecuteSqlServerShowPlanAsync(
