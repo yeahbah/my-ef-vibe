@@ -92,7 +92,8 @@
             "npgsql",
             "sqlite",
             "oracle",
-            "mysql"
+            "mysql",
+            "mariadb"
           ],
           "markdownDescription": "Database provider when using `efvibe.connectionString`."
         },

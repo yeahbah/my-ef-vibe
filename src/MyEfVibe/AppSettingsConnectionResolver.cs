@@ -145,7 +145,11 @@ internal static class AppSettingsConnectionResolver
 
         if (Directory.EnumerateFiles(outputDirectory, "Pomelo.EntityFrameworkCore.MySql*.dll").Any()
             || Directory.EnumerateFiles(outputDirectory, "MySql.EntityFrameworkCore*.dll").Any())
-            return MyEfVibeProvider.MySql;
+        {
+            return LooksLikeMariaDbConnection(connectionString)
+                ? MyEfVibeProvider.MariaDb
+                : MyEfVibeProvider.MySql;
+        }
 
         if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase)
             || connectionString.Contains("Username=", StringComparison.OrdinalIgnoreCase))
@@ -165,8 +169,15 @@ internal static class AppSettingsConnectionResolver
 
         if (connectionString.Contains("Uid=", StringComparison.OrdinalIgnoreCase)
             || connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase))
-            return MyEfVibeProvider.MySql;
+        {
+            return LooksLikeMariaDbConnection(connectionString)
+                ? MyEfVibeProvider.MariaDb
+                : MyEfVibeProvider.MySql;
+        }
 
         return null;
     }
+
+    private static bool LooksLikeMariaDbConnection(string connectionString) =>
+        connectionString.Contains("mariadb", StringComparison.OrdinalIgnoreCase);
 }

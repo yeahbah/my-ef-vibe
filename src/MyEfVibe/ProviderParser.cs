@@ -20,7 +20,9 @@ internal static class ProviderParser
 
             "oracle" or "ora" or "odb" => MyEfVibeProvider.Oracle,
 
-            "mysql" or "mariadb" or "pomelo" => MyEfVibeProvider.MySql,
+            "mysql" or "pomelo" => MyEfVibeProvider.MySql,
+
+            "mariadb" or "maria" => MyEfVibeProvider.MariaDb,
 
             _ => null,
 

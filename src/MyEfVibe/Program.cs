@@ -40,7 +40,7 @@ internal static class Program
 
         var providerOption = new Option<string?>(
             aliases: new[] { "--provider" },
-            description: "Database provider key used with `--connection-string`: sqlserver | npgsql | sqlite | oracle | mysql.");
+            description: "Database provider key used with `--connection-string`: sqlserver | npgsql | sqlite | oracle | mysql | mariadb.");
 
         var expressionOption = new Option<string?>(
             aliases: new[] { "-e", "--expression" },
@@ -143,7 +143,7 @@ internal static class Program
 
         if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
         {
-            CliUi.WriteError("`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql).");
+            CliUi.WriteError("`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
             return 3;
         }
 

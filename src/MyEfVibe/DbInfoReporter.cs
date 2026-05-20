@@ -131,6 +131,10 @@ internal static class DbInfoReporter
         if (providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase))
             return "Oracle";
 
+        if (providerName.Contains("MariaDb", StringComparison.OrdinalIgnoreCase)
+            || providerName.Contains("MariaDB", StringComparison.Ordinal))
+            return "MariaDB";
+
         if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
             || providerName.Contains("MySQL", StringComparison.Ordinal))
             return "MySQL";
@@ -185,7 +189,9 @@ internal static class DbInfoReporter
             _ when providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) => "SELECT sqlite_version()",
             _ when providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase) =>
                 "SELECT banner FROM v$version WHERE ROWNUM = 1",
-            _ when providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
+            _ when providerName.Contains("MariaDb", StringComparison.OrdinalIgnoreCase)
+                || providerName.Contains("MariaDB", StringComparison.Ordinal)
+                || providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
                 || providerName.Contains("MySQL", StringComparison.Ordinal) => "SELECT VERSION()",
             _ => null,
         };

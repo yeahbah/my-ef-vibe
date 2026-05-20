@@ -10,6 +10,7 @@ internal static class CsprojInspector
         "Npgsql.EntityFrameworkCore",
         "Pomelo.EntityFrameworkCore",
         "MySql.EntityFrameworkCore",
+        "MariaDB.EntityFrameworkCore",
         "Oracle.EntityFrameworkCore",
     ];
 

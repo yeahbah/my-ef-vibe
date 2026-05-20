@@ -72,7 +72,7 @@ internal static class DbContextActivator
             + $"{Environment.NewLine}"
             + " - Add a public parameterless constructor on the DbContext."
             + $"{Environment.NewLine}"
-            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite | oracle | mysql) to build `DbContextOptions<TContext>`."
+            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb) to build `DbContextOptions<TContext>`."
             + $"{Environment.NewLine}"
             + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.";
 
@@ -89,7 +89,7 @@ internal static class DbContextActivator
             if (string.IsNullOrWhiteSpace(connectionString))
                 failureMessage += ", but no connection string was found.";
             else if (!provider.HasValue)
-                failureMessage += ", but the database provider could not be inferred. Pass `--provider` (sqlserver | npgsql | sqlite | oracle | mysql).";
+                failureMessage += ", but the database provider could not be inferred. Pass `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).";
             else
                 failureMessage +=
                     ", but constructing `DbContextOptions` failed."
@@ -696,6 +696,11 @@ internal static class DbContextActivator
             [MyEfVibeProvider.Oracle] =
                 [new("Oracle.EntityFrameworkCore", "UseOracle")],
             [MyEfVibeProvider.MySql] =
+            [
+                new("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
+                new("MySql.EntityFrameworkCore", "UseMySQL"),
+            ],
+            [MyEfVibeProvider.MariaDb] =
             [
                 new("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
                 new("MySql.EntityFrameworkCore", "UseMySQL"),

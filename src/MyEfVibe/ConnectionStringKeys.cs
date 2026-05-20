@@ -8,6 +8,7 @@ internal static class ConnectionStringKeys
         "Postgres",
         "Sqlite",
         "MySql",
+        "MariaDb",
         "Oracle",
         "Database",
     ];
