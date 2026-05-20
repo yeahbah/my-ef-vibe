@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace MyEfVibe;
 
-internal sealed record LogToBinding(MethodInfo Method, object LogLevelValue, string CommandCategory);
+internal sealed record LogToBinding(MethodInfo Method, Type? LogLevelEnumType, string CommandCategory);
 
 internal static class EntityFrameworkReflectionCache
 {
@@ -172,13 +172,13 @@ internal static class EntityFrameworkReflectionCache
                 if (!parameters[0].ParameterType.IsAssignableFrom(databaseFacade.GetType()))
                     continue;
 
-                object logLevelValue = 2;
+                Type? logLevelEnumType = null;
 
                 if (parameters.Length >= 3 && parameters[2].ParameterType.IsEnum)
-                    logLevelValue = Enum.ToObject(parameters[2].ParameterType, 2);
+                    logLevelEnumType = parameters[2].ParameterType;
 
                 if (parameters[1].ParameterType == typeof(Action<string>))
-                    return new LogToBinding(candidate, logLevelValue, commandCategory);
+                    return new LogToBinding(candidate, logLevelEnumType, commandCategory);
 
                 if (parameters[1].ParameterType.IsGenericType
                     && parameters[1].ParameterType.GetGenericTypeDefinition() == typeof(Action<>))
@@ -188,13 +188,13 @@ internal static class EntityFrameworkReflectionCache
                     if (actionGenericArgs.Length == 1
                         && string.Equals(actionGenericArgs[0].Name, "DbCommand", StringComparison.Ordinal))
                     {
-                        return new LogToBinding(candidate, logLevelValue, commandCategory);
+                        return new LogToBinding(candidate, logLevelEnumType, commandCategory);
                     }
 
                     if (actionGenericArgs.Length == 4
                         && actionGenericArgs[3] == typeof(string))
                     {
-                        return new LogToBinding(candidate, logLevelValue, commandCategory);
+                        return new LogToBinding(candidate, logLevelEnumType, commandCategory);
                     }
                 }
             }

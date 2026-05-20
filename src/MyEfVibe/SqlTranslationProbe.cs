@@ -20,6 +20,8 @@ internal static class SqlTranslationProbe
         (".MinAsync()", null),
         (".AverageAsync()", null),
         (".SumAsync()", null),
+        (".ToDictionaryAsync()", null),
+        (".ToDictionary()", null),
         (".ToList()", null),
         (".ToArray()", null),
         (".Count()", null),
@@ -49,6 +51,8 @@ internal static class SqlTranslationProbe
         "MinAsync",
         "AverageAsync",
         "SumAsync",
+        "ToDictionaryAsync",
+        "ToDictionary",
         "ToList",
         "ToArray",
         "Count",
@@ -78,7 +82,31 @@ internal static class SqlTranslationProbe
             return TryFinalizeProbe(probe, takeLimit);
         }
 
-        return TryStripTrailingTerminalCall(trimmed);
+        var terminalProbe = TryStripTrailingTerminalCall(trimmed);
+
+        if (terminalProbe is not null)
+            return terminalProbe;
+
+        return TryAsBareQueryableProbe(trimmed);
+    }
+
+    /// <summary>
+    /// Accepts deferred query expressions (e.g. assigned to a local) that have no terminal operator.
+    /// </summary>
+    private static string? TryAsBareQueryableProbe(string expression)
+    {
+        var probe = expression.Trim().TrimEnd(';').Trim();
+
+        foreach (var suffix in new[] { ".AsQueryable()", ".AsQueryable();" })
+        {
+            if (probe.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                probe = probe[..^suffix.Length].TrimEnd();
+                break;
+            }
+        }
+
+        return LinqEfQueryHeuristics.LooksLikeEfQuery(probe) ? probe : null;
     }
 
     internal static bool TryExtractParenthesizedContent(string text, int openParenIndex, out string content)
@@ -135,16 +163,72 @@ internal static class SqlTranslationProbe
         if (takeLimit is null)
             return queryable;
 
-        var arguments = terminalArguments?.Trim();
+        var predicate = TryExtractPredicateArgument(terminalArguments);
 
-        if (!string.IsNullOrWhiteSpace(arguments) && LooksLikePredicate(arguments))
-            return $"{queryable}.Where({arguments}).Take({takeLimit.Value})";
+        if (!string.IsNullOrWhiteSpace(predicate))
+            return $"{queryable}.Where({predicate}).Take({takeLimit.Value})";
 
         return $"{queryable}.Take({takeLimit.Value})";
     }
 
+    private static string? TryExtractPredicateArgument(string? arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+            return null;
+
+        foreach (var part in SplitTopLevelCommaSeparated(arguments))
+        {
+            var trimmed = part.Trim();
+
+            if (LooksLikePredicate(trimmed))
+                return trimmed;
+        }
+
+        return LooksLikePredicate(arguments) ? arguments.Trim() : null;
+    }
+
     private static bool LooksLikePredicate(string arguments) =>
         arguments.Contains("=>", StringComparison.Ordinal);
+
+    private static IEnumerable<string> SplitTopLevelCommaSeparated(string arguments)
+    {
+        var start = 0;
+        var depth = 0;
+
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            switch (arguments[index])
+            {
+                case '(':
+                case '[':
+                case '{':
+                    depth++;
+                    break;
+
+                case ')':
+                case ']':
+                case '}':
+                    depth--;
+                    break;
+
+                case ',' when depth == 0:
+                    yield return arguments[start..index];
+                    start = index + 1;
+                    break;
+
+                case '"':
+                    index = SkipStringLiteral(arguments, index);
+                    break;
+
+                case '\'':
+                    index = SkipCharLiteral(arguments, index);
+                    break;
+            }
+        }
+
+        if (start < arguments.Length)
+            yield return arguments[start..];
+    }
 
     private static int? TryGetTakeLimitForMethod(string methodName) =>
         methodName switch

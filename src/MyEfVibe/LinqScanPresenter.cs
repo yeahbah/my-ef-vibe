@@ -103,6 +103,15 @@ internal static class LinqScanPresenter
             ? $"\n[grey]{dismissedSkippedCount} previously dismissed finding(s) excluded[/]"
             : string.Empty;
 
+        var criticalCount = result.Findings.Count(static f => f.Severity == LinqScanSeverity.Critical);
+        var errorCount = result.Findings.Count(static f => f.Severity == LinqScanSeverity.Error);
+        var warningCount = result.Findings.Count(static f => f.Severity == LinqScanSeverity.Warning);
+        var infoCount = result.Findings.Count(static f => f.Severity == LinqScanSeverity.Info);
+
+        var severityLine = result.Findings.Count == 0
+            ? string.Empty
+            : $"\n[grey]Severity:[/] [red]{criticalCount} critical[/] · [red]{errorCount} error[/] · [yellow]{warningCount} warning[/] · [cyan]{infoCount} info[/]";
+
         AnsiConsole.WriteLine();
 
         AnsiConsole.Write(
@@ -111,6 +120,7 @@ internal static class LinqScanPresenter
                     $"[bold]{title}[/] — [yellow]{result.Findings.Count}[/] finding(s) in "
                     + $"[cyan]{fileCount}[/] file(s)\n"
                     + $"[grey]{result.FilesScanned} source file(s) · {result.ProjectsScanned} project(s) · {detailLine}[/]"
+                    + severityLine
                     + dismissedLine
                     + $"\n[grey]{footerLine}[/]"))
             {

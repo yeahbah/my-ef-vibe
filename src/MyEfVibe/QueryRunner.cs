@@ -6,7 +6,7 @@ internal static class QueryRunner
         object dbContextInstance,
         ScriptSession session,
         WorkspaceHost host,
-        SqlDisplaySettings sqlSettings,
+        DbLogSettings dbLogSettings,
         string expression,
         CancellationToken cancellationToken = default)
     {
@@ -18,7 +18,7 @@ internal static class QueryRunner
                 dbContextInstance,
                 session,
                 expression,
-                sqlSettings,
+                dbLogSettings,
                 host,
                 analytics,
                 cancellationToken: cancellationToken);

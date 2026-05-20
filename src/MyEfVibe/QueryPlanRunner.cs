@@ -16,7 +16,9 @@ internal static partial class QueryPlanRunner
     {
         if (string.IsNullOrWhiteSpace(translatedSql))
         {
-            CliUi.WriteWarning("No translated SQL yet. Run a query that produces IQueryable SQL first.");
+            CliUi.WriteWarning(
+                "No SQL available yet. Run a query with :dblog on (executed SQL), "
+                + "or an IQueryable expression (uses ToQueryString()).");
             return;
         }
 
@@ -54,40 +56,73 @@ internal static partial class QueryPlanRunner
     }
 
     /// <summary>
-    /// Strips EF <c>ToQueryString()</c> parameter comment lines and inlines parameter values.
+    /// Strips parameter/duration comment lines from captured or translated SQL and inlines parameter values.
     /// </summary>
     private static string SanitizeTranslatedSql(string sql)
     {
+        var executable = DbLogSqlExtractor.ExtractExecutableSql(sql) ?? sql;
+
         var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
         var sqlLines = new List<string>();
 
-        foreach (var line in sql.Split('\n'))
+        foreach (var line in executable.Split('\n'))
         {
             var trimmed = line.Trim();
 
-            if (trimmed.StartsWith("-- @", StringComparison.Ordinal))
-            {
-                var match = ParameterCommentRegex().Match(trimmed);
-
-                if (match.Success)
-                    parameters[match.Groups["name"].Value] = match.Groups["value"].Value;
-
+            if (trimmed.StartsWith("-- duration:", StringComparison.OrdinalIgnoreCase))
                 continue;
-            }
+
+            if (TryParseToQueryStringParameterComment(trimmed, parameters))
+                continue;
+
+            if (TryParseDbLogParametersComment(trimmed, parameters))
+                continue;
 
             sqlLines.Add(line);
         }
 
         var body = string.Join(Environment.NewLine, sqlLines).Trim();
 
-        foreach (var (name, value) in parameters)
-            body = body.Replace($"@{name}", FormatParameterLiteral(value), StringComparison.Ordinal);
+        foreach (var name in parameters.Keys.OrderByDescending(static n => n.Length))
+            body = body.Replace($"@{name}", FormatParameterLiteral(parameters[name]), StringComparison.Ordinal);
 
         return body;
     }
 
+    private static bool TryParseToQueryStringParameterComment(string trimmed, Dictionary<string, string> parameters)
+    {
+        if (!trimmed.StartsWith("-- @", StringComparison.Ordinal))
+            return false;
+
+        var match = ParameterCommentRegex().Match(trimmed);
+
+        if (!match.Success)
+            return false;
+
+        parameters[match.Groups["name"].Value] = match.Groups["value"].Value;
+        return true;
+    }
+
+    private static bool TryParseDbLogParametersComment(string trimmed, Dictionary<string, string> parameters)
+    {
+        const string prefix = "-- parameters:";
+
+        if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var assignments = trimmed[prefix.Length..];
+
+        foreach (Match match in DbLogParameterAssignmentRegex().Matches(assignments))
+            parameters[match.Groups["name"].Value] = match.Groups["value"].Value.Trim();
+
+        return true;
+    }
+
     private static string FormatParameterLiteral(string value)
     {
+        if (string.Equals(value, "NULL", StringComparison.OrdinalIgnoreCase))
+            return "NULL";
+
         if (long.TryParse(value, out _))
             return value;
 
@@ -96,13 +131,19 @@ internal static partial class QueryPlanRunner
             return value;
 
         if (bool.TryParse(value, out var boolean))
-            return boolean ? "TRUE" : "FALSE";
+            return boolean ? "1" : "0";
+
+        if (value.StartsWith('\'') && value.EndsWith('\'') && value.Length >= 2)
+            return value;
 
         return $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
     }
 
     [GeneratedRegex(@"^-- @(?<name>\w+)='(?<value>.*)'$")]
     private static partial Regex ParameterCommentRegex();
+
+    [GeneratedRegex(@"@(?<name>\w+)\s*=\s*(?<value>[^,]+)")]
+    private static partial Regex DbLogParameterAssignmentRegex();
 
     private static string BuildExplainSql(MyEfVibeProvider provider, string sql)
     {

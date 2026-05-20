@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
@@ -7,29 +8,48 @@ namespace MyEfVibe;
 internal sealed class EfSqlCapture : IDisposable
 {
     private readonly List<SqlCommandEntry> _entries = new();
-    private readonly Stopwatch _sessionStopwatch = Stopwatch.StartNew();
+    private readonly object _dbContextInstance;
+    private readonly DbLogSettings _settings;
+    private readonly DiagnosticSqlCaptureBinding? _diagnosticBinding;
     private IDisposable? _logSubscription;
-    private long _lastCommandStartedMs;
+    private readonly List<IDisposable> _listenerSubscriptions = new();
 
-    private EfSqlCapture()
+    private EfSqlCapture(object dbContextInstance, DbLogSettings settings, DiagnosticSqlCaptureBinding? diagnosticBinding)
     {
+        _dbContextInstance = dbContextInstance;
+        _settings = settings;
+        _diagnosticBinding = diagnosticBinding;
     }
 
-    internal static EfSqlCapture? TryAttach(object dbContextInstance)
+    internal static EfSqlCapture? TryAttach(object dbContextInstance, DbLogSettings settings)
     {
+        if (!settings.Enabled)
+            return null;
+
+        var diagnosticBinding = DiagnosticSqlCaptureResolver.Resolve(dbContextInstance);
+        var capture = new EfSqlCapture(dbContextInstance, settings, diagnosticBinding);
+
+        if (diagnosticBinding is not null
+            && TrySubscribeDiagnostics(capture, diagnosticBinding, dbContextInstance))
+            return capture;
+
         var databaseFacade = dbContextInstance.GetType().GetProperty("Database")?.GetValue(dbContextInstance);
 
         if (databaseFacade is null)
             return null;
 
-        var binding = EntityFrameworkReflectionCache.ResolveLogTo(databaseFacade);
+        var logToBinding = EntityFrameworkReflectionCache.ResolveLogTo(databaseFacade);
 
-        if (binding is null)
+        if (logToBinding is null)
             return null;
 
-        var capture = new EfSqlCapture();
-
-        if (!TryInvokeLogTo(binding, databaseFacade, capture.OnLog, capture.OnDbCommand, out capture._logSubscription))
+        if (!TryInvokeLogTo(
+                logToBinding,
+                databaseFacade,
+                settings,
+                capture.OnLog,
+                capture.OnDbCommand,
+                out capture._logSubscription))
             return null;
 
         return capture;
@@ -83,7 +103,142 @@ internal sealed class EfSqlCapture : IDisposable
     public void Dispose()
     {
         _logSubscription?.Dispose();
+
+        foreach (var subscription in _listenerSubscriptions)
+            subscription.Dispose();
+
+        _listenerSubscriptions.Clear();
         _entries.Clear();
+    }
+
+    private static bool TrySubscribeDiagnostics(
+        EfSqlCapture capture,
+        DiagnosticSqlCaptureBinding binding,
+        object dbContextInstance)
+    {
+        var diagnosticListener = DiagnosticSqlCaptureResolver.ResolveDiagnosticListener(dbContextInstance);
+
+        if (diagnosticListener is not null)
+        {
+            capture._listenerSubscriptions.Add(
+                diagnosticListener.Subscribe(new DiagnosticEventObserver(capture, binding, capture._settings.Verbose)));
+
+            return true;
+        }
+
+        capture._listenerSubscriptions.Add(
+            DiagnosticListener.AllListeners.Subscribe(new DiagnosticListenerObserver(capture, binding, capture._settings.Verbose)));
+
+        return true;
+    }
+
+    private void OnCommandExecutedDiagnosticEvent(object eventData)
+    {
+        if (_diagnosticBinding is null)
+            return;
+
+        try
+        {
+            if (!TryAcceptDiagnosticEvent(eventData, out var durationMs, out var command))
+                return;
+
+            var commandText = ExtractCommandText(_diagnosticBinding, eventData, command);
+
+            if (string.IsNullOrWhiteSpace(commandText))
+                return;
+
+            RecordCommand(commandText.Trim(), durationMs, ExtractDbCommandParameters(command));
+        }
+        catch
+        {
+            // Ignore malformed diagnostic payloads from other providers.
+        }
+    }
+
+    private void OnVerboseDiagnosticEvent(string eventName, object eventData)
+    {
+        try
+        {
+            if (!TryAcceptDiagnosticEvent(eventData, out var durationMs, out var command))
+                return;
+
+            var message = FormatVerboseDiagnosticMessage(eventName, eventData, command);
+
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+
+            RecordCommand(
+                message,
+                durationMs,
+                command is null ? Array.Empty<string>() : ExtractDbCommandParameters(command));
+        }
+        catch
+        {
+            // Ignore malformed diagnostic payloads from other providers.
+        }
+    }
+
+    private bool TryAcceptDiagnosticEvent(object eventData, out long? durationMs, out object? command)
+    {
+        durationMs = null;
+        command = null;
+
+        var eventType = eventData.GetType();
+        var contextProperty = eventType.GetProperty("Context")
+            ?? _diagnosticBinding?.ContextProperty;
+
+        var logLevelProperty = eventType.GetProperty("LogLevel")
+            ?? _diagnosticBinding?.LogLevelProperty;
+
+        if (contextProperty?.GetValue(eventData) is not { } context
+            || !ReferenceEquals(context, _dbContextInstance))
+            return false;
+
+        if (logLevelProperty?.GetValue(eventData) is Enum eventLogLevel
+            && (int)(object)eventLogLevel < (int)_settings.Level)
+            return false;
+
+        var durationProperty = eventType.GetProperty("Duration") ?? _diagnosticBinding?.DurationProperty;
+        durationMs = ExtractDurationMilliseconds(durationProperty?.GetValue(eventData));
+
+        var commandProperty = eventType.GetProperty("Command") ?? _diagnosticBinding?.CommandProperty;
+        command = commandProperty?.GetValue(eventData);
+
+        return true;
+    }
+
+    private string FormatVerboseDiagnosticMessage(string eventName, object eventData, object? command)
+    {
+        var eventType = eventData.GetType();
+        var logLevel = (eventType.GetProperty("LogLevel") ?? _diagnosticBinding?.LogLevelProperty)
+            ?.GetValue(eventData) as Enum;
+
+        var logCommandText = (eventType.GetProperty("LogCommandText") ?? _diagnosticBinding?.LogCommandTextProperty)
+            ?.GetValue(eventData) as string;
+
+        var builder = new StringBuilder();
+        builder.Append('[');
+        builder.Append(logLevel?.ToString()?.ToLowerInvariant() ?? "information");
+        builder.Append("] ");
+        builder.Append(eventName);
+
+        if (!string.IsNullOrWhiteSpace(logCommandText))
+        {
+            builder.AppendLine();
+            builder.Append(logCommandText.Trim());
+        }
+        else if (command is not null)
+        {
+            var commandText = command.GetType().GetProperty("CommandText")?.GetValue(command) as string;
+
+            if (!string.IsNullOrWhiteSpace(commandText))
+            {
+                builder.AppendLine();
+                builder.Append(commandText.Trim());
+            }
+        }
+
+        return builder.ToString().Trim();
     }
 
     private void OnLog(string message)
@@ -91,10 +246,11 @@ internal sealed class EfSqlCapture : IDisposable
         if (string.IsNullOrWhiteSpace(message))
             return;
 
-        if (!LooksLikeDatabaseCommandLog(message))
+        if (!_settings.Verbose && !LooksLikeDatabaseCommandLog(message))
             return;
 
-        RecordCommand(NormalizeLogMessage(message));
+        var normalized = _settings.Verbose ? message.Trim() : NormalizeLogMessage(message);
+        RecordCommand(normalized, null, ExtractParameters(normalized));
     }
 
     private void OnDbCommand(object dbCommand)
@@ -104,10 +260,10 @@ internal sealed class EfSqlCapture : IDisposable
         if (string.IsNullOrWhiteSpace(commandText))
             return;
 
-        RecordCommand(commandText.Trim());
+        RecordCommand(commandText.Trim(), null, ExtractDbCommandParameters(dbCommand));
     }
 
-    private void RecordCommand(string normalized)
+    private void RecordCommand(string normalized, long? durationMilliseconds, IReadOnlyList<string> parameters)
     {
         if (string.IsNullOrWhiteSpace(normalized))
             return;
@@ -115,21 +271,83 @@ internal sealed class EfSqlCapture : IDisposable
         if (_entries.Count > 0 && string.Equals(_entries[^1].Text, normalized, StringComparison.Ordinal))
             return;
 
-        var nowMs = _sessionStopwatch.ElapsedMilliseconds;
-        var duration = _entries.Count == 0 ? null : (long?)(nowMs - _lastCommandStartedMs);
-
-        if (_entries.Count > 0 && duration is < 0)
-            duration = null;
-
-        _entries.Add(new SqlCommandEntry(normalized, duration, ExtractParameters(normalized)));
-        _lastCommandStartedMs = nowMs;
+        _entries.Add(new SqlCommandEntry(normalized, durationMilliseconds, parameters));
     }
 
-    private static IReadOnlyList<string> ExtractParameters(string message)
+    private static long? ExtractDurationMilliseconds(object? durationValue)
+    {
+        if (durationValue is TimeSpan duration)
+            return (long)Math.Round(duration.TotalMilliseconds);
+
+        return null;
+    }
+
+    private static string? ExtractCommandText(
+        DiagnosticSqlCaptureBinding binding,
+        object eventData,
+        object? command)
+    {
+        if (binding.LogCommandTextProperty?.GetValue(eventData) is string logCommandText
+            && !string.IsNullOrWhiteSpace(logCommandText))
+            return logCommandText;
+
+        if (command is null)
+            return null;
+
+        return command.GetType().GetProperty("CommandText")?.GetValue(command) as string;
+    }
+
+    private static IReadOnlyList<string> ExtractDbCommandParameters(object? command)
+    {
+        if (command is null)
+            return Array.Empty<string>();
+
+        if (command is DbCommand dbCommand)
+            return ExtractDbCommandParameters(dbCommand);
+
+        var parametersObject = command.GetType().GetProperty("Parameters")?.GetValue(command);
+
+        if (parametersObject is not System.Collections.IEnumerable parameters)
+            return Array.Empty<string>();
+
+        var values = new List<string>();
+
+        foreach (var parameter in parameters)
+        {
+            if (parameter is DbParameter dbParameter)
+            {
+                values.Add(FormatDbParameter(dbParameter));
+                continue;
+            }
+
+            var name = parameter.GetType().GetProperty("ParameterName")?.GetValue(parameter) as string;
+            var value = parameter.GetType().GetProperty("Value")?.GetValue(parameter);
+
+            if (!string.IsNullOrWhiteSpace(name))
+                values.Add($"{name} = {value ?? "NULL"}");
+        }
+
+        return values;
+    }
+
+    private static IReadOnlyList<string> ExtractDbCommandParameters(DbCommand command)
+    {
+        var values = new List<string>();
+
+        foreach (DbParameter parameter in command.Parameters)
+            values.Add(FormatDbParameter(parameter));
+
+        return values;
+    }
+
+    private static string FormatDbParameter(DbParameter parameter) =>
+        $"{parameter.ParameterName} = {parameter.Value ?? "NULL"}";
+
+    private static IReadOnlyList<string> ExtractParameters(string normalized)
     {
         var parameters = new List<string>();
 
-        foreach (var line in message.Split('\n', StringSplitOptions.TrimEntries))
+        foreach (var line in normalized.Split('\n', StringSplitOptions.TrimEntries))
         {
             if (line.StartsWith("@", StringComparison.Ordinal) || line.Contains("p__", StringComparison.Ordinal))
                 parameters.Add(line);
@@ -163,6 +381,7 @@ internal sealed class EfSqlCapture : IDisposable
     private static bool TryInvokeLogTo(
         LogToBinding binding,
         object databaseFacade,
+        DbLogSettings settings,
         Action<string> stringLogAction,
         Action<object> commandLogAction,
         out IDisposable? subscription)
@@ -177,6 +396,10 @@ internal sealed class EfSqlCapture : IDisposable
             if (logAction is null)
                 return false;
 
+            var logLevelValue = binding.LogLevelEnumType is null
+                ? (object)(int)settings.Level
+                : Enum.ToObject(binding.LogLevelEnumType, (int)settings.Level);
+
             if (parameters.Length == 2)
             {
                 subscription = binding.Method.Invoke(null, new object?[] { databaseFacade, logAction }) as IDisposable;
@@ -184,11 +407,11 @@ internal sealed class EfSqlCapture : IDisposable
                 return subscription is not null;
             }
 
-            if (parameters.Length == 3)
+            if (parameters.Length == 3 || settings.Verbose)
             {
                 subscription = binding.Method.Invoke(
                     null,
-                    new object?[] { databaseFacade, logAction, binding.LogLevelValue }) as IDisposable;
+                    new object?[] { databaseFacade, logAction, logLevelValue }) as IDisposable;
 
                 return subscription is not null;
             }
@@ -199,7 +422,7 @@ internal sealed class EfSqlCapture : IDisposable
                 {
                     databaseFacade,
                     logAction,
-                    binding.LogLevelValue,
+                    logLevelValue,
                     new[] { binding.CommandCategory },
                 }) as IDisposable;
 
@@ -276,5 +499,81 @@ internal sealed class EfSqlCapture : IDisposable
         }
 
         return normalized;
+    }
+
+    private sealed class DiagnosticEventObserver : IObserver<KeyValuePair<string, object?>>
+    {
+        private readonly EfSqlCapture _capture;
+        private readonly DiagnosticSqlCaptureBinding _binding;
+        private readonly bool _verbose;
+
+        internal DiagnosticEventObserver(EfSqlCapture capture, DiagnosticSqlCaptureBinding binding, bool verbose)
+        {
+            _capture = capture;
+            _binding = binding;
+            _verbose = verbose;
+        }
+
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+            if (value.Value is null)
+                return;
+
+            if (_verbose)
+            {
+                if (value.Value.GetType().GetProperty("Context") is null)
+                    return;
+
+                _capture.OnVerboseDiagnosticEvent(value.Key, value.Value);
+                return;
+            }
+
+            if (!string.Equals(value.Key, _binding.CommandExecutedEventName, StringComparison.Ordinal))
+                return;
+
+            if (!_binding.CommandExecutedEventDataType.IsInstanceOfType(value.Value))
+                return;
+
+            _capture.OnCommandExecutedDiagnosticEvent(value.Value);
+        }
+    }
+
+    private sealed class DiagnosticListenerObserver : IObserver<DiagnosticListener>
+    {
+        private readonly EfSqlCapture _capture;
+        private readonly DiagnosticSqlCaptureBinding _binding;
+        private readonly bool _verbose;
+
+        internal DiagnosticListenerObserver(EfSqlCapture capture, DiagnosticSqlCaptureBinding binding, bool verbose)
+        {
+            _capture = capture;
+            _binding = binding;
+            _verbose = verbose;
+        }
+
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void OnNext(DiagnosticListener listener)
+        {
+            if (!string.Equals(listener.Name, "Microsoft.EntityFrameworkCore", StringComparison.Ordinal))
+                return;
+
+            _capture._listenerSubscriptions.Add(
+                listener.Subscribe(new DiagnosticEventObserver(_capture, _binding, _verbose)));
+        }
     }
 }

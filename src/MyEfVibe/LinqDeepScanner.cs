@@ -85,19 +85,19 @@ internal static class LinqDeepScanner
                 ? "Queryable call site — translated SQL available."
                 : "Queryable call site — SQL translation failed.";
 
-            findings.Add(new LinqScanFinding(
+            findings.Add(LinqScanFinding.Create(
                 site.FilePath,
                 site.Line,
                 site.Code,
                 "query-site",
                 message,
-                LinqScanRecommendations.Get("query-site"),
-                translation.Sql,
-                translation.Note));
+                translatedSql: translation.Sql,
+                sqlTranslationNote: translation.Note));
         }
 
         var ordered = findings
-            .OrderBy(static finding => finding.FilePath, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(static finding => finding.Severity)
+            .ThenBy(static finding => finding.FilePath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(static finding => finding.Line)
             .ThenBy(static finding => finding.RuleId, StringComparer.Ordinal)
             .ToArray();

@@ -7,11 +7,11 @@ internal static class AnalyticsPresenter
     internal static void WriteEvaluation(
         object? result,
         EvaluationMetrics metrics,
-        SqlDisplaySettings sqlSettings,
+        DbLogSettings dbLogSettings,
         bool useSpectre)
     {
-        if (sqlSettings.ShowSql)
-            WriteSql(metrics, useSpectre);
+        if (dbLogSettings.Enabled)
+            WriteSql(metrics, dbLogSettings, useSpectre);
 
         if (useSpectre && !Console.IsOutputRedirected)
         {
@@ -36,33 +36,45 @@ internal static class AnalyticsPresenter
         }
     }
 
-    internal static void WriteSql(EvaluationMetrics metrics, bool useSpectre)
+    internal static void WriteSql(EvaluationMetrics metrics, DbLogSettings dbLogSettings, bool useSpectre)
     {
+        if (metrics.ExecutedSql.Count == 0 && string.IsNullOrWhiteSpace(metrics.TranslatedSql))
+            return;
+
         if (useSpectre && !Console.IsOutputRedirected)
         {
-            if (!string.IsNullOrWhiteSpace(metrics.TranslatedSql))
-                CliUi.WriteSqlBlock("Translated SQL", metrics.TranslatedSql);
+            WriteSqlBlocks(metrics, dbLogSettings, CliUi.WriteSqlBlock);
+            AnsiConsole.WriteLine();
+            return;
+        }
+
+        WriteSqlBlocks(
+            metrics,
+            dbLogSettings,
+            static (title, sql) =>
+            {
+                Console.WriteLine($"{title}:");
+                Console.WriteLine(sql);
+            });
+    }
+
+    private static void WriteSqlBlocks(
+        EvaluationMetrics metrics,
+        DbLogSettings dbLogSettings,
+        Action<string, string> writeBlock)
+    {
+        if (metrics.ExecutedSql.Count > 0)
+        {
+            var blockTitle = dbLogSettings.Verbose ? "Database log (verbose)" : "Database log";
 
             foreach (var sql in metrics.ExecutedSql)
-                CliUi.WriteSqlBlock("Executed SQL", sql);
-
-            if (metrics.TranslatedSql is not null || metrics.ExecutedSql.Count > 0)
-                AnsiConsole.WriteLine();
+                writeBlock(blockTitle, sql);
 
             return;
         }
 
         if (!string.IsNullOrWhiteSpace(metrics.TranslatedSql))
-        {
-            Console.WriteLine("Translated SQL:");
-            Console.WriteLine(metrics.TranslatedSql);
-        }
-
-        foreach (var sql in metrics.ExecutedSql)
-        {
-            Console.WriteLine("Executed SQL:");
-            Console.WriteLine(sql);
-        }
+            writeBlock("Translated SQL", metrics.TranslatedSql);
     }
 
     internal static void WriteFooter(EvaluationMetrics metrics)
@@ -78,13 +90,13 @@ internal static class AnalyticsPresenter
             parts.Add($"db {metrics.DatabaseMilliseconds} ms");
 
         if (metrics.SqlCommandCount > 0)
-            parts.Add($"{metrics.SqlCommandCount} cmd");
+            parts.Add($"{metrics.SqlCommandCount} command(s)");
 
-        parts.Add(DescribeRows(metrics));
-        parts.Add(metrics.IsMaterialized ? "materialized" : "deferred");
+        if (metrics.RowCount is not null)
+            parts.Add($"{metrics.RowCount} row(s)");
 
         if (metrics.EstimatedBytes is not null)
-            parts.Add($"~{FormatBytes(metrics.EstimatedBytes.Value)}");
+            parts.Add(FormatBytes(metrics.EstimatedBytes.Value));
 
         return string.Join(" · ", parts);
     }
@@ -94,8 +106,11 @@ internal static class AnalyticsPresenter
         if (warnings.Count == 0)
             return;
 
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[yellow]Warnings[/]");
+
         foreach (var warning in warnings)
-            AnsiConsole.MarkupLine($"[yellow]![/] {Markup.Escape(warning)}");
+            AnsiConsole.MarkupLine($"  [yellow]![/] {Markup.Escape(warning)}");
     }
 
     internal static void WriteSessionStats(IReadOnlyList<EvaluationMetrics> evaluations)
@@ -106,57 +121,29 @@ internal static class AnalyticsPresenter
             return;
         }
 
+        var succeeded = evaluations.Count(static metrics => metrics.Succeeded);
+        var totalMs = evaluations.Sum(static metrics => metrics.TotalMilliseconds);
+        var totalDbMs = evaluations.Sum(static metrics => metrics.DatabaseMilliseconds ?? 0);
+        var totalCommands = evaluations.Sum(static metrics => metrics.SqlCommandCount);
+
         var table = new Table()
             .RoundedBorder()
             .BorderColor(Color.Grey)
-            .AddColumn("#")
-            .AddColumn("ms")
-            .AddColumn("db")
-            .AddColumn("cmd")
-            .AddColumn("rows")
-            .AddColumn("kind")
-            .AddColumn("snippet");
+            .AddColumn("[grey]Metric[/]")
+            .AddColumn("[grey]Value[/]");
 
-        var index = 1;
-
-        foreach (var metrics in evaluations.TakeLast(20))
-        {
-            table.AddRow(
-                index.ToString(),
-                metrics.TotalMilliseconds.ToString(),
-                metrics.DatabaseMilliseconds?.ToString() ?? "-",
-                metrics.SqlCommandCount.ToString(),
-                metrics.RowCount?.ToString() ?? "-",
-                metrics.ResultKind.ToString(),
-                Truncate(metrics.Snippet.ReplaceLineEndings(" "), 40));
-
-            index++;
-        }
+        table.AddRow("Evaluations", evaluations.Count.ToString());
+        table.AddRow("Succeeded", succeeded.ToString());
+        table.AddRow("Total ms", totalMs.ToString());
+        table.AddRow("Database ms", totalDbMs.ToString());
+        table.AddRow("SQL commands", totalCommands.ToString());
 
         AnsiConsole.Write(table);
-
-        var succeeded = evaluations.Where(static metrics => metrics.Succeeded).ToArray();
-
-        if (succeeded.Length > 0)
-        {
-            AnsiConsole.MarkupLine(
-                $"[grey]Session: {evaluations.Count} runs · " +
-                $"avg {succeeded.Average(static metrics => metrics.TotalMilliseconds):F0} ms · " +
-                $"max {succeeded.Max(static metrics => metrics.TotalMilliseconds)} ms · " +
-                $"{succeeded.Sum(static metrics => metrics.SqlCommandCount)} SQL commands[/]");
-        }
-
         AnsiConsole.WriteLine();
     }
 
-    internal static void WriteCompare(EvaluationMetrics? baseline, EvaluationMetrics? current)
+    internal static void WriteCompare(EvaluationMetrics baseline, EvaluationMetrics current)
     {
-        if (baseline is null || current is null)
-        {
-            CliUi.WriteWarning("Need two evaluations. Run a query, then `:compare set`, change and run again, then `:compare`.");
-            return;
-        }
-
         var table = new Table().RoundedBorder().BorderColor(Color.Grey);
         table.AddColumn("");
         table.AddColumn("baseline");
@@ -171,16 +158,19 @@ internal static class AnalyticsPresenter
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
 
-        if (!string.IsNullOrWhiteSpace(baseline.TranslatedSql) || !string.IsNullOrWhiteSpace(current.TranslatedSql))
+        var baselineSql = FormatExecutedSql(baseline);
+        var currentSql = FormatExecutedSql(current);
+
+        if (!string.IsNullOrWhiteSpace(baselineSql) || !string.IsNullOrWhiteSpace(currentSql))
         {
             AnsiConsole.MarkupLine("[bold]SQL diff[/]");
 
-            if (string.Equals(baseline.TranslatedSql, current.TranslatedSql, StringComparison.Ordinal))
-                AnsiConsole.MarkupLine("[green]Translated SQL unchanged.[/]");
+            if (string.Equals(baselineSql, currentSql, StringComparison.Ordinal))
+                AnsiConsole.MarkupLine("[green]Database log SQL unchanged.[/]");
             else
             {
-                CliUi.WriteSqlBlock("baseline", baseline.TranslatedSql ?? "(none)");
-                CliUi.WriteSqlBlock("current", current.TranslatedSql ?? "(none)");
+                CliUi.WriteSqlBlock("baseline", baselineSql ?? "(none)");
+                CliUi.WriteSqlBlock("current", currentSql ?? "(none)");
             }
         }
 
@@ -215,6 +205,19 @@ internal static class AnalyticsPresenter
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
     }
+
+    internal static string? GetPlanSql(EvaluationMetrics? metrics)
+    {
+        if (metrics is null)
+            return null;
+
+        return DbLogSqlExtractor.SelectPlanSql(metrics.ExecutedSql, metrics.TranslatedSql);
+    }
+
+    private static string? FormatExecutedSql(EvaluationMetrics metrics) =>
+        metrics.ExecutedSql.Count == 0
+            ? metrics.TranslatedSql
+            : string.Join(Environment.NewLine + Environment.NewLine, metrics.ExecutedSql);
 
     private static string DescribeRows(EvaluationMetrics metrics) =>
         metrics.ResultKind switch

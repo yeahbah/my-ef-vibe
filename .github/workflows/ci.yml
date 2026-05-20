@@ -33,6 +33,9 @@ jobs:
       - name: Build
         run: dotnet build MyEfVibe.slnx -c Release --no-restore
 
+      - name: Test
+        run: dotnet test tests/MyEfVibe.Tests/MyEfVibe.Tests.csproj -c Release --no-build --verbosity normal
+
       - name: Pack
         run: >
           dotnet pack src/MyEfVibe/MyEfVibe.csproj

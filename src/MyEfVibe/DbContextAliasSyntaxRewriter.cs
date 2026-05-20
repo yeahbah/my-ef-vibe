@@ -36,8 +36,11 @@ internal sealed class DbContextAliasSyntaxRewriter : CSharpSyntaxRewriter
     }
 
     private static bool MightContainDbContextReference(string code) =>
-        code.Contains("Context", StringComparison.Ordinal)
-        || code.Contains("context", StringComparison.Ordinal)
+        code.Contains("dbContext", StringComparison.Ordinal)
+        || code.Contains("DbContext", StringComparison.Ordinal)
+        || code.Contains("_context", StringComparison.Ordinal)
+        || code.Contains("applicationDbContext", StringComparison.Ordinal)
+        || code.Contains("appDbContext", StringComparison.Ordinal)
         || code.Contains("db.", StringComparison.Ordinal);
 
     public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
@@ -58,9 +61,6 @@ internal sealed class DbContextAliasSyntaxRewriter : CSharpSyntaxRewriter
         if (string.Equals(identifier, "db", StringComparison.Ordinal))
             return base.VisitIdentifierName(node);
 
-        if (identifier == "context" && ShouldReplaceContextIdentifier(node))
-            return SyntaxFactory.IdentifierName("db");
-
         if (DbContextIdentifiers.Contains(identifier) && ShouldReplaceDbContextIdentifier(node))
             return SyntaxFactory.IdentifierName("db");
 
@@ -68,14 +68,12 @@ internal sealed class DbContextAliasSyntaxRewriter : CSharpSyntaxRewriter
     }
 
     private static bool ShouldReplaceMemberName(string name) =>
-        DbContextIdentifiers.Contains(name)
-        || string.Equals(name, "context", StringComparison.Ordinal);
+        DbContextIdentifiers.Contains(name);
 
     private static bool ShouldReplaceDbContextIdentifier(IdentifierNameSyntax node) =>
-        IsMemberAccessReceiver(node) || IsInvocationTarget(node);
-
-    private static bool ShouldReplaceContextIdentifier(IdentifierNameSyntax node) =>
-        !IsLambdaParameter(node) && (IsMemberAccessReceiver(node) || IsInvocationTarget(node));
+        !IsParameterReference(node)
+        && !IsLambdaParameter(node)
+        && (IsMemberAccessReceiver(node) || IsInvocationTarget(node));
 
     private static bool IsMemberAccessReceiver(IdentifierNameSyntax node) =>
         node.Parent is MemberAccessExpressionSyntax memberAccess
@@ -84,6 +82,19 @@ internal sealed class DbContextAliasSyntaxRewriter : CSharpSyntaxRewriter
     private static bool IsInvocationTarget(IdentifierNameSyntax node) =>
         node.Parent is InvocationExpressionSyntax invocation
         && invocation.Expression == node;
+
+    private static bool IsParameterReference(IdentifierNameSyntax node)
+    {
+        var name = node.Identifier.Text;
+
+        for (var current = node.Parent; current is not null; current = current.Parent)
+        {
+            if (current is ParameterSyntax parameter && parameter.Identifier.Text == name)
+                return true;
+        }
+
+        return false;
+    }
 
     private static bool IsLambdaParameter(IdentifierNameSyntax node)
     {
@@ -94,9 +105,6 @@ internal sealed class DbContextAliasSyntaxRewriter : CSharpSyntaxRewriter
             if (current is SimpleLambdaExpressionSyntax simple
                 && simple.Parameter is { } simpleParameter
                 && simpleParameter.Identifier.Text == name)
-                return true;
-
-            if (current is ParameterSyntax parameter && parameter.Identifier.Text == name)
                 return true;
 
             if (current is SimpleLambdaExpressionSyntax or ParenthesizedLambdaExpressionSyntax)

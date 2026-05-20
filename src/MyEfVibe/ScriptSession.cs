@@ -180,7 +180,7 @@ internal sealed class ScriptSession
     /// </summary>
     internal async Task<object?> EvaluateProbeAsync(string code, CancellationToken cancellationToken = default)
     {
-        var trimmed = SnippetNormalizer.ForEvaluation(code);
+        var trimmed = SnippetNormalizer.ForEvaluation(ProbeScriptFormatter.ToScriptExpression(code));
 
         if (string.IsNullOrEmpty(trimmed))
             return null;

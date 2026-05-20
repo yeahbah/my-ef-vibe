@@ -130,7 +130,7 @@ export function buildEfvibeArgs(settings: EfvibeSettings): string[] {
   }
 
   if (settings.showSql) {
-    args.push('--sql');
+    args.push('--dblog');
   }
 
   if (settings.dotnetFramework) {

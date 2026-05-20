@@ -11,7 +11,7 @@ internal enum LinqScanMode
 
 internal static class LinqScanSessionFile
 {
-    internal const int CurrentVersion = 2;
+    internal const int CurrentVersion = 3;
     internal const string LiteFileName = "myefvibe-scan-lite.json";
     internal const string DeepFileName = "myefvibe-scan-deep.json";
 
@@ -85,6 +85,7 @@ internal sealed record LinqScanFindingDto(
     string Code,
     string RuleId,
     string Message,
+    string? Severity = null,
     string? Recommendation = null,
     string? TranslatedSql = null,
     string? SqlTranslationNote = null,
@@ -97,20 +98,28 @@ internal sealed record LinqScanFindingDto(
             finding.Code,
             finding.RuleId,
             finding.Message,
+            LinqScanRuleCatalog.ToDisplayString(finding.Severity),
             finding.ResolvedRecommendation,
             finding.TranslatedSql,
             finding.SqlTranslationNote,
             finding.SavedNote);
 
-    internal LinqScanFinding ToFinding() =>
-        new(
+    internal LinqScanFinding ToFinding()
+    {
+        var severity = LinqScanRuleCatalog.TryParseSeverity(Severity, out var parsed)
+            ? parsed
+            : LinqScanRuleCatalog.GetSeverity(RuleId);
+
+        return new LinqScanFinding(
             FilePath,
             Line,
             Code,
             RuleId,
             Message,
+            severity,
             Recommendation,
             TranslatedSql,
             SqlTranslationNote,
             SavedNote);
+    }
 }

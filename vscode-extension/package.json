@@ -105,7 +105,7 @@
         "efvibe.showSql": {
           "type": "boolean",
           "default": true,
-          "description": "Pass `--sql` to the efvibe CLI (show generated SQL)."
+          "description": "Pass `--dblog` to the efvibe CLI (show database command log)."
         },
         "efvibe.dotnetFramework": {
           "type": "string",

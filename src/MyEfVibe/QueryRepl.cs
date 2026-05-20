@@ -9,7 +9,7 @@ internal sealed class QueryRepl
     private readonly object _dbContext;
     private readonly string _contextTypeName;
     private readonly string _projectLabel;
-    private readonly SqlDisplaySettings _sqlSettings;
+    private readonly DbLogSettings _dbLogSettings;
     private readonly SessionAnalytics _analytics = new();
     private readonly InputHistory _history = new();
     private readonly LinqScanReviewSession _scanReview = new();
@@ -20,7 +20,7 @@ internal sealed class QueryRepl
         ScriptSession session,
         WorkspaceHost host,
         object dbContext,
-        SqlDisplaySettings sqlSettings,
+        DbLogSettings dbLogSettings,
         string projectLabel)
     {
         _session = session;
@@ -28,9 +28,9 @@ internal sealed class QueryRepl
         _dbContext = dbContext;
         _contextTypeName = dbContext.GetType().Name;
         _projectLabel = projectLabel;
-        _sqlSettings = sqlSettings;
+        _dbLogSettings = dbLogSettings;
         _lineReader = new ReplLineReader(_history, new ReplCompletionService(), _scanReview);
-        _commands = new ReplCommandHandler(session, host, dbContext, sqlSettings, _analytics, _history, _scanReview);
+        _commands = new ReplCommandHandler(session, host, dbContext, dbLogSettings, _analytics, _history, _scanReview);
     }
 
     internal async Task RunAsync(CancellationToken cancellationToken = default)
@@ -184,7 +184,7 @@ internal sealed class QueryRepl
     private void WriteBanner()
     {
         CliUi.WriteBanner();
-        CliUi.WriteSessionPanel(_contextTypeName, _projectLabel, _sqlSettings.ShowSql);
+        CliUi.WriteSessionPanel(_contextTypeName, _projectLabel, _dbLogSettings);
         CliUi.WriteRule("repl");
     }
 
@@ -221,21 +221,6 @@ internal sealed class QueryRepl
                 CliUi.WriteSuccess("Script state cleared. `db` is unchanged.");
                 return (true, false);
 
-            case "sql":
-                _sqlSettings.Toggle();
-                CliUi.WriteSuccess($"SQL logging is now {(_sqlSettings.ShowSql ? "on" : "off")}.");
-                return (true, false);
-
-            case "sql on":
-                _sqlSettings.ShowSql = true;
-                CliUi.WriteSuccess("SQL logging is now on.");
-                return (true, false);
-
-            case "sql off":
-                _sqlSettings.ShowSql = false;
-                CliUi.WriteSuccess("SQL logging is now off.");
-                return (true, false);
-
             default:
                 if (await _commands.TryHandleAsync(command, cancellationToken))
                     return (true, false);
@@ -253,7 +238,7 @@ internal sealed class QueryRepl
                 _dbContext,
                 _session,
                 snippet,
-                _sqlSettings,
+                _dbLogSettings,
                 _host,
                 _analytics,
                 cancellationToken: cancellationToken);

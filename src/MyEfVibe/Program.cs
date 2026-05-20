@@ -14,6 +14,9 @@ internal static class Program
             return 0;
         }
 
+        if (args.Length > 0 && string.Equals(args[0], "scan", StringComparison.OrdinalIgnoreCase))
+            return await ScanCommandRunner.RunFromArgsAsync(args[1..]);
+
         CliUi.Configure();
 
         var workspaceOption = new Option<DirectoryInfo?>(
@@ -46,10 +49,18 @@ internal static class Program
             aliases: new[] { "-e", "--expression" },
             description: "Run a single expression and exit (non-interactive).");
 
-        var sqlOption = new Option<bool>(
-            aliases: new[] { "--sql" },
-            description: "Show generated SQL (executed commands and translated IQueryable SQL).",
+        var dbLogOption = new Option<bool>(
+            aliases: new[] { "--dblog" },
+            description: "Enable EF database command logging (default: on; toggle in REPL with :dblog).",
             getDefaultValue: () => true);
+
+        var dbLogLevelOption = new Option<string?>(
+            aliases: new[] { "--dblog-level" },
+            description: "Database log level: trace | debug | information | warning | error | critical | none.");
+
+        var dbLogVerboseOption = new Option<bool>(
+            aliases: new[] { "--dblog-verbose" },
+            description: "Show full EF diagnostic logs (default: sql-only executed commands).");
 
         var versionOption = new Option<bool>(
             aliases: new[] { "--version", "-V" },
@@ -82,7 +93,9 @@ internal static class Program
             connectionOption,
             providerOption,
             expressionOption,
-            sqlOption,
+            dbLogOption,
+            dbLogLevelOption,
+            dbLogVerboseOption,
             versionOption,
             aboutJsonOption,
             frameworkOption,
@@ -118,7 +131,9 @@ internal static class Program
             parseResult.GetValueForOption(connectionOption),
             parseResult.GetValueForOption(providerOption),
             parseResult.GetValueForOption(expressionOption),
-            parseResult.GetValueForOption(sqlOption),
+            parseResult.GetValueForOption(dbLogOption),
+            parseResult.GetValueForOption(dbLogLevelOption),
+            parseResult.GetValueForOption(dbLogVerboseOption),
             parseResult.GetValueForOption(aboutJsonOption),
             parseResult.GetValueForOption(frameworkOption),
             parseResult.GetValueForArgument(expressionArgument));
@@ -132,12 +147,20 @@ internal static class Program
         string? connectionString,
         string? providerRaw,
         string? expressionOptionValue,
-        bool showSql,
+        bool dbLogEnabled,
+        string? dbLogLevelRaw,
+        bool dbLogVerbose,
         bool aboutJson,
         string? frameworkOrNull,
         string[]? expressionArgumentTokens)
     {
-        var sqlSettings = new SqlDisplaySettings { ShowSql = showSql };
+        var dbLogSettings = new DbLogSettings { Enabled = dbLogEnabled, Verbose = dbLogVerbose };
+
+        if (!string.IsNullOrWhiteSpace(dbLogLevelRaw)
+            && DbLogLevelParser.TryParse(dbLogLevelRaw, out var parsedLevel))
+        {
+            dbLogSettings.Level = parsedLevel;
+        }
 
         var parsedProvider = ProviderParser.ParseOrNull(providerRaw);
 
@@ -266,9 +289,9 @@ internal static class Program
         }
 
         if (!string.IsNullOrWhiteSpace(oneShotExpression))
-            return await QueryRunner.RunOnceAsync(dbContextInstance, session, host, sqlSettings, oneShotExpression);
+            return await QueryRunner.RunOnceAsync(dbContextInstance, session, host, dbLogSettings, oneShotExpression);
 
-        var repl = new QueryRepl(session, host, dbContextInstance, sqlSettings, projectLabel);
+        var repl = new QueryRepl(session, host, dbContextInstance, dbLogSettings, projectLabel);
 
         await repl.RunAsync();
 

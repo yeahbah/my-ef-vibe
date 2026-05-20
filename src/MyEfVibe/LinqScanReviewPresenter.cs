@@ -17,6 +17,7 @@ internal static class LinqScanReviewPresenter
         body.AddRow("[grey]File[/]", $"[cyan]{Markup.Escape(relativePath)}[/]");
         body.AddRow("[grey]Line[/]", $"[white]{finding.Line}[/]");
         body.AddRow("[grey]Rule[/]", $"[dim]{Markup.Escape(finding.RuleId)}[/]");
+        body.AddRow("[grey]Severity[/]", FormatSeverityMarkup(finding.Severity));
         body.AddRow("[grey]Message[/]", Markup.Escape(finding.Message));
 
         if (!string.IsNullOrWhiteSpace(finding.SavedNote))
@@ -54,6 +55,15 @@ internal static class LinqScanReviewPresenter
             + "[grey]:repeat[/] restart · [grey]:end[/] exit review");
         AnsiConsole.WriteLine();
     }
+
+    private static string FormatSeverityMarkup(LinqScanSeverity severity) =>
+        severity switch
+        {
+            LinqScanSeverity.Critical => "[bold red]critical[/]",
+            LinqScanSeverity.Error => "[bold red]error[/]",
+            LinqScanSeverity.Warning => "[bold yellow]warning[/]",
+            _ => "[dim cyan]info[/]",
+        };
 
     private static string TryToRelativePath(string rootDirectory, string absolutePath)
     {

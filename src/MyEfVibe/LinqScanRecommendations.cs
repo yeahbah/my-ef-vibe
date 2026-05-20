@@ -26,9 +26,14 @@ internal static class LinqScanRecommendations
                 + "Avoid relying on database default ordering — it can change between executions.",
 
             "raw-sql" =>
-                "Use FromSqlInterpolated / ExecuteSqlInterpolated so values are parameterized, not concatenated.\n"
-                + "Review execution plans and indexes for predicates in the SQL.\n"
-                + "Prefer LINQ where possible; reserve raw SQL for cases EF cannot express.",
+                "Review execution plans and indexes for predicates in the SQL.\n"
+                + "Prefer LINQ where possible; reserve raw SQL for cases EF cannot express.\n"
+                + "Keep using separate SQL parameters (not string concatenation) for dynamic values.",
+
+            "raw-sql-unparameterized" =>
+                "Never build SQL with string concatenation or interpolation into FromSqlRaw/ExecuteSqlRaw.\n"
+                + "Use ExecuteSqlRaw(sql, parameters) / FromSqlRaw(sql, parameters) with placeholders ({0}, @p0), or ExecuteSqlInterpolated / FromSqlInterpolated.\n"
+                + "Review execution plans and indexes after fixing parameterization.",
 
             "n-plus-one" =>
                 "Load related data up front with Include/ThenInclude, or one query Where(id in batch).\n"
@@ -40,6 +45,6 @@ internal static class LinqScanRecommendations
                 + "Paste the expression in the REPL to run, benchmark, or use :plan on the live query.",
 
             _ =>
-                "Run the query with SQL logging (:sql) or :plan to inspect the generated SQL and row counts.",
+                "Run the query with database logging (:dblog on) or :plan to inspect the executed SQL and row counts.",
         };
 }

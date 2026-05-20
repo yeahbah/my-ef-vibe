@@ -26,7 +26,6 @@ internal static class BenchmarkRunner
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            using var sqlCapture = EfSqlCapture.TryAttach(dbContext);
             var stopwatch = Stopwatch.StartNew();
 
             await session.EvaluateAsync(snippet, cancellationToken);

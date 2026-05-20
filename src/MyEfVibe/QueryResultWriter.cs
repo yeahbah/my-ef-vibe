@@ -6,7 +6,7 @@ internal static class QueryResultWriter
         object dbContextInstance,
         ScriptSession session,
         string snippet,
-        SqlDisplaySettings sqlSettings,
+        DbLogSettings dbLogSettings,
         WorkspaceHost host,
         SessionAnalytics analytics,
         TextWriter? output = null,
@@ -20,14 +20,14 @@ internal static class QueryResultWriter
                 dbContextInstance,
                 session,
                 snippet,
-                sqlSettings,
-                host,
+                dbLogSettings,
+                host.EnumerateLoadedAssemblies(),
                 cancellationToken);
 
             var (_, _, _, _, _, exportRows) = ResultAnalyzer.Analyze(result);
 
             analytics.Record(metrics, result, exportRows);
-            AnalyticsPresenter.WriteEvaluation(result, metrics, sqlSettings, useSpectre);
+            AnalyticsPresenter.WriteEvaluation(result, metrics, dbLogSettings, useSpectre);
         }
         catch (EvaluationFailedException failure)
         {

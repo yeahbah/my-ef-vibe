@@ -206,7 +206,7 @@ Dismissals and notes are keyed by file, line, and rule id (`myefvibe-scan-dismis
 
 Each finding includes a **Fix** section with concrete remediation hints (e.g. `AsSplitQuery()` for cartesian includes, `OrderBy` before `Take`, batching for N+1). Deep findings may also show a **Translated SQL** panel.
 
-Rules include: client-side `AsEnumerable()`, unbounded materialization, multiple `Include`/`ThenInclude`, `Take` without `OrderBy`, raw SQL, possible N+1 inside loops, and (deep only) `query-site` entries for call sites with SQL but no heuristic warning.
+Rules include: client-side `AsEnumerable()`, unbounded materialization, multiple `Include`/`ThenInclude`, `Take` without `OrderBy`, raw SQL, possible N+1 inside loops, and (deep only) `query-site` entries for call sites with SQL but no heuristic warning. Full reference: [docs/linq-scan-rules.md](docs/linq-scan-rules.md).
 
 ### Schema and connection (`:tables`, `:describe`, `:dbinfo`)
 

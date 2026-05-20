@@ -7,7 +7,7 @@ internal sealed class ReplCommandHandler
     private readonly ScriptSession _session;
     private readonly WorkspaceHost _host;
     private readonly object _dbContext;
-    private readonly SqlDisplaySettings _sqlSettings;
+    private readonly DbLogSettings _dbLogSettings;
     private readonly SessionAnalytics _analytics;
     private readonly InputHistory _history;
     private readonly LinqScanReviewSession _scanReview;
@@ -16,7 +16,7 @@ internal sealed class ReplCommandHandler
         ScriptSession session,
         WorkspaceHost host,
         object dbContext,
-        SqlDisplaySettings sqlSettings,
+        DbLogSettings dbLogSettings,
         SessionAnalytics analytics,
         InputHistory history,
         LinqScanReviewSession scanReview)
@@ -24,7 +24,7 @@ internal sealed class ReplCommandHandler
         _session = session;
         _host = host;
         _dbContext = dbContext;
-        _sqlSettings = sqlSettings;
+        _dbLogSettings = dbLogSettings;
         _analytics = analytics;
         _history = history;
         _scanReview = scanReview;
@@ -117,10 +117,14 @@ internal sealed class ReplCommandHandler
                 _scanReview.TrySetNote(string.Join(' ', parts.Skip(1)));
                 return true;
 
+            case "dblog":
+                HandleDbLog(parts);
+                return true;
+
             case "plan":
                 await QueryPlanRunner.WritePlanAsync(
                     _dbContext,
-                    _analytics.LastMetrics?.TranslatedSql,
+                    AnalyticsPresenter.GetPlanSql(_analytics.LastMetrics),
                     _host.EnumerateLoadedAssemblies(),
                     cancellationToken);
                 return true;
@@ -276,6 +280,47 @@ internal sealed class ReplCommandHandler
             LinqScanMode.Deep,
             stats,
             dismissedSkipped);
+    }
+
+    private void HandleDbLog(string[] parts)
+    {
+        if (parts.Length == 1)
+        {
+            CliUi.WriteSuccess($"Database logging is {DbLogCommandParser.FormatStatus(_dbLogSettings)}.");
+            return;
+        }
+
+        switch (parts[1].ToLowerInvariant())
+        {
+            case "status":
+                CliUi.WriteSuccess($"Database logging is {DbLogCommandParser.FormatStatus(_dbLogSettings)}.");
+                return;
+
+            case "on":
+                _dbLogSettings.Enabled = true;
+                _dbLogSettings.Verbose = false;
+
+                if (parts.Length >= 3
+                    && !DbLogCommandParser.TryApplyOnArguments(parts[2..], _dbLogSettings, out var error))
+                {
+                    CliUi.WriteWarning(error ?? "Invalid :dblog options.");
+                    return;
+                }
+
+                CliUi.WriteSuccess($"Database logging is {DbLogCommandParser.FormatStatus(_dbLogSettings)}.");
+                return;
+
+            case "off":
+                _dbLogSettings.Enabled = false;
+                _dbLogSettings.Verbose = false;
+                CliUi.WriteSuccess("Database logging is off.");
+                return;
+
+            default:
+                CliUi.WriteWarning(
+                    "Usage: :dblog [on|off [level] [verbose]] — default is sql-only; add verbose for full EF logs.");
+                return;
+        }
     }
 
     private void HandleCompare(string[] parts)

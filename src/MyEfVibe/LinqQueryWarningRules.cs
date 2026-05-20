@@ -47,15 +47,208 @@ internal static class LinqQueryWarningRules
                 "Take() without OrderBy — row order is undefined."));
         }
 
-        if (normalized.Contains("FromSqlRaw(", StringComparison.Ordinal)
-            || normalized.Contains("ExecuteSqlRaw(", StringComparison.Ordinal))
+        AnalyzeRawSqlWarnings(normalized, warnings);
+
+        return warnings;
+    }
+
+    private static void AnalyzeRawSqlWarnings(
+        string normalized,
+        List<(string RuleId, string Message)> warnings)
+    {
+        var hasParameterizedRaw = false;
+        var hasUnparameterizedRaw = false;
+
+        foreach (var method in new[] { "FromSqlRaw", "ExecuteSqlRaw", "FromSqlRawAsync", "ExecuteSqlRawAsync" })
+        {
+            foreach (var arguments in EnumerateRawSqlInvocationArguments(normalized, method))
+            {
+                if (HasSqlParameterArguments(arguments))
+                    hasParameterizedRaw = true;
+                else
+                    hasUnparameterizedRaw = true;
+            }
+        }
+
+        if (hasUnparameterizedRaw)
+        {
+            warnings.Add((
+                "raw-sql-unparameterized",
+                "Uses raw SQL without separate SQL parameters — injection and plan-cache risk."));
+        }
+        else if (hasParameterizedRaw)
         {
             warnings.Add((
                 "raw-sql",
-                "Uses raw SQL — verify parameterization and indexing."));
+                "Uses parameterized raw SQL — verify indexing and execution plan."));
+        }
+    }
+
+    private static IEnumerable<string> EnumerateRawSqlInvocationArguments(string text, string methodName)
+    {
+        var needle = $"{methodName}(";
+
+        for (var index = 0; index < text.Length;)
+        {
+            var start = text.IndexOf(needle, index, StringComparison.Ordinal);
+
+            if (start < 0)
+                yield break;
+
+            var openParen = start + needle.Length - 1;
+
+            if (!TryExtractParenthesizedContent(text, openParen, out var arguments))
+            {
+                index = start + needle.Length;
+                continue;
+            }
+
+            yield return arguments;
+            index = openParen + arguments.Length + 2;
+        }
+    }
+
+    private static bool HasSqlParameterArguments(string arguments)
+    {
+        var argumentCount = SplitTopLevelCommaSeparated(arguments)
+            .Select(static part => part.Trim())
+            .Count(static part => part.Length > 0);
+
+        return argumentCount >= 2;
+    }
+
+    private static IEnumerable<string> SplitTopLevelCommaSeparated(string arguments)
+    {
+        var start = 0;
+        var depth = 0;
+
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            switch (arguments[index])
+            {
+                case '(':
+                case '[':
+                case '{':
+                    depth++;
+                    break;
+
+                case ')':
+                case ']':
+                case '}':
+                    depth--;
+                    break;
+
+                case ',' when depth == 0:
+                    yield return arguments[start..index];
+                    start = index + 1;
+                    break;
+
+                case '"':
+                    index = SkipStringLiteral(arguments, index);
+                    break;
+
+                case '\'':
+                    index = SkipCharLiteral(arguments, index);
+                    break;
+            }
         }
 
-        return warnings;
+        if (start < arguments.Length)
+            yield return arguments[start..];
+    }
+
+    private static bool TryExtractParenthesizedContent(string text, int openParenIndex, out string content)
+    {
+        content = string.Empty;
+
+        if (!TryFindClosingParenthesis(text, openParenIndex, out var closeParenIndex))
+            return false;
+
+        content = text[(openParenIndex + 1)..closeParenIndex];
+        return true;
+    }
+
+    private static bool TryFindClosingParenthesis(string text, int openParenIndex, out int closeParenIndex)
+    {
+        closeParenIndex = -1;
+
+        if (openParenIndex < 0 || openParenIndex >= text.Length || text[openParenIndex] != '(')
+            return false;
+
+        var depth = 0;
+
+        for (var index = openParenIndex; index < text.Length; index++)
+        {
+            switch (text[index])
+            {
+                case '(':
+                    depth++;
+                    break;
+
+                case ')':
+                    depth--;
+
+                    if (depth == 0)
+                    {
+                        closeParenIndex = index;
+                        return true;
+                    }
+
+                    break;
+
+                case '"':
+                    index = SkipStringLiteral(text, index);
+                    break;
+
+                case '\'':
+                    index = SkipCharLiteral(text, index);
+                    break;
+            }
+        }
+
+        return false;
+    }
+
+    private static int SkipStringLiteral(string text, int startIndex)
+    {
+        var index = startIndex + 1;
+
+        while (index < text.Length)
+        {
+            if (text[index] == '\\')
+            {
+                index += 2;
+                continue;
+            }
+
+            if (text[index] == '"')
+                return index;
+
+            index++;
+        }
+
+        return text.Length - 1;
+    }
+
+    private static int SkipCharLiteral(string text, int startIndex)
+    {
+        var index = startIndex + 1;
+
+        while (index < text.Length)
+        {
+            if (text[index] == '\\')
+            {
+                index += 2;
+                continue;
+            }
+
+            if (text[index] == '\'')
+                return index;
+
+            index++;
+        }
+
+        return text.Length - 1;
     }
 
     private static int CountOccurrences(string text, string pattern)

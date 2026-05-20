@@ -9,19 +9,13 @@ internal static class QueryEvaluator
         object dbContextInstance,
         ScriptSession session,
         string snippet,
-        SqlDisplaySettings sqlSettings,
-        WorkspaceHost host,
+        DbLogSettings dbLogSettings,
+        IEnumerable<Assembly> inspectionAssemblies,
         CancellationToken cancellationToken = default)
     {
-        var warnings = SnippetWarningsAnalyzer.Analyze(snippet);
-        string? translatedSql = null;
+        var warnings = new List<string>(SnippetWarningsAnalyzer.Analyze(snippet));
 
-        if (sqlSettings.ShowSql)
-            translatedSql = await TryGetProbeTranslatedSqlAsync(session, snippet, host, cancellationToken);
-
-        var sqlFormatterAssemblies = host.EnumerateDiscoveryAssemblies().ToArray();
-
-        using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance);
+        using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance, dbLogSettings);
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -31,19 +25,21 @@ internal static class QueryEvaluator
 
             stopwatch.Stop();
 
-            if (translatedSql is null && sqlSettings.ShowSql)
-            {
-                RelationalQueryableSqlFormatter.TryGetSql(
-                    result,
-                    sqlFormatterAssemblies,
-                    out translatedSql);
-            }
-
             var (kind, typeName, rowCount, isMaterialized, estimatedBytes, exportRows) =
                 ResultAnalyzer.Analyze(result);
 
             var executedSql = sqlCapture?.Commands.Select(EfSqlCapture.FormatEntry).ToArray()
                 ?? Array.Empty<string>();
+
+            string? translatedSql = null;
+
+            if (executedSql.Length == 0
+                && result is System.Linq.IQueryable
+                && RelationalQueryableSqlFormatter.TryGetSql(result, inspectionAssemblies, out var queryString))
+            {
+                translatedSql = queryString;
+                warnings.Add("Query not executed; showing translated SQL from ToQueryString().");
+            }
 
             var metrics = new EvaluationMetrics(
                 snippet,
@@ -73,43 +69,6 @@ internal static class QueryEvaluator
             throw new EvaluationFailedException(
                 EvaluationMetrics.Failed(snippet, stopwatch.ElapsedMilliseconds, message),
                 failure);
-        }
-    }
-
-    private static async Task<string?> TryGetProbeTranslatedSqlAsync(
-        ScriptSession session,
-        string snippet,
-        WorkspaceHost host,
-        CancellationToken cancellationToken)
-    {
-        var probeExpression = SqlTranslationProbe.TryCreateProbeExpression(snippet);
-
-        if (probeExpression is null)
-            return null;
-
-        var formatterAssemblies = host.EnumerateDiscoveryAssemblies().ToArray();
-
-        try
-        {
-            var sqlLiteral = await session.EvaluateProbeAsync(
-                $"{probeExpression.TrimEnd()}.ToQueryString()",
-                cancellationToken);
-
-            if (sqlLiteral is string sqlFromScript && !string.IsNullOrWhiteSpace(sqlFromScript))
-                return sqlFromScript;
-
-            var queryable = await session.EvaluateProbeAsync(probeExpression, cancellationToken);
-
-            return RelationalQueryableSqlFormatter.TryGetSql(
-                queryable,
-                formatterAssemblies,
-                out var sql)
-                ? sql
-                : null;
-        }
-        catch
-        {
-            return null;
         }
     }
 

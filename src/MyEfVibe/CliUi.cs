@@ -70,7 +70,7 @@ internal static class CliUi
         AnsiConsole.WriteLine();
     }
 
-    internal static void WriteSessionPanel(string contextTypeName, string projectLabel, bool sqlEnabled)
+    internal static void WriteSessionPanel(string contextTypeName, string projectLabel, DbLogSettings dbLogSettings)
     {
         var grid = new Grid();
         grid.AddColumn();
@@ -79,10 +79,10 @@ internal static class CliUi
         grid.AddRow("[grey]DbContext[/]", $"[cyan]{Markup.Escape(contextTypeName)}[/]");
         grid.AddRow("[grey]Project[/]", $"[white]{Markup.Escape(projectLabel)}[/]");
         grid.AddRow(
-            "[grey]SQL[/]",
-            sqlEnabled
-                ? "[green]on[/] [grey](:sql to toggle)[/]"
-                : "[grey]off[/] [grey](:sql to toggle)[/]");
+            "[grey]Db log[/]",
+            dbLogSettings.Enabled
+                ? $"[green]on[/] [grey]({DbLogLevelParser.Format(dbLogSettings.Level)} · {DbLogCommandParser.FormatMode(dbLogSettings)} · :dblog)[/]"
+                : "[grey]off[/] [grey](:dblog on|off [level] [verbose])[/]");
         grid.AddRow(
             "[grey]Input[/]",
             "[grey]Enter next line · ; run · Shift+Enter newline · Tab complete[/]");
@@ -111,7 +111,9 @@ internal static class CliUi
         table.AddRow("[cyan]:about[/]", "Tool version, license, and current session info");
         table.AddRow("[cyan]:clear[/]", "Clear the terminal screen");
         table.AddRow("[cyan]:reset[/]", "Clear script variables ([grey]db[/] stays)");
-        table.AddRow("[cyan]:sql[/]", "Toggle SQL output");
+        table.AddRow(
+            "[cyan]:dblog[/]",
+            "Database logging (sql-only by default) — :dblog on|off [level] [verbose]");
         table.AddRow("[cyan]:stats[/]", "Session evaluation statistics");
         table.AddRow("[cyan]:tracked[/]", "Change tracker summary");
         table.AddRow("[cyan]:tables[/]", "List DbSets and row counts");
@@ -123,7 +125,7 @@ internal static class CliUi
         table.AddRow("[cyan]:dismiss[/] [[note]]", "Skip finding in future scans; Del on empty prompt during scan review");
         table.AddRow("[cyan]:note[/] text…", "Save a required note on the current finding (shown on next scan)");
         table.AddRow("[cyan]:repeat[/] · [cyan]:end[/]", "Restart scan review queue · exit scan review");
-        table.AddRow("[cyan]:plan[/]", "EXPLAIN last translated SQL");
+        table.AddRow("[cyan]:plan[/]", "EXPLAIN last database log SQL");
         table.AddRow("[cyan]:compare set[/]", "Save baseline · [cyan]:compare[/] diff last run");
         table.AddRow("[cyan]:history stats[/]", "History with timings");
         table.AddRow("[cyan]:benchmark N[/]", "Repeat last query N times");

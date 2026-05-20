@@ -10,6 +10,13 @@ internal static class LinqDeepSqlTranslator
         string statementOrCode,
         CancellationToken cancellationToken = default)
     {
+        if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statementOrCode))
+        {
+            return new LinqSqlTranslationResult(
+                null,
+                "Not an EF Core query expression.");
+        }
+
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statementOrCode);
 
         if (probe is null)
@@ -23,14 +30,16 @@ internal static class LinqDeepSqlTranslator
 
         try
         {
+            var scriptProbe = ProbeScriptFormatter.ToScriptExpression(probe);
+
             var sqlLiteral = await session.EvaluateProbeAsync(
-                $"{probe.TrimEnd()}.ToQueryString()",
+                $"{scriptProbe}.ToQueryString()",
                 cancellationToken);
 
             if (sqlLiteral is string sqlFromScript && !string.IsNullOrWhiteSpace(sqlFromScript))
                 return new LinqSqlTranslationResult(sqlFromScript, null);
 
-            var queryable = await session.EvaluateProbeAsync(probe, cancellationToken);
+            var queryable = await session.EvaluateProbeAsync(scriptProbe, cancellationToken);
 
             if (RelationalQueryableSqlFormatter.TryGetSql(
                     queryable,

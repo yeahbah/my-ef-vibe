@@ -21,11 +21,13 @@ Scans include sources from **both** `-p` (EF/persistence) and `-s` (startup/API 
 
 ## Rules detected
 
+See **[linq-scan-rules.md](./linq-scan-rules.md)** for the full catalog (severity, triggers, fixes, and examples).
+
 - `AsEnumerable()` / client-side evaluation risk (`client-eval`)
 - `ToList()` / `ToArray()` without `Take` on large sets (`unbounded-materialize`)
 - Multiple `Include()` / `ThenInclude()` — cartesian explosion risk (`cartesian`)
 - `Take()` without `OrderBy` — unstable paging (`unordered-take`)
-- `FromSqlRaw` / `ExecuteSqlRaw` (`raw-sql`)
+- `FromSqlRaw` / `ExecuteSqlRaw` — parameterized (`raw-sql`, warning) or without params (`raw-sql-unparameterized`, error)
 - Query-like calls inside `foreach` / `for` — possible N+1 (`n-plus-one`)
 - `query-site` (deep only) — call site with translated SQL and no heuristic hit
 

@@ -54,7 +54,8 @@ internal static class LinqLiteScanner
         return new LinqLiteScanResult(
             filesScanned,
             projectPaths.Count,
-            findings.OrderBy(static finding => finding.FilePath, StringComparer.OrdinalIgnoreCase)
+            findings.OrderByDescending(static finding => finding.Severity)
+                .ThenBy(static finding => finding.FilePath, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(static finding => finding.Line)
                 .ThenBy(static finding => finding.RuleId, StringComparer.Ordinal)
                 .ToArray());
@@ -94,6 +95,10 @@ internal static class LinqLiteScanner
                 continue;
 
             var statement = GetStatementText(invocation);
+
+            if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement))
+                continue;
+
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
             var preview = ToPreviewLine(statement);
 
@@ -104,13 +109,12 @@ internal static class LinqLiteScanner
                 if (!reported.Add(key))
                     continue;
 
-                findings.Add(new LinqScanFinding(
+                findings.Add(LinqScanFinding.Create(
                     absolutePath,
                     line,
                     preview,
                     ruleId,
-                    message,
-                    LinqScanRecommendations.Get(ruleId)));
+                    message));
             }
         }
 
@@ -142,13 +146,12 @@ internal static class LinqLiteScanner
         if (!reported.Add(key))
             return;
 
-        findings.Add(new LinqScanFinding(
+        findings.Add(LinqScanFinding.Create(
             absolutePath,
             line,
             ToPreviewLine(bodyText),
             ruleId,
-            message,
-            LinqScanRecommendations.Get(ruleId)));
+            message));
     }
 
     private static bool LooksLikeQueryInLoop(string bodyText)

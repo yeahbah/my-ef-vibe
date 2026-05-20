@@ -51,6 +51,10 @@ internal static class SessionPaths
     internal static string EnsurePendingSessionDirectory(string workspaceRoot) =>
         EnsureSessionDirectory(Path.Combine(workspaceRoot, ".pending"));
 
+    internal static string EnsureProjectScanDirectory(string workspaceRoot, string projectCsprojPath) =>
+        EnsureSessionDirectory(
+            Path.Combine(workspaceRoot, GetProjectSessionFolderName(projectCsprojPath), "scan"));
+
     private static string SanitizeFolderName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();

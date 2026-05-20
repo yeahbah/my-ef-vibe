@@ -11,7 +11,12 @@ internal static class LinqDeepExpressionAdapter
 
         normalized = ReplaceContextAliases(normalized);
 
-        return SqlTranslationProbe.TryCreateProbeExpression(normalized);
+        var probe = SqlTranslationProbe.TryCreateProbeExpression(normalized);
+
+        if (probe is null)
+            return null;
+
+        return ProbeParameterStubber.Stub(ProbeScriptFormatter.ToScriptExpression(probe));
     }
 
     private static string NormalizeStatement(string code)
@@ -26,6 +31,8 @@ internal static class LinqDeepExpressionAdapter
 
         if (trimmed.StartsWith("await ", StringComparison.Ordinal))
             trimmed = trimmed["await ".Length..].Trim();
+
+        trimmed = StripNullCoalescingSuffix(trimmed);
 
         return trimmed.Trim().TrimEnd(';').Trim();
     }
@@ -53,32 +60,26 @@ internal static class LinqDeepExpressionAdapter
         return trimmed;
     }
 
+    private static string StripNullCoalescingSuffix(string trimmed)
+    {
+        const string throwSuffix = "?? throw";
+
+        var index = trimmed.IndexOf(throwSuffix, StringComparison.Ordinal);
+
+        if (index < 0)
+            return trimmed;
+
+        return trimmed[..index].Trim();
+    }
+
     private static string StripAssignmentRhs(string trimmed)
     {
-        var equalsIndex = trimmed.IndexOf('=');
-
-        if (equalsIndex <= 0)
+        if (!trimmed.StartsWith("var ", StringComparison.Ordinal))
             return trimmed;
 
-        if (trimmed.Contains("=>", StringComparison.Ordinal))
-            return trimmed;
+        var equalsIndex = ProbeScriptFormatter.FindVarDeclarationEqualsIndex(trimmed);
 
-        if (trimmed.AsSpan(0, equalsIndex).Contains("==", StringComparison.Ordinal))
-            return trimmed;
-
-        if (trimmed.AsSpan(0, equalsIndex).Contains("!=", StringComparison.Ordinal))
-            return trimmed;
-
-        if (trimmed.AsSpan(0, equalsIndex).Contains("<=", StringComparison.Ordinal))
-            return trimmed;
-
-        if (trimmed.AsSpan(0, equalsIndex).Contains(">=", StringComparison.Ordinal))
-            return trimmed;
-
-        var left = trimmed[..equalsIndex].Trim();
-
-        if (!left.StartsWith("var ", StringComparison.Ordinal)
-            && !left.Contains(' ', StringComparison.Ordinal))
+        if (equalsIndex < 0)
             return trimmed;
 
         var rhs = trimmed[(equalsIndex + 1)..].Trim();

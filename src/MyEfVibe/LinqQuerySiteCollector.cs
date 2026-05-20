@@ -82,6 +82,10 @@ internal static class LinqQuerySiteCollector
                 continue;
 
             var statement = GetStatementText(invocation);
+
+            if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement))
+                continue;
+
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
             var preview = ToPreviewLine(statement);
 
