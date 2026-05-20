@@ -1,0 +1,130 @@
+{
+  "name": "vscode-efvibe",
+  "displayName": "efvibe",
+  "description": "Run the efvibe EF Core LINQ REPL from VS Code with workspace-aware project settings.",
+  "version": "0.1.0",
+  "publisher": "efvibe",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yeahbah/my-ef-vibe"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Debuggers"
+  ],
+  "keywords": [
+    "efcore",
+    "entity-framework",
+    "linq",
+    "repl",
+    "dotnet"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "workspaceContains:**/*.csproj",
+    "onCommand:efvibe.startRepl",
+    "onCommand:efvibe.runExpression",
+    "onCommand:efvibe.checkPrerequisites",
+    "onCommand:efvibe.refreshStatus"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "efvibe.startRepl",
+        "title": "efvibe: Start REPL",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.runExpression",
+        "title": "efvibe: Run Expression",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.checkPrerequisites",
+        "title": "efvibe: Check Prerequisites",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.refreshStatus",
+        "title": "efvibe: Refresh Status",
+        "category": "efvibe"
+      }
+    ],
+    "configuration": {
+      "title": "efvibe",
+      "properties": {
+        "efvibe.workspaceRoot": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Session root for exports and scan artifacts. Empty uses the CLI default (`~/.efvibe` or `%APPDATA%/efvibe`)."
+        },
+        "efvibe.project": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the EF Core project (`.csproj` with the DbContext). Supports `${workspaceFolder}`."
+        },
+        "efvibe.startupProject": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Startup project for configuration (user secrets, appsettings). Supports `${workspaceFolder}`."
+        },
+        "efvibe.context": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "DbContext type name or fully qualified name when multiple contexts exist."
+        },
+        "efvibe.connectionString": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Optional connection string passed to `efvibe --connection-string`."
+        },
+        "efvibe.provider": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "sqlserver",
+            "npgsql",
+            "sqlite",
+            "oracle",
+            "mysql"
+          ],
+          "markdownDescription": "Database provider when using `efvibe.connectionString`."
+        },
+        "efvibe.toolPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Optional path to the `efvibe` executable. When empty, uses `dotnet efvibe` from `dotnet-tools.json` or global `efvibe` on PATH."
+        },
+        "efvibe.showSql": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pass `--sql` to the efvibe CLI (show generated SQL)."
+        },
+        "efvibe.dotnetFramework": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Target framework for your EF project build (for example `net8.0`). Passed as `dotnet efvibe -f` and `efvibe --framework`."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "tsc -p ./ --noEmit",
+    "package": "npm run compile && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.1",
+    "typescript": "^5.7.0"
+  }
+}

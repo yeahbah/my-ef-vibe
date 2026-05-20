@@ -41,7 +41,7 @@ flowchart LR
 
 ## Phased roadmap
 
-### Phase 0 — Foundation (2–3 weeks)
+### Phase 0 — Foundation (2–3 weeks) ✅ implemented in `vscode-extension/`
 
 **Goal:** Installable extension that launches efvibe correctly for a .NET workspace.
 
@@ -57,8 +57,8 @@ flowchart LR
 
 **CLI gaps to close (small):**
 
-- `--version` / `--about-json` — session metadata without parsing Spectre markup
-- Consistent non-zero exit codes on build / DbContext failure
+- `--version` / `--about-json` — session metadata without parsing Spectre markup (`--about-json` added)
+- Consistent non-zero exit codes on build / DbContext failure (existing: 1 parse, 3 provider, 10 workspace, 14 DbContext)
 
 ### Phase 1 — Editor-integrated queries (4–6 weeks)
 

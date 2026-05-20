@@ -1,0 +1,6 @@
+{
+    "efvibe.project": "/Users/arnolddiaz/Projects/AdventureWorks/apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
+    "efvibe.startupProject": "/Users/arnolddiaz/Projects/AdventureWorks/apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
+    "efvibe.context": "AdventureWorksDbContext",
+    "efvibe.dotnetFramework": "net10.0"
+}

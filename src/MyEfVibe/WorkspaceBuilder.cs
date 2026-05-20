@@ -8,35 +8,49 @@ internal static class WorkspaceBuilder
         string sessionDirectory,
         string searchDirectory,
         string? explicitProjectPathOrNull,
-        string? explicitStartupPathOrNull)
+        string? explicitStartupPathOrNull,
+        string? frameworkOrNull = null)
     {
         var projectFile = WorkspaceProjectLocator.ResolveProject(searchDirectory, explicitProjectPathOrNull);
         var startupProject = StartupProjectResolver.Resolve(searchDirectory, projectFile, explicitStartupPathOrNull);
 
-        return BuildResolvedProject(sessionDirectory, projectFile, startupProject);
+        return BuildResolvedProject(sessionDirectory, projectFile, startupProject, frameworkOrNull);
     }
 
     internal static WorkspaceBuildResult BuildResolvedProject(
         string sessionDirectory,
         FileInfo projectFile,
-        FileInfo startupProject)
+        FileInfo startupProject,
+        string? frameworkOrNull)
     {
-        RunDotnetBuild(projectFile.FullName);
+        var projectFramework = ProjectTargetFrameworkResolver.ResolveBuildFramework(
+            projectFile.FullName,
+            frameworkOrNull);
+
+        RunDotnetBuild(projectFile.FullName, projectFramework);
 
         if (!string.Equals(projectFile.FullName, startupProject.FullName, StringComparison.OrdinalIgnoreCase)
-            && !WorkspaceBuildResult.TryLocateStartupOutput(startupProject.FullName, out _))
+            && !WorkspaceBuildResult.TryLocateStartupOutput(startupProject.FullName, projectFramework, out _))
         {
-            RunDotnetBuild(startupProject.FullName);
+            var startupFramework = ProjectTargetFrameworkResolver.ResolveBuildFramework(
+                startupProject.FullName,
+                frameworkOrNull);
+
+            RunDotnetBuild(startupProject.FullName, startupFramework);
         }
 
-        return WorkspaceBuildResult.RequirePrimaryAssembly(sessionDirectory, projectFile, startupProject);
+        return WorkspaceBuildResult.RequirePrimaryAssembly(
+            sessionDirectory,
+            projectFile,
+            startupProject,
+            projectFramework);
     }
 
-    internal static void RunDotnetBuild(string csprojFullPath)
+    internal static void RunDotnetBuild(string csprojFullPath, string targetFrameworkMoniker)
     {
-        var frameworkArg = HostRuntimeFramework.PreferredOutputFolderName() is { } tfm
-            ? $" -f {tfm}"
-            : string.Empty;
+        var frameworkArg = string.IsNullOrWhiteSpace(targetFrameworkMoniker)
+            ? string.Empty
+            : $" -f {ProjectTargetFrameworkResolver.NormalizeMoniker(targetFrameworkMoniker)}";
 
         var startInfo = new ProcessStartInfo
         {

@@ -184,15 +184,5 @@ internal static class WorkspaceProjectSelector
     }
 
     private static IEnumerable<string> DiscoverCsproj(string normalizedSearchDirectory)
-        =>
-        Directory
-            .EnumerateFiles(normalizedSearchDirectory, "*.csproj", SearchOption.AllDirectories)
-            .Where(static path => !IsUnderBuildArtifacts(path));
-
-    private static bool IsUnderBuildArtifacts(string absolutePathCandidate)
-        =>
-        absolutePathCandidate.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            .Any(static segment =>
-                string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
+        => ProjectReferenceWalker.EnumerateCsprojFiles(normalizedSearchDirectory);
 }

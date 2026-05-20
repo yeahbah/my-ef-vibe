@@ -9,6 +9,7 @@ internal sealed record WorkspaceBuildResult(
     string StartupProjectPath,
     string OutputDirectory,
     string PrimaryAssemblyDll,
+    string TargetFrameworkMoniker,
     string? StartupOutputDirectory = null)
 {
     internal ImmutableHashSet<string> ReferenceAssemblyPaths =>
@@ -17,16 +18,22 @@ internal sealed record WorkspaceBuildResult(
     internal static WorkspaceBuildResult RequirePrimaryAssembly(
         string sessionDirectory,
         FileInfo csprojFile,
-        FileInfo startupProject)
+        FileInfo startupProject,
+        string targetFrameworkMoniker)
     {
         var projectDirectory =
             csprojFile.Directory!.FullName.TrimEnd(Path.DirectorySeparatorChar);
 
         var asmNameLogical = CsprojReader.ReadLogicalAssemblyName(csprojFile.FullName);
 
-        if (!TryLocateBuiltAssembly(Path.Combine(projectDirectory, "bin"), asmNameLogical, out var dll))
+        if (!TryLocateBuiltAssembly(
+                Path.Combine(projectDirectory, "bin"),
+                asmNameLogical,
+                targetFrameworkMoniker,
+                out var dll))
             throw new WorkspaceException(
-                $"Could not find `{asmNameLogical}.dll` after build. Checked `bin/Debug` and `bin/Release` for common TFMs.");
+                $"Could not find `{asmNameLogical}.dll` after build for `{targetFrameworkMoniker}`."
+                + $" Checked `bin/Debug` and `bin/Release`.");
 
         var outputDirectory =
             Path.GetDirectoryName(dll)!;
@@ -37,7 +44,7 @@ internal sealed record WorkspaceBuildResult(
                 csprojFile.FullName,
                 startupProject.FullName,
                 StringComparison.OrdinalIgnoreCase)
-            && TryLocateStartupOutput(startupProject.FullName, out var locatedStartupOutput))
+            && TryLocateStartupOutput(startupProject.FullName, targetFrameworkMoniker, out var locatedStartupOutput))
             startupOutputDirectory = locatedStartupOutput;
 
         return new WorkspaceBuildResult(
@@ -46,10 +53,14 @@ internal sealed record WorkspaceBuildResult(
             StartupProjectPath: startupProject.FullName,
             OutputDirectory: outputDirectory,
             PrimaryAssemblyDll: dll,
+            TargetFrameworkMoniker: targetFrameworkMoniker,
             StartupOutputDirectory: startupOutputDirectory);
     }
 
-    internal static bool TryLocateStartupOutput(string startupProjectPath, out string? outputDirectory)
+    internal static bool TryLocateStartupOutput(
+        string startupProjectPath,
+        string targetFrameworkMoniker,
+        out string? outputDirectory)
     {
         outputDirectory = null;
 
@@ -61,7 +72,11 @@ internal sealed record WorkspaceBuildResult(
 
         var startupAssemblyName = CsprojReader.ReadLogicalAssemblyName(startupProjectPath);
 
-        if (!TryLocateBuiltAssembly(Path.Combine(startupProjectDirectory, "bin"), startupAssemblyName, out var startupDll))
+        if (!TryLocateBuiltAssembly(
+                Path.Combine(startupProjectDirectory, "bin"),
+                startupAssemblyName,
+                targetFrameworkMoniker,
+                out var startupDll))
             return false;
 
         outputDirectory = Path.GetDirectoryName(startupDll);
@@ -69,9 +84,13 @@ internal sealed record WorkspaceBuildResult(
         return true;
     }
 
-    private static bool TryLocateBuiltAssembly(string binRoot, string assemblyName, out string dllPath)
+    private static bool TryLocateBuiltAssembly(
+        string binRoot,
+        string assemblyName,
+        string targetFrameworkMoniker,
+        out string dllPath)
     {
-        var preferredTfm = HostRuntimeFramework.PreferredOutputFolderName();
+        var tfm = ProjectTargetFrameworkResolver.NormalizeMoniker(targetFrameworkMoniker);
 
         foreach (var configuration in new[] { "Release", "Debug" })
         {
@@ -80,37 +99,11 @@ internal sealed record WorkspaceBuildResult(
             if (!Directory.Exists(configurationRoot))
                 continue;
 
-            if (!string.IsNullOrEmpty(preferredTfm))
+            var candidate = Path.Combine(configurationRoot, tfm, $"{assemblyName}.dll");
+
+            if (File.Exists(candidate))
             {
-                var preferredCandidate = Path.Combine(configurationRoot, preferredTfm, $"{assemblyName}.dll");
-
-                if (File.Exists(preferredCandidate))
-                {
-                    dllPath = preferredCandidate;
-                    return true;
-                }
-            }
-
-            var tfmDirectoriesDescending =
-                Directory.EnumerateDirectories(configurationRoot)
-                    .OrderByDescending(static tfmPath => TfmRankingScore.DescendingScore(tfmPath));
-
-            foreach (var tfmFolder in tfmDirectoriesDescending)
-            {
-                if (!string.IsNullOrEmpty(preferredTfm)
-                    && string.Equals(
-                        Path.GetFileName(tfmFolder),
-                        preferredTfm,
-                        StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var candidate = Path.Combine(tfmFolder, $"{assemblyName}.dll");
-
-                if (!File.Exists(candidate))
-                    continue;
-
                 dllPath = candidate;
-
                 return true;
             }
         }

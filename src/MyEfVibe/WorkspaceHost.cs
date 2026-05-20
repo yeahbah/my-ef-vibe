@@ -7,6 +7,7 @@ namespace MyEfVibe;
 internal sealed class WorkspaceHost : IDisposable
 {
     private readonly WorkspaceAssemblyResolver _resolver;
+    private readonly string _targetFrameworkMoniker;
     private string? _startupOutputDirectory;
     private bool _startupBuildAttempted;
 
@@ -17,6 +18,7 @@ internal sealed class WorkspaceHost : IDisposable
         string projectPath,
         string startupProjectPath,
         string outputDirectory,
+        string targetFrameworkMoniker,
         string? startupOutputDirectory,
         string sessionDirectory)
     {
@@ -26,6 +28,7 @@ internal sealed class WorkspaceHost : IDisposable
         ProjectPath = projectPath;
         StartupProjectPath = startupProjectPath;
         OutputDirectory = outputDirectory;
+        _targetFrameworkMoniker = targetFrameworkMoniker;
         _startupOutputDirectory = startupOutputDirectory;
         SessionDirectory = sessionDirectory;
     }
@@ -42,6 +45,8 @@ internal sealed class WorkspaceHost : IDisposable
     internal string StartupProjectPath { get; }
 
     internal string OutputDirectory { get; }
+
+    internal string TargetFrameworkMoniker => _targetFrameworkMoniker;
 
     internal string? StartupOutputDirectory => _startupOutputDirectory;
 
@@ -110,6 +115,7 @@ internal sealed class WorkspaceHost : IDisposable
             workspaceBuild.ProjectPath,
             workspaceBuild.StartupProjectPath,
             workspaceBuild.OutputDirectory,
+            workspaceBuild.TargetFrameworkMoniker,
             workspaceBuild.StartupOutputDirectory,
             workspaceBuild.SessionDirectory);
     }
@@ -243,15 +249,16 @@ internal sealed class WorkspaceHost : IDisposable
 
         _startupBuildAttempted = true;
 
-        if (WorkspaceBuildResult.TryLocateStartupOutput(StartupProjectPath, out var startupOutputDirectory))
+        if (WorkspaceBuildResult.TryLocateStartupOutput(StartupProjectPath, _targetFrameworkMoniker, out var startupOutputDirectory))
         {
             _startupOutputDirectory = startupOutputDirectory;
             return _startupOutputDirectory;
         }
 
-        WorkspaceBuilder.RunDotnetBuild(StartupProjectPath);
+        var startupFramework = ProjectTargetFrameworkResolver.ResolveBuildFramework(StartupProjectPath, null);
+        WorkspaceBuilder.RunDotnetBuild(StartupProjectPath, startupFramework);
 
-        if (WorkspaceBuildResult.TryLocateStartupOutput(StartupProjectPath, out startupOutputDirectory))
+        if (WorkspaceBuildResult.TryLocateStartupOutput(StartupProjectPath, startupFramework, out startupOutputDirectory))
             _startupOutputDirectory = startupOutputDirectory;
 
         return _startupOutputDirectory;

@@ -26,9 +26,8 @@ internal static class StartupProjectResolver
         if (!Directory.Exists(normalizedSearch))
             return null;
 
-        var referencers = Directory
-            .EnumerateFiles(normalizedSearch, "*.csproj", SearchOption.AllDirectories)
-            .Where(static path => !IsUnderBuildArtifacts(path))
+        var referencers = ProjectReferenceWalker
+            .EnumerateCsprojFiles(normalizedSearch)
             .Where(path => !string.Equals(path, efProjectPath, StringComparison.OrdinalIgnoreCase))
             .Where(path => !CsprojInspector.IsTestProject(path))
             .Where(path => ProjectReferenceWalker.ReferencesProject(path, efProjectPath))
@@ -102,10 +101,4 @@ internal static class StartupProjectResolver
             : $"{name} [grey]({string.Join(", ", traits)})[/]";
     }
 
-    private static bool IsUnderBuildArtifacts(string absolutePathCandidate)
-        =>
-        absolutePathCandidate.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            .Any(static segment =>
-                string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
 }

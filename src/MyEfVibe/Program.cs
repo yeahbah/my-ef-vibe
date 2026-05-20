@@ -55,6 +55,16 @@ internal static class Program
             aliases: new[] { "--version", "-V" },
             description: "Show tool version and exit.");
 
+        var aboutJsonOption = new Option<bool>(
+            aliases: new[] { "--about-json" },
+            description: "Write session metadata as JSON to stdout and exit (no REPL).");
+
+        var frameworkOption = new Option<string?>(
+            aliases: new[] { "-f", "--framework" },
+            description:
+                "Target framework moniker for building the workspace project (for example net8.0). "
+                + "Defaults to a framework listed in the project file, not the efvibe tool runtime.");
+
         var expressionArgument = new Argument<string[]>("expression")
 
         {
@@ -74,6 +84,8 @@ internal static class Program
             expressionOption,
             sqlOption,
             versionOption,
+            aboutJsonOption,
+            frameworkOption,
             expressionArgument,
         };
 
@@ -107,6 +119,8 @@ internal static class Program
             parseResult.GetValueForOption(providerOption),
             parseResult.GetValueForOption(expressionOption),
             parseResult.GetValueForOption(sqlOption),
+            parseResult.GetValueForOption(aboutJsonOption),
+            parseResult.GetValueForOption(frameworkOption),
             parseResult.GetValueForArgument(expressionArgument));
     }
 
@@ -119,6 +133,8 @@ internal static class Program
         string? providerRaw,
         string? expressionOptionValue,
         bool showSql,
+        bool aboutJson,
+        string? frameworkOrNull,
         string[]? expressionArgumentTokens)
     {
         var sqlSettings = new SqlDisplaySettings { ShowSql = showSql };
@@ -180,7 +196,11 @@ internal static class Program
         {
             workspaceBuild = CliUi.RunWithStatus(
                 "Building EF project…",
-                () => WorkspaceBuilder.BuildResolvedProject(pendingSessionDirectory, resolvedProject, resolvedStartup));
+                () => WorkspaceBuilder.BuildResolvedProject(
+                    pendingSessionDirectory,
+                    resolvedProject,
+                    resolvedStartup,
+                    frameworkOrNull));
         }
         catch (WorkspaceException workspaceFailure)
         {
@@ -238,6 +258,12 @@ internal static class Program
             dbContextInstance,
             workspaceBuild.ReferenceAssemblyPaths,
             host.AssemblyLoader);
+
+        if (aboutJson)
+        {
+            AboutJsonReporter.Write(dbContextInstance, host, workspaceRoot, parsedProvider);
+            return 0;
+        }
 
         if (!string.IsNullOrWhiteSpace(oneShotExpression))
             return await QueryRunner.RunOnceAsync(dbContextInstance, session, host, sqlSettings, oneShotExpression);

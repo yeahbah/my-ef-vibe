@@ -13,7 +13,19 @@ internal static class ProjectReferenceWalker
         "packages",
         "artifacts",
         "TestResults",
+        ".Trash",
+        ".Trashes",
+        "Trash",
     };
+
+    internal static IEnumerable<string> EnumerateCsprojFiles(string searchRootDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(searchRootDirectory) || !Directory.Exists(searchRootDirectory))
+            yield break;
+
+        foreach (var projectFile in EnumerateProjectFiles(searchRootDirectory))
+            yield return projectFile;
+    }
 
     internal static bool ReferencesProject(string csprojPath, string targetProjectPath, int maxDepth = 8)
     {
@@ -115,11 +127,7 @@ internal static class ProjectReferenceWalker
             {
                 childDirectories = Directory.EnumerateDirectories(currentDirectory);
             }
-            catch (UnauthorizedAccessException)
-            {
-                continue;
-            }
-            catch (DirectoryNotFoundException)
+            catch (Exception failure) when (IsBenignEnumerationFailure(failure))
             {
                 continue;
             }
@@ -140,11 +148,7 @@ internal static class ProjectReferenceWalker
             {
                 projectFiles = Directory.EnumerateFiles(currentDirectory, "*.csproj", SearchOption.TopDirectoryOnly);
             }
-            catch (UnauthorizedAccessException)
-            {
-                continue;
-            }
-            catch (DirectoryNotFoundException)
+            catch (Exception failure) when (IsBenignEnumerationFailure(failure))
             {
                 continue;
             }
@@ -153,4 +157,9 @@ internal static class ProjectReferenceWalker
                 yield return Path.GetFullPath(projectFile);
         }
     }
+
+    private static bool IsBenignEnumerationFailure(Exception failure)
+        => failure is UnauthorizedAccessException
+           or DirectoryNotFoundException
+           or IOException;
 }
