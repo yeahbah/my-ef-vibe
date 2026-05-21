@@ -3,7 +3,7 @@
 Interactive CLI to run LINQ against an external .NET project's EF Core `DbContext`.
 
 Point `efvibe` at your solution, get a REPL with **`db`** (your `DbContext`) in scope, see translated SQL,
-execution metrics, and helpers like `:tables`, `:describe`, `:dbinfo`, `:plan`, `:stats`, and `:scan lite`.
+execution metrics, and helpers like `:tables`, `:describe`, `:dbinfo`, `:plan`, `:stats`, `:scan lite`, and `:scan deep`.
 
 Requires [.NET 8 SDK](https://dotnet.microsoft.com/download) or newer (tool ships `net8.0`, `net9.0`, and `net10.0` assets).
 
@@ -20,6 +20,10 @@ Startup banner, session panel, and a LINQ query with translated SQL, results, an
 `:dbinfo` — provider, connection, and startup project details:
 
 ![efvibe :dbinfo](screenshots/screen3.png)
+
+`:scan deep` — review queue with translated SQL and EXPLAIN query plans per call site (saved to `myefvibe-scan-deep.json`):
+
+![efvibe :scan deep with translated SQL and query plan](screenshots/scan-deep.png)
 
 ## Install
 
@@ -81,7 +85,7 @@ In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). End 
 | `:dbinfo` | Provider, connection string, server version |
 | `:tracked` | Change tracker summary |
 | `:scan lite` | Static LINQ scan; step through findings in a review queue |
-| `:scan deep` | Lite scan + translated SQL per call site (live `db`) |
+| `:scan deep` | Lite rules + `ToQueryString()` SQL + `EXPLAIN` per call site (live `db`; requires connection) |
 
 One-shot:
 
@@ -151,7 +155,7 @@ User secrets use flat keys such as `ConnectionStrings:DefaultConnection` in `~/.
 | File | Purpose |
 |------|---------|
 | `myefvibe-scan-lite.json` | Last `:scan lite` results |
-| `myefvibe-scan-deep.json` | Last `:scan deep` results (includes SQL where available) |
+| `myefvibe-scan-deep.json` | Last `:scan deep` results — heuristics, `translatedSql`, `queryPlan` / `queryPlanNote` per finding, plus scan stats (`sqlTranslatedCount`, `queryPlanCount`, …) |
 | `myefvibe-scan-dismissals.json` | Dismissed findings (skipped on future scans) |
 | `myefvibe-scan-notes.json` | Saved notes on findings (shown on next scan, highlighted in yellow) |
 | `myefvibe-export-*.csv/json` | `:export` output |
@@ -167,7 +171,7 @@ Highlights:
 - **`:describe <entity>`** (`:desc`) — property sheet for an entity (`Product`, `AddressEntity`, DbSet name `Products`, or full type name). Shows CLR types (including arrays such as `byte[]`); adds PK, FK, column name, and max length when EF model metadata is available.
 - **`:dbinfo`** — DbContext type, EF/Core version, provider, connection state, connection string, and server version.
 - **`:plan`** — execution plan for the last translated SQL (provider-specific).
-- **`:scan lite`** / **`:scan deep`** — project-wide LINQ scan with a review queue, **Fix** hints, optional **Translated SQL** (deep), `:dismiss`, and `:note`.
+- **`:scan lite`** / **`:scan deep`** — project-wide LINQ scan with a review queue, **Fix** hints, **Translated SQL** and **Query plan (EXPLAIN)** on deep scan (same engine as `:plan`), `:dismiss`, and `:note`. Deep results persist in `myefvibe-scan-deep.json`.
 - **`:about`** — tool version, license, and session paths.
 
 ## Documentation
