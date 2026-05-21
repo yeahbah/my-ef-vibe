@@ -33,6 +33,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="MyEfVibe.Tests" />
+    <InternalsVisibleTo Include="MyEfVibe.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -4,5 +4,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MyEfVibe.Tests/MyEfVibe.Tests.csproj" />
+    <Project Path="tests/MyEfVibe.IntegrationTests/MyEfVibe.IntegrationTests.csproj" />
   </Folder>
 </Solution>

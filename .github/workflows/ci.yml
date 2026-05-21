@@ -33,6 +33,7 @@ jobs:
       - name: Build
         run: dotnet build MyEfVibe.slnx -c Release --no-restore
 
+      # Integration tests (live DBs) are local-only: tests/MyEfVibe.IntegrationTests — not run here.
       - name: Test
         run: dotnet test tests/MyEfVibe.Tests/MyEfVibe.Tests.csproj -c Release --no-build --verbosity normal
 

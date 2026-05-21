@@ -1,0 +1,42 @@
+{
+  "integrationRoot": "/Users/arnolddiaz/Projects",
+  "scenarios": [
+    {
+      "id": "sqlserver",
+      "provider": "sqlserver",
+      "repoRoot": "AdventureWorks",
+      "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
+      "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
+      "context": "AdventureWorksDbContext",
+      "framework": "net10.0"
+    },
+    {
+      "id": "postgresql",
+      "provider": "npgsql",
+      "repoRoot": "AdventureWorksPg/AdventureWorks",
+      "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
+      "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
+      "context": "AdventureWorksDbContext",
+      "framework": "net10.0"
+    },
+    {
+      "id": "oracle",
+      "provider": "oracle",
+      "repoRoot": "AdventureWorksOra/app/AdventureWorks",
+      "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
+      "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
+      "context": "AdventureWorksDbContext",
+      "framework": "net10.0",
+      "connectionString": "User Id=AdvWorks;Password=Oracle1;Data Source=localhost:1521/FREEPDB1;Connection Timeout=60"
+    },
+    {
+      "id": "sqlite",
+      "provider": "sqlite",
+      "repoRoot": "AdventureWorksSqlite/AdventureWorks",
+      "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
+      "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
+      "context": "AdventureWorksDbContext",
+      "framework": "net10.0"
+    }
+  ]
+}
