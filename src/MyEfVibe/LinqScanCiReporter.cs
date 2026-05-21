@@ -63,7 +63,9 @@ internal static class LinqScanCiReporter
             result.Findings.Select(LinqScanFindingDto.From).ToList(),
             deepStats?.QuerySitesVisited,
             deepStats?.SqlTranslatedCount,
-            deepStats?.SqlFailedCount);
+            deepStats?.SqlFailedCount,
+            deepStats?.QueryPlanCount,
+            deepStats?.QueryPlanFailedCount);
 
         Console.WriteLine(JsonSerializer.Serialize(document, JsonOptions));
     }
@@ -83,5 +85,7 @@ internal static class LinqScanCiReporter
         List<LinqScanFindingDto> Findings,
         int? QuerySitesVisited = null,
         int? SqlTranslatedCount = null,
-        int? SqlFailedCount = null);
+        int? SqlFailedCount = null,
+        int? QueryPlanCount = null,
+        int? QueryPlanFailedCount = null);
 }

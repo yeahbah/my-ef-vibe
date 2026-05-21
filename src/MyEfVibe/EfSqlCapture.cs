@@ -191,7 +191,7 @@ internal sealed class EfSqlCapture : IDisposable
             ?? _diagnosticBinding?.LogLevelProperty;
 
         if (contextProperty?.GetValue(eventData) is not { } context
-            || !ReferenceEquals(context, _dbContextInstance))
+            || !IsTargetDbContext(context))
             return false;
 
         if (logLevelProperty?.GetValue(eventData) is Enum eventLogLevel
@@ -262,6 +262,9 @@ internal sealed class EfSqlCapture : IDisposable
 
         RecordCommand(commandText.Trim(), null, ExtractDbCommandParameters(dbCommand));
     }
+
+    private bool IsTargetDbContext(object context) =>
+        ReferenceEquals(context, _dbContextInstance) || Equals(context, _dbContextInstance);
 
     private void RecordCommand(string normalized, long? durationMilliseconds, IReadOnlyList<string> parameters)
     {

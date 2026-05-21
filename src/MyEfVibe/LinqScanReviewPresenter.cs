@@ -39,8 +39,16 @@ internal static class LinqScanReviewPresenter
             });
 
         if (!string.IsNullOrWhiteSpace(finding.TranslatedSql))
-            CliUi.WriteSqlBlock("Translated SQL", finding.TranslatedSql);
-        else
+            CliUi.WriteSqlBlock("Translated SQL (ToQueryString)", finding.TranslatedSql);
+
+        if (!string.IsNullOrWhiteSpace(finding.QueryPlan))
+            CliUi.WriteSqlBlock("Query plan (EXPLAIN)", finding.QueryPlan);
+        else if (!string.IsNullOrWhiteSpace(finding.QueryPlanNote)
+                 && !string.IsNullOrWhiteSpace(finding.TranslatedSql))
+            CliUi.WriteSqlBlock("Query plan", finding.QueryPlanNote);
+
+        if (string.IsNullOrWhiteSpace(finding.TranslatedSql)
+            && string.IsNullOrWhiteSpace(finding.QueryPlan))
             AnsiConsole.WriteLine();
     }
 

@@ -8,31 +8,27 @@ namespace MyEfVibe;
 
 internal static partial class QueryPlanRunner
 {
-    internal static async Task WritePlanAsync(
+    internal static string SanitizeSqlForExplain(string sql, MyEfVibeProvider? provider)
+        => SanitizeTranslatedSql(sql, provider);
+
+    internal static async Task<QueryPlanResult> TryExplainAsync(
         object dbContext,
-        string? translatedSql,
+        string? sql,
         IEnumerable<Assembly> inspectionAssemblies,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(translatedSql))
-        {
-            CliUi.WriteWarning(
-                "No SQL available yet. Run a query with :dblog on (executed SQL), "
-                + "or an IQueryable expression (uses ToQueryString()).");
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(sql))
+            return QueryPlanResult.Failed("No SQL available for EXPLAIN.");
 
         var provider = ResolveProvider(dbContext);
-        var executableSql = SanitizeTranslatedSql(translatedSql, provider);
 
         if (provider is null)
-        {
-            CliUi.WriteWarning("EXPLAIN is not supported for this provider.");
-            return;
-        }
+            return QueryPlanResult.Failed("EXPLAIN is not supported for this provider.");
 
         try
         {
+            var executableSql = SanitizeTranslatedSql(sql, provider);
+
             var rows = provider switch
             {
                 MyEfVibeProvider.SqlServer => await ExecuteSqlServerShowPlanAsync(
@@ -53,17 +49,39 @@ internal static partial class QueryPlanRunner
             };
 
             if (rows.Count == 0)
-            {
-                CliUi.WriteWarning("EXPLAIN returned no rows.");
-                return;
-            }
+                return QueryPlanResult.Failed("EXPLAIN returned no rows.");
 
-            CliUi.WriteSqlBlock("Query plan", string.Join(Environment.NewLine, rows));
+            return QueryPlanResult.Succeeded(rows);
         }
         catch (Exception failure)
         {
-            CliUi.WriteErrorPanel("Query plan failed", failure.Message);
+            return QueryPlanResult.Failed(failure.Message);
         }
+    }
+
+    internal static async Task WritePlanAsync(
+        object dbContext,
+        string? translatedSql,
+        IEnumerable<Assembly> inspectionAssemblies,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(translatedSql))
+        {
+            CliUi.WriteWarning(
+                "No SQL available yet. Run a query with :dblog on (executed SQL), "
+                + "or an IQueryable expression (uses ToQueryString()).");
+            return;
+        }
+
+        var result = await TryExplainAsync(dbContext, translatedSql, inspectionAssemblies, cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(result.PlanText))
+        {
+            CliUi.WriteSqlBlock("Query plan", result.PlanText);
+            return;
+        }
+
+        CliUi.WriteErrorPanel("Query plan failed", result.Note ?? "EXPLAIN failed.");
     }
 
     /// <summary>
@@ -71,7 +89,10 @@ internal static partial class QueryPlanRunner
     /// </summary>
     private static string SanitizeTranslatedSql(string sql, MyEfVibeProvider? provider)
     {
-        var executable = DbLogSqlExtractor.ExtractExecutableSql(sql) ?? sql;
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
+        CollectParameterAssignments(sql, parameters);
+
+        var executable = DbLogSqlExtractor.ExtractExecutableSql(sql) ?? sql.Trim();
 
         if (provider == MyEfVibeProvider.Oracle)
         {
@@ -81,32 +102,29 @@ internal static partial class QueryPlanRunner
                 executable = oracleSql;
         }
 
-        var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
-        var sqlLines = new List<string>();
+        var body = executable;
 
-        foreach (var line in executable.Split('\n'))
+        foreach (var name in parameters.Keys.OrderByDescending(static n => n.Length))
+            body = InlineParameter(body, name, parameters[name]);
+
+        return body;
+    }
+
+    private static void CollectParameterAssignments(string sql, Dictionary<string, string> parameters)
+    {
+        foreach (var line in sql.Split('\n'))
         {
             var trimmed = line.Trim();
-
-            if (trimmed.StartsWith("-- duration:", StringComparison.OrdinalIgnoreCase))
-                continue;
 
             if (TryParseToQueryStringParameterComment(trimmed, parameters))
                 continue;
 
-            if (TryParseDbLogParametersComment(trimmed, parameters))
-                continue;
-
-            sqlLines.Add(line);
+            TryParseDbLogParametersComment(trimmed, parameters);
         }
-
-        var body = string.Join(Environment.NewLine, sqlLines).Trim();
-
-        foreach (var name in parameters.Keys.OrderByDescending(static n => n.Length))
-            body = body.Replace($"@{name}", FormatParameterLiteral(parameters[name]), StringComparison.Ordinal);
-
-        return body;
     }
+
+    private static string InlineParameter(string sql, string name, string value)
+        => sql.Replace($"@{name}", FormatParameterLiteral(value), StringComparison.Ordinal);
 
     private static bool TryParseToQueryStringParameterComment(string trimmed, Dictionary<string, string> parameters)
     {
@@ -132,7 +150,14 @@ internal static partial class QueryPlanRunner
         var assignments = trimmed[prefix.Length..];
 
         foreach (Match match in DbLogParameterAssignmentRegex().Matches(assignments))
-            parameters[match.Groups["name"].Value] = match.Groups["value"].Value.Trim();
+        {
+            var parameterName = match.Groups["name"].Value.Trim();
+
+            if (parameterName.Length == 0)
+                continue;
+
+            parameters[parameterName] = match.Groups["value"].Value.Trim();
+        }
 
         return true;
     }

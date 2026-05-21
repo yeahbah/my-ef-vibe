@@ -27,6 +27,17 @@ public sealed class SqlTranslationProbeTests
     }
 
     [Fact]
+    public void TryCreateProbeExpression_First_AddsTake()
+    {
+        const string expression = "db.Products.First()";
+
+        var probe = SqlTranslationProbe.TryCreateProbeExpression(expression);
+
+        Assert.NotNull(probe);
+        Assert.Equal("db.Products.Take(1)", ProbeTestHelper.CollapseWhitespace(probe));
+    }
+
+    [Fact]
     public void TryCreateProbeExpression_BareQueryableWithAsQueryable_ReturnsChain()
     {
         const string expression = "db.Employees.Where(e => e.Active).AsQueryable()";

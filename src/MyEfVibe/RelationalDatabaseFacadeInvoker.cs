@@ -13,6 +13,20 @@ internal static class RelationalDatabaseFacadeInvoker
         IEnumerable<Assembly> inspectionAssemblies,
         out DbConnection? connection)
     {
+        if (TryGetDbConnectionCore(databaseFacade, inspectionAssemblies, out connection))
+            return true;
+
+        return TryGetDbConnectionCore(
+            databaseFacade,
+            AppDomain.CurrentDomain.GetAssemblies(),
+            out connection);
+    }
+
+    private static bool TryGetDbConnectionCore(
+        object databaseFacade,
+        IEnumerable<Assembly> inspectionAssemblies,
+        out DbConnection? connection)
+    {
         connection = null;
 
         foreach (var assembly in inspectionAssemblies)

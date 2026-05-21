@@ -68,6 +68,12 @@ internal static class LinqScanPresenter
             : $"SQL translated [cyan]{deepStats.SqlTranslatedCount}[/]/[white]{deepStats.QuerySitesVisited}[/] site(s)"
               + (deepStats.SqlFailedCount > 0
                   ? $" · [yellow]{deepStats.SqlFailedCount}[/] could not translate"
+                  : string.Empty)
+              + (deepStats.QueryPlanCount > 0
+                  ? $" · [green]{deepStats.QueryPlanCount}[/] EXPLAIN plan(s)"
+                  : string.Empty)
+              + (deepStats.QueryPlanFailedCount > 0
+                  ? $" · [yellow]{deepStats.QueryPlanFailedCount}[/] plan(s) failed"
                   : string.Empty);
 
         WriteSummaryPanel(
@@ -75,7 +81,7 @@ internal static class LinqScanPresenter
             result,
             savedPath,
             sqlLine,
-            "Heuristics + ToQueryString per call site — review queue below",
+            "Heuristics + ToQueryString + EXPLAIN per call site — review queue below",
             dismissedSkippedCount);
     }
 
@@ -83,7 +89,7 @@ internal static class LinqScanPresenter
     {
         CliUi.WriteWarning("Usage: :scan lite | :scan deep");
         AnsiConsole.MarkupLine("[grey]:scan lite[/] — static Roslyn heuristics");
-        AnsiConsole.MarkupLine("[grey]:scan deep[/] — lite scan plus translated SQL via live [cyan]db[/] (requires connection)");
+        AnsiConsole.MarkupLine("[grey]:scan deep[/] — lite scan + translated SQL + EXPLAIN via live [cyan]db[/] (requires connection)");
     }
 
     private static void WriteSummaryPanel(

@@ -33,12 +33,17 @@ internal static class QueryEvaluator
 
             string? translatedSql = null;
 
-            if (executedSql.Length == 0
-                && result is System.Linq.IQueryable
-                && RelationalQueryableSqlFormatter.TryGetSql(result, inspectionAssemblies, out var queryString))
+            if (executedSql.Length == 0)
             {
-                translatedSql = queryString;
-                warnings.Add("Query not executed; showing translated SQL from ToQueryString().");
+                translatedSql = await TryResolveTranslatedSqlFallbackAsync(
+                    session,
+                    snippet,
+                    result,
+                    inspectionAssemblies,
+                    cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(translatedSql))
+                    warnings.Add(BuildTranslatedSqlWarning(result));
             }
 
             var metrics = new EvaluationMetrics(
@@ -71,6 +76,42 @@ internal static class QueryEvaluator
                 failure);
         }
     }
+
+    private static async Task<string?> TryResolveTranslatedSqlFallbackAsync(
+        ScriptSession session,
+        string snippet,
+        object? result,
+        IEnumerable<Assembly> inspectionAssemblies,
+        CancellationToken cancellationToken)
+    {
+        if (SqlTranslationProbe.TryCreateProbeExpression(snippet) is { } probeExpression)
+        {
+            try
+            {
+                var probeSql = await session.EvaluateAsync(
+                    $"{probeExpression}.ToQueryString()",
+                    cancellationToken);
+
+                if (probeSql is string literal && !string.IsNullOrWhiteSpace(literal))
+                    return literal;
+            }
+            catch
+            {
+                // Fall back to the evaluated result when the probe cannot be translated.
+            }
+        }
+
+        if (result is System.Linq.IQueryable
+            && RelationalQueryableSqlFormatter.TryGetSql(result, inspectionAssemblies, out var queryString))
+            return queryString;
+
+        return null;
+    }
+
+    private static string BuildTranslatedSqlWarning(object? result) =>
+        result is System.Linq.IQueryable
+            ? "Query not executed; showing translated SQL from ToQueryString()."
+            : "Executed SQL was not captured from the database log; showing translated SQL from ToQueryString() (provider LIMIT/TOP may differ at runtime).";
 
     private static string DescribeExceptionChain(Exception failure)
     {

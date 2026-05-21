@@ -3,7 +3,9 @@ namespace MyEfVibe;
 internal sealed record LinqDeepScanStats(
     int QuerySitesVisited,
     int SqlTranslatedCount,
-    int SqlFailedCount);
+    int SqlFailedCount,
+    int QueryPlanCount,
+    int QueryPlanFailedCount);
 
 internal static class LinqDeepScanner
 {
@@ -49,6 +51,11 @@ internal static class LinqDeepScanner
 
         var translatedCount = sqlBySite.Values.Count(static result => !string.IsNullOrWhiteSpace(result.Sql));
         var failedCount = uniqueSites.Length - translatedCount;
+        var planCount = sqlBySite.Values.Count(static result => !string.IsNullOrWhiteSpace(result.QueryPlan));
+        var planFailedCount = sqlBySite.Values.Count(static result =>
+            !string.IsNullOrWhiteSpace(result.Sql)
+            && string.IsNullOrWhiteSpace(result.QueryPlan)
+            && !string.IsNullOrWhiteSpace(result.QueryPlanNote));
 
         var warningLines = lite.Findings
             .Select(static finding => $"{finding.FilePath}|{finding.Line}")
@@ -65,6 +72,8 @@ internal static class LinqDeepScanner
             {
                 TranslatedSql = translation?.Sql,
                 SqlTranslationNote = translation?.Note,
+                QueryPlan = translation?.QueryPlan,
+                QueryPlanNote = translation?.QueryPlanNote,
             });
         }
 
@@ -92,7 +101,9 @@ internal static class LinqDeepScanner
                 "query-site",
                 message,
                 translatedSql: translation.Sql,
-                sqlTranslationNote: translation.Note));
+                sqlTranslationNote: translation.Note,
+                queryPlan: translation.QueryPlan,
+                queryPlanNote: translation.QueryPlanNote));
         }
 
         var ordered = findings
@@ -103,7 +114,12 @@ internal static class LinqDeepScanner
             .ToArray();
 
         var result = new LinqLiteScanResult(lite.FilesScanned, lite.ProjectsScanned, ordered);
-        var stats = new LinqDeepScanStats(uniqueSites.Length, translatedCount, failedCount);
+        var stats = new LinqDeepScanStats(
+            uniqueSites.Length,
+            translatedCount,
+            failedCount,
+            planCount,
+            planFailedCount);
 
         return (result, stats);
     }

@@ -178,7 +178,7 @@ Re-show with `:warnings`.
 
 Test projects are skipped. This covers persistence + API + application-layer repositories. It uses Roslyn syntax analysis and the same heuristics as snippet `:warnings` — no database, no SQL generation.
 
-**`:scan deep`** runs the lite heuristics, then attempts **`ToQueryString()`** for each query call site using the live REPL `db` context (requires a working connection). Source is adapted for the REPL: `DbContext` → `db`, conditions extracted from `if` / `while` / `switch`, and terminal operators removed (including `AnyAsync(ct)`, `ToListAsync(cancellationToken)`, etc.). Expressions that still depend on method parameters, locals, or other runtime-only values may fail translation — the note is shown on the finding.
+**`:scan deep`** runs the lite heuristics, then attempts **`ToQueryString()`** and **`EXPLAIN`** (same as `:plan`) for each query call site using the live REPL `db` context (requires a working connection). Source is adapted for the REPL: `DbContext` → `db`, conditions extracted from `if` / `while` / `switch`, and terminal operators removed (including `AnyAsync(ct)`, `ToListAsync(cancellationToken)`, etc.). Expressions that still depend on method parameters, locals, or other runtime-only values may fail translation — the note is shown on the finding.
 
 ```text
 :scan lite

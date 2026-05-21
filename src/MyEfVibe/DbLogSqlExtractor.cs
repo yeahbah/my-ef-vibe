@@ -56,21 +56,16 @@ internal static partial class DbLogSqlExtractor
                 && !ContainsSqlKeyword(entry))
                 continue;
 
-            var executable = ExtractExecutableSql(entry);
-
-            if (!string.IsNullOrWhiteSpace(executable))
-                return executable;
+            return entry;
         }
 
         foreach (var entry in executedSql)
         {
-            var executable = ExtractExecutableSql(entry);
-
-            if (!string.IsNullOrWhiteSpace(executable))
-                return executable;
+            if (ContainsSqlKeyword(entry))
+                return entry;
         }
 
-        return ExtractExecutableSql(translatedSql);
+        return translatedSql;
     }
 
     private static bool LooksLikeSqlLine(string trimmed) =>

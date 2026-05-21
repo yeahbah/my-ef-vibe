@@ -23,6 +23,8 @@ internal sealed class ScriptSession
 
     internal ImmutableArray<MetadataReference> MetadataReferences { get; }
 
+    internal object DbContext => _globalsType.GetProperty("db")!.GetValue(_globals)!;
+
     internal CSharpCompilationOptions CompilationOptions { get; } =
         new(OutputKind.DynamicallyLinkedLibrary);
 

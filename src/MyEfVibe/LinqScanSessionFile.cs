@@ -11,7 +11,7 @@ internal enum LinqScanMode
 
 internal static class LinqScanSessionFile
 {
-    internal const int CurrentVersion = 3;
+    internal const int CurrentVersion = 4;
     internal const string LiteFileName = "myefvibe-scan-lite.json";
     internal const string DeepFileName = "myefvibe-scan-deep.json";
 
@@ -53,7 +53,9 @@ internal sealed record LinqScanSessionDocument(
     List<LinqScanFindingDto> Findings,
     int? QuerySitesVisited = null,
     int? SqlTranslatedCount = null,
-    int? SqlFailedCount = null)
+    int? SqlFailedCount = null,
+    int? QueryPlanCount = null,
+    int? QueryPlanFailedCount = null)
 {
     internal static LinqScanSessionDocument FromResult(
         LinqLiteScanResult result,
@@ -70,7 +72,9 @@ internal sealed record LinqScanSessionDocument(
             result.Findings.Select(LinqScanFindingDto.From).ToList(),
             deepStats?.QuerySitesVisited,
             deepStats?.SqlTranslatedCount,
-            deepStats?.SqlFailedCount);
+            deepStats?.SqlFailedCount,
+            deepStats?.QueryPlanCount,
+            deepStats?.QueryPlanFailedCount);
 
     internal LinqLiteScanResult ToResult() =>
         new(
@@ -89,6 +93,8 @@ internal sealed record LinqScanFindingDto(
     string? Recommendation = null,
     string? TranslatedSql = null,
     string? SqlTranslationNote = null,
+    string? QueryPlan = null,
+    string? QueryPlanNote = null,
     string? SavedNote = null)
 {
     internal static LinqScanFindingDto From(LinqScanFinding finding) =>
@@ -102,6 +108,8 @@ internal sealed record LinqScanFindingDto(
             finding.ResolvedRecommendation,
             finding.TranslatedSql,
             finding.SqlTranslationNote,
+            finding.QueryPlan,
+            finding.QueryPlanNote,
             finding.SavedNote);
 
     internal LinqScanFinding ToFinding()
@@ -120,6 +128,8 @@ internal sealed record LinqScanFindingDto(
             Recommendation,
             TranslatedSql,
             SqlTranslationNote,
+            QueryPlan,
+            QueryPlanNote,
             SavedNote);
     }
 }

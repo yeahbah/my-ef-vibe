@@ -65,16 +65,19 @@ internal static class AnalyticsPresenter
     {
         if (metrics.ExecutedSql.Count > 0)
         {
-            var blockTitle = dbLogSettings.Verbose ? "Database log (verbose)" : "Database log";
+            var blockTitle = dbLogSettings.Verbose ? "Database log (verbose)" : "Executed SQL";
 
             foreach (var sql in metrics.ExecutedSql)
                 writeBlock(blockTitle, sql);
+
+            if (!string.IsNullOrWhiteSpace(metrics.TranslatedSql))
+                writeBlock("Translated SQL (ToQueryString)", metrics.TranslatedSql);
 
             return;
         }
 
         if (!string.IsNullOrWhiteSpace(metrics.TranslatedSql))
-            writeBlock("Translated SQL", metrics.TranslatedSql);
+            writeBlock("Translated SQL (ToQueryString)", metrics.TranslatedSql);
     }
 
     internal static void WriteFooter(EvaluationMetrics metrics)

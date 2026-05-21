@@ -120,7 +120,7 @@ internal static class CliUi
         table.AddRow("[cyan]:dbinfo[/]", "Database, provider, and connection details");
         table.AddRow("[cyan]:describe <entity>[/]", "Entity properties (DbSet name or type)");
         table.AddRow("[cyan]:scan lite[/]", "Static LINQ performance scan of EF project sources");
-        table.AddRow("[cyan]:scan deep[/]", "Lite scan plus ToQueryString SQL per call site (live db)");
+        table.AddRow("[cyan]:scan deep[/]", "Lite scan + ToQueryString + EXPLAIN per call site (live db)");
         table.AddRow("[cyan]:next[/] · [cyan]:prev[/]", "Step through scan findings (also → / ← on empty prompt)");
         table.AddRow("[cyan]:dismiss[/] [[note]]", "Skip finding in future scans; Del on empty prompt during scan review");
         table.AddRow("[cyan]:note[/] text…", "Save a required note on the current finding (shown on next scan)");

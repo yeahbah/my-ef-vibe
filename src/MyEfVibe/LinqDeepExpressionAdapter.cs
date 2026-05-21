@@ -2,7 +2,9 @@ namespace MyEfVibe;
 
 internal static class LinqDeepExpressionAdapter
 {
-    internal static string? TryCreateProbeExpression(string statementOrExpression)
+    internal static string? TryCreateProbeExpression(
+        string statementOrExpression,
+        string? representativeEntityTypeName = null)
     {
         var normalized = NormalizeStatement(statementOrExpression);
 
@@ -16,7 +18,13 @@ internal static class LinqDeepExpressionAdapter
         if (probe is null)
             return null;
 
-        return ProbeParameterStubber.Stub(ProbeScriptFormatter.ToScriptExpression(probe));
+        probe = ProbeParameterStubber.Stub(ProbeScriptFormatter.ToScriptExpression(probe));
+
+        if (string.IsNullOrWhiteSpace(representativeEntityTypeName)
+            || !OpenGenericProbeBinder.ContainsOpenGenericTypeParameter(probe))
+            return probe;
+
+        return OpenGenericProbeBinder.Bind(probe, representativeEntityTypeName);
     }
 
     private static string NormalizeStatement(string code)

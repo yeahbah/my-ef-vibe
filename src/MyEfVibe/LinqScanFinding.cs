@@ -10,6 +10,8 @@ internal sealed record LinqScanFinding(
     string? Recommendation = null,
     string? TranslatedSql = null,
     string? SqlTranslationNote = null,
+    string? QueryPlan = null,
+    string? QueryPlanNote = null,
     string? SavedNote = null)
 {
     internal static LinqScanFinding Create(
@@ -21,6 +23,8 @@ internal sealed record LinqScanFinding(
         string? recommendation = null,
         string? translatedSql = null,
         string? sqlTranslationNote = null,
+        string? queryPlan = null,
+        string? queryPlanNote = null,
         string? savedNote = null) =>
         new(
             filePath,
@@ -32,6 +36,8 @@ internal sealed record LinqScanFinding(
             recommendation ?? LinqScanRecommendations.Get(ruleId),
             translatedSql,
             sqlTranslationNote,
+            queryPlan,
+            queryPlanNote,
             savedNote);
 
     internal string ResolvedRecommendation =>
