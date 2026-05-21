@@ -168,7 +168,8 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         }
 
         if (_depsManifest?.TryResolve(assemblyName, out var depsPath) == true
-            && SystemTextJsonPathSupportsWeb(depsPath))
+            && SystemTextJsonPathSupportsWeb(depsPath)
+            && !IsProjectLocalSystemTextJsonCopy(depsPath))
         {
             var fromDeps = TryLoad(context, depsPath);
 
@@ -180,7 +181,8 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
 
         if (File.Exists(outputCandidate)
             && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, outputCandidate)
-            && SystemTextJsonPathSupportsWeb(outputCandidate))
+            && SystemTextJsonPathSupportsWeb(outputCandidate)
+            && !IsProjectLocalSystemTextJsonCopy(outputCandidate))
         {
             var fromOutput = TryLoad(context, outputCandidate);
 
@@ -193,6 +195,17 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
 
     private static bool IsSystemTextJson(string? simpleName)
         => string.Equals(simpleName, SystemTextJsonCapabilities.AssemblySimpleName, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsProjectLocalSystemTextJsonCopy(string absolutePath)
+    {
+        var normalized = absolutePath.Replace('\\', Path.DirectorySeparatorChar);
+
+        if (normalized.Contains($"{Path.DirectorySeparatorChar}shared{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return normalized.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+               || normalized.Contains($"{Path.DirectorySeparatorChar}.nuget{Path.DirectorySeparatorChar}packages{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool SystemTextJsonPathSupportsWeb(string absolutePath)
     {

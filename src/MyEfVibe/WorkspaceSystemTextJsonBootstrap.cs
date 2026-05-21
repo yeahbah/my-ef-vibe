@@ -5,11 +5,29 @@ namespace MyEfVibe;
 
 internal static class WorkspaceSystemTextJsonBootstrap
 {
+    internal static void PrimeSharedFramework(SharedFrameworkCatalog sharedFrameworkCatalog)
+    {
+        if (SystemTextJsonCapabilities.IsCompatibleLoaded())
+            return;
+
+        if (!sharedFrameworkCatalog.TryResolve(SystemTextJsonCapabilities.AssemblySimpleName, out var sharedPath))
+            return;
+
+        TryLoadCandidate(sharedPath);
+    }
+
     internal static void EnsureLoaded(WorkspaceAssemblyResolver resolver, SharedFrameworkCatalog sharedFrameworkCatalog)
     {
+        PrimeSharedFramework(sharedFrameworkCatalog);
+
         if (SystemTextJsonCapabilities.TryGetLoaded(out var existing)
             && !SystemTextJsonCapabilities.IsCompatible(existing))
         {
+            if (IsLikelyProjectOutputCopy(existing.Location))
+            {
+                throw CreateProjectOutputCopyException(existing);
+            }
+
             throw CreateIncompatibleAlreadyLoadedException(existing);
         }
 
@@ -18,14 +36,7 @@ internal static class WorkspaceSystemTextJsonBootstrap
 
         foreach (var candidatePath in EnumerateCandidatePaths(resolver, sharedFrameworkCatalog))
         {
-            try
-            {
-                AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, candidatePath);
-            }
-            catch (Exception failure) when (failure is BadImageFormatException or FileLoadException or IOException)
-            {
-                continue;
-            }
+            TryLoadCandidate(candidatePath);
 
             if (SystemTextJsonCapabilities.IsCompatibleLoaded())
                 return;
@@ -43,6 +54,35 @@ internal static class WorkspaceSystemTextJsonBootstrap
             + $"{Environment.NewLine}Ensure the .NET SDK includes the target shared framework (for example `Microsoft.NETCore.App` for `net8.0`),"
             + $" rebuild with `-f net8.0`, and remove any stale `System.Text.Json.dll` copied into the project `bin` folder.");
     }
+
+    private static void TryLoadCandidate(string candidatePath)
+    {
+        try
+        {
+            AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, candidatePath);
+        }
+        catch (Exception failure) when (failure is BadImageFormatException or FileLoadException or IOException)
+        {
+        }
+    }
+
+    private static bool IsLikelyProjectOutputCopy(string? location)
+    {
+        if (string.IsNullOrWhiteSpace(location))
+            return false;
+
+        var normalized = location.Replace('\\', Path.DirectorySeparatorChar);
+
+        return normalized.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Contains($"{Path.DirectorySeparatorChar}shared{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static InvalidOperationException CreateProjectOutputCopyException(Assembly assembly)
+        => new(
+            "An incompatible `System.Text.Json.dll` was loaded from the project build output"
+            + $" ({SystemTextJsonCapabilities.Describe(assembly)})."
+            + $"{Environment.NewLine}Delete `System.Text.Json.dll` from the `-p` and `-s` project `bin` folders, rebuild, exit efvibe, and start a new session."
+            + $"{Environment.NewLine}efvibe loads the shared-framework copy for the workspace TFM (for example `Microsoft.NETCore.App` for `net8.0`).");
 
     private static InvalidOperationException CreateIncompatibleAlreadyLoadedException(Assembly assembly)
         => new(

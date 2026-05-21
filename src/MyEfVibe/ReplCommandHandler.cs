@@ -339,6 +339,13 @@ internal sealed class ReplCommandHandler
             return;
         }
 
+        if (_analytics.CompareBaseline is null || _analytics.LastMetrics is null)
+        {
+            CliUi.WriteWarning(
+                "Run a query, then `:compare set` for a baseline, run another query, and use `:compare` again.");
+            return;
+        }
+
         AnalyticsPresenter.WriteCompare(_analytics.CompareBaseline, _analytics.LastMetrics);
     }
 

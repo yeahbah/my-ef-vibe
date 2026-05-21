@@ -63,6 +63,8 @@ internal sealed class WorkspaceHost : IDisposable
             workspaceBuild.StartupOutputDirectory,
             startupAssemblyDll);
 
+        WorkspaceSystemTextJsonBootstrap.PrimeSharedFramework(sharedFrameworkCatalog);
+
         var depsManifest = WorkspaceDepsManifest.TryLoad(workspaceBuild.PrimaryAssemblyDll);
         depsManifest = MergeStartupDepsManifest(workspaceBuild, depsManifest);
 

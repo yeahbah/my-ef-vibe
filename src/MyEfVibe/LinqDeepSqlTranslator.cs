@@ -23,6 +23,18 @@ internal static class LinqDeepSqlTranslator
                 "Not an EF Core query expression.");
         }
 
+        var includedModelEntities = DbContextModelEntityDiscovery.DiscoverIncludedEntityTypeNames(session.DbContext);
+
+        if (SetEntityTypeExtractor.TryExtractConcreteEntityTypeName(statementOrCode, out var setEntityType)
+            && includedModelEntities.Count > 0
+            && !includedModelEntities.Contains(setEntityType))
+        {
+            return new LinqSqlTranslationResult(
+                null,
+                $"{setEntityType} is not included in the model for this DbContext"
+                + $" (Set<{setEntityType}>() has no mapped table in the current provider configuration).");
+        }
+
         var entityTypeNames = DbSetEntityDiscovery.DiscoverEntityTypeNames(session.DbContext);
         var representativeEntity = DbSetEntityDiscovery.SelectRepresentativeEntityName(entityTypeNames);
 
