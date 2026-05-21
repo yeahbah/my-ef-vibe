@@ -25,14 +25,17 @@ internal static class LinqDeepSqlTranslator
 
         var includedModelEntities = DbContextModelEntityDiscovery.DiscoverIncludedEntityTypeNames(session.DbContext);
 
-        if (SetEntityTypeExtractor.TryExtractConcreteEntityTypeName(statementOrCode, out var setEntityType)
+        if (QueryableEntityTypeResolver.TryExtractConcreteEntityTypeName(
+                statementOrCode,
+                session.DbContext.GetType(),
+                out var queryEntityType)
             && includedModelEntities.Count > 0
-            && !includedModelEntities.Contains(setEntityType))
+            && !includedModelEntities.Contains(queryEntityType))
         {
             return new LinqSqlTranslationResult(
                 null,
-                $"{setEntityType} is not included in the model for this DbContext"
-                + $" (Set<{setEntityType}>() has no mapped table in the current provider configuration).");
+                $"{queryEntityType} is not included in the model for this DbContext"
+                + $" (no mapped table in the current provider configuration; SQL/EXPLAIN skipped).");
         }
 
         var entityTypeNames = DbSetEntityDiscovery.DiscoverEntityTypeNames(session.DbContext);
@@ -92,6 +95,9 @@ internal static class LinqDeepSqlTranslator
         }
         catch (Exception failure)
         {
+            if (TryCreateUnmappedEntityNote(failure, includedModelEntities, out var unmappedNote))
+                return new LinqSqlTranslationResult(null, unmappedNote);
+
             return new LinqSqlTranslationResult(null, TruncateNote(failure.Message));
         }
     }
@@ -115,6 +121,47 @@ internal static class LinqDeepSqlTranslator
             null,
             plan.PlanText,
             plan.Note);
+    }
+
+    private static bool TryCreateUnmappedEntityNote(
+        Exception failure,
+        IReadOnlySet<string> includedModelEntities,
+        out string note)
+    {
+        note = string.Empty;
+
+        if (includedModelEntities.Count == 0)
+            return false;
+
+        var message = failure.Message;
+
+        if (!message.Contains("not included in the model", StringComparison.OrdinalIgnoreCase)
+            && !message.Contains("Cannot create a DbSet for", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        const string prefix = "Cannot create a DbSet for '";
+
+        var start = message.IndexOf(prefix, StringComparison.Ordinal);
+
+        if (start < 0)
+            return false;
+
+        start += prefix.Length;
+        var end = message.IndexOf('\'', start);
+
+        if (end <= start)
+            return false;
+
+        var entityType = message[start..end];
+
+        if (includedModelEntities.Contains(entityType))
+            return false;
+
+        note =
+            $"{entityType} is not included in the model for this DbContext"
+            + $" (no mapped table in the current provider configuration; SQL/EXPLAIN skipped).";
+
+        return true;
     }
 
     private static string TruncateNote(string message)

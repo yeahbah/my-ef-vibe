@@ -201,7 +201,10 @@ internal sealed class ReplCommandHandler
     {
         var result = CliUi.RunWithStatus(
             "Scanning project sources for LINQ patterns…",
-            () => LinqLiteScanner.Scan(_host.ProjectPath, _host.StartupProjectPath));
+            () => LinqLiteScanner.Scan(
+                _host.ProjectPath,
+                _host.StartupProjectPath,
+                _session.DbContext.GetType()));
 
         var (filteredFindings, dismissedSkipped) = LinqScanDismissalStore.FilterFindings(
             result.Findings,
@@ -249,6 +252,7 @@ internal sealed class ReplCommandHandler
                         _host.StartupProjectPath,
                         _session,
                         _host,
+                        _session.DbContext.GetType(),
                         progress,
                         cancellationToken);
                 });

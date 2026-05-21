@@ -2,7 +2,9 @@ namespace MyEfVibe;
 
 internal static class LinqQueryWarningRules
 {
-    internal static IReadOnlyList<(string RuleId, string Message)> AnalyzeSnippet(string snippet)
+    internal static IReadOnlyList<(string RuleId, string Message)> AnalyzeSnippet(
+        string snippet,
+        string? containingMethodName = null)
     {
         var warnings = new List<(string RuleId, string Message)>();
         var normalized = snippet.ReplaceLineEndings("\n");
@@ -14,28 +16,20 @@ internal static class LinqQueryWarningRules
                 "Uses AsEnumerable() — may force client-side evaluation."));
         }
 
-        if (normalized.Contains(".ToList()", StringComparison.Ordinal)
-            || normalized.Contains(".ToListAsync(", StringComparison.Ordinal)
-            || normalized.Contains(".ToArray()", StringComparison.Ordinal)
-            || normalized.Contains(".ToArrayAsync(", StringComparison.Ordinal))
+        if (MaterializesWithoutTake(normalized) && !IsIntentionalFullListMaterialization(containingMethodName))
         {
-            if (!normalized.Contains(".Take(", StringComparison.Ordinal)
-                && !normalized.Contains(".TakeAsync(", StringComparison.Ordinal))
-            {
-                warnings.Add((
-                    "unbounded-materialize",
-                    "Materializes results without Take() — may load a large result set."));
-            }
+            warnings.Add((
+                "unbounded-materialize",
+                "Materializes results without Take() — may load a large result set."));
         }
 
-        var includeCount = CountOccurrences(normalized, ".Include(")
-                         + CountOccurrences(normalized, ".ThenInclude(");
+        var topLevelIncludeCount = CountOccurrences(normalized, ".Include(");
 
-        if (includeCount >= 2)
+        if (topLevelIncludeCount >= 2)
         {
             warnings.Add((
                 "cartesian",
-                $"Multiple Include/ThenInclude calls ({includeCount}) — watch for cartesian explosion."));
+                $"Multiple Include calls ({topLevelIncludeCount}) — watch for cartesian explosion."));
         }
 
         if ((normalized.Contains(".Take(", StringComparison.Ordinal)
@@ -45,6 +39,13 @@ internal static class LinqQueryWarningRules
             warnings.Add((
                 "unordered-take",
                 "Take() without OrderBy — row order is undefined."));
+        }
+
+        if (UsesUnboundedTerminalFirst(normalized))
+        {
+            warnings.Add((
+                "first-without-take",
+                "First()/FirstOrDefault() without Take(1) — on PostgreSQL, executed SQL may omit LIMIT and scan the full table."));
         }
 
         AnalyzeRawSqlWarnings(normalized, warnings);
@@ -249,6 +250,65 @@ internal static class LinqQueryWarningRules
         }
 
         return text.Length - 1;
+    }
+
+    private static bool MaterializesWithoutTake(string normalized) =>
+        (normalized.Contains(".ToList()", StringComparison.Ordinal)
+         || normalized.Contains(".ToListAsync(", StringComparison.Ordinal)
+         || normalized.Contains(".ToArray()", StringComparison.Ordinal)
+         || normalized.Contains(".ToArrayAsync(", StringComparison.Ordinal))
+        && !normalized.Contains(".Take(", StringComparison.Ordinal)
+        && !normalized.Contains(".TakeAsync(", StringComparison.Ordinal);
+
+    private static bool IsIntentionalFullListMaterialization(string? containingMethodName) =>
+        string.Equals(containingMethodName, "ListAllAsync", StringComparison.Ordinal);
+
+    private static bool UsesUnboundedTerminalFirst(string normalized)
+    {
+        if (normalized.Contains(".Take(", StringComparison.Ordinal)
+            || normalized.Contains(".TakeAsync(", StringComparison.Ordinal))
+            return false;
+
+        if (!UsesTerminalFirst(normalized))
+            return false;
+
+        return !HasBoundedFirstFilter(normalized);
+    }
+
+    private static bool UsesTerminalFirst(string normalized) =>
+        normalized.Contains(".First()", StringComparison.Ordinal)
+        || normalized.Contains(".FirstOrDefault()", StringComparison.Ordinal)
+        || normalized.Contains(".FirstAsync(", StringComparison.Ordinal)
+        || normalized.Contains(".FirstOrDefaultAsync(", StringComparison.Ordinal);
+
+    private static bool HasBoundedFirstFilter(string normalized)
+    {
+        if (normalized.Contains(".Where(", StringComparison.Ordinal))
+            return true;
+
+        foreach (var method in new[]
+                 {
+                     "FirstOrDefaultAsync(",
+                     "FirstAsync(",
+                     "FirstOrDefault(",
+                     "First(",
+                 })
+        {
+            var index = 0;
+
+            while ((index = normalized.IndexOf(method, index, StringComparison.Ordinal)) >= 0)
+            {
+                var openParen = index + method.Length - 1;
+
+                if (TryExtractParenthesizedContent(normalized, openParen, out var arguments)
+                    && arguments.Contains("=>", StringComparison.Ordinal))
+                    return true;
+
+                index += method.Length;
+            }
+        }
+
+        return false;
     }
 
     private static int CountOccurrences(string text, string pattern)

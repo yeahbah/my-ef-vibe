@@ -27,6 +27,102 @@ public sealed class LinqQueryWarningRulesTests
     }
 
     [Fact]
+    public void AnalyzeSnippet_SingleIncludeWithThenInclude_DoesNotReportCartesian()
+    {
+        const string snippet = """
+            return await DbContext.Addresses
+                .Include(a => a.StateProvince)
+                .ThenInclude(b => b.CountryRegion)
+                .FirstOrDefaultAsync();
+            """;
+
+        var warnings = LinqQueryWarningRules.AnalyzeSnippet(snippet);
+
+        Assert.DoesNotContain(warnings, static w => w.RuleId == "cartesian");
+    }
+
+    [Fact]
+    public void AnalyzeSnippet_TwoTopLevelIncludes_ReportsCartesian()
+    {
+        const string snippet = """
+            return await DbContext.Employees
+                .Include(e => e.EmployeeDepartmentHistory).ThenInclude(h => h.Department)
+                .Include(e => e.EmployeeDepartmentHistory).ThenInclude(h => h.Shift)
+                .FirstOrDefaultAsync();
+            """;
+
+        var warnings = LinqQueryWarningRules.AnalyzeSnippet(snippet);
+
+        Assert.Contains(warnings, static w => w.RuleId == "cartesian");
+    }
+
+    [Fact]
+    public void AnalyzeSnippet_FirstOrDefaultAsyncWithPredicate_DoesNotReportFirstWithoutTake()
+    {
+        const string snippet = """
+            return await _dbContext.Set<Currency>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.CurrencyCode == code, cancellationToken);
+            """;
+
+        var warnings = LinqQueryWarningRules.AnalyzeSnippet(snippet);
+
+        Assert.DoesNotContain(warnings, static w => w.RuleId == "first-without-take");
+    }
+
+    [Fact]
+    public void AnalyzeSnippet_WhereBeforeFirstOrDefault_DoesNotReportFirstWithoutTake()
+    {
+        const string snippet = """
+            return await DbContext.Addresses
+                .Where(x => x.AddressId == addressId)
+                .FirstOrDefaultAsync();
+            """;
+
+        var warnings = LinqQueryWarningRules.AnalyzeSnippet(snippet);
+
+        Assert.DoesNotContain(warnings, static w => w.RuleId == "first-without-take");
+    }
+
+    [Fact]
+    public void AnalyzeSnippet_UnfilteredFirstOrDefault_ReportsFirstWithoutTake()
+    {
+        const string snippet = "return await DbContext.Products.FirstOrDefaultAsync();";
+
+        var warnings = LinqQueryWarningRules.AnalyzeSnippet(snippet);
+
+        Assert.Contains(warnings, static w => w.RuleId == "first-without-take");
+    }
+
+    [Fact]
+    public void AnalyzeSnippet_ListAllAsync_DoesNotReportUnboundedMaterialize()
+    {
+        const string snippet = """
+            return await _dbContext.Set<Currency>()
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+            """;
+
+        var warnings = LinqQueryWarningRules.AnalyzeSnippet(snippet, containingMethodName: "ListAllAsync");
+
+        Assert.DoesNotContain(warnings, static w => w.RuleId == "unbounded-materialize");
+    }
+
+    [Fact]
+    public void AnalyzeSnippet_OtherMethod_StillReportsUnboundedMaterialize()
+    {
+        const string snippet = """
+            return await _dbContext.Set<Currency>()
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+            """;
+
+        var warnings = LinqQueryWarningRules.AnalyzeSnippet(snippet, containingMethodName: "GetPagedAsync");
+
+        Assert.Contains(warnings, static w => w.RuleId == "unbounded-materialize");
+    }
+
+    [Fact]
     public void AnalyzeSnippet_FromSqlInterpolated_DoesNotReportRawSqlRules()
     {
         const string snippet =

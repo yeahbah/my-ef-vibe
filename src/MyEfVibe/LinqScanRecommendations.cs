@@ -25,6 +25,11 @@ internal static class LinqScanRecommendations
                 + "Order by an indexed, stable key (often the primary key) for efficient paging.\n"
                 + "Avoid relying on database default ordering — it can change between executions.",
 
+            "first-without-take" =>
+                "Filter before First: use FirstOrDefaultAsync(x => x.Key == id) or .Where(...).Take(1).FirstOrDefaultAsync().\n"
+                + "Ensure `using Microsoft.EntityFrameworkCore` for EF async operators (not System.Linq.Async).\n"
+                + "Run with :dblog on or :plan to confirm executed SQL includes LIMIT/TOP/FETCH.",
+
             "raw-sql" =>
                 "Review execution plans and indexes for predicates in the SQL.\n"
                 + "Prefer LINQ where possible; reserve raw SQL for cases EF cannot express.\n"
@@ -43,6 +48,16 @@ internal static class LinqScanRecommendations
             "query-site" =>
                 "Compare translated SQL to intent — check filters, joins, and row multiplication.\n"
                 + "Paste the expression in the REPL to run, benchmark, or use :plan on the live query.",
+
+            "unmapped-entity" =>
+                "This entity is not configured in the DbContext model for the active provider (e.g. SQLite LT subset).\n"
+                + "Ignore scan results for this site when testing a reduced model, or switch provider/context.\n"
+                + "To support the entity, add mapping/configuration and ensure the table exists for that provider.",
+
+            "invalid-navigation-include" =>
+                "The Include/ThenInclude chain references a navigation that is not available for this provider's model.\n"
+                + "On SQLite LT, StateProvince and similar navigations are often Ignored — use scalar columns or drop the Include.\n"
+                + "Fix lambda parameters so ThenInclude targets the previous navigation type (e.g. sp => sp.CountryRegion).",
 
             _ =>
                 "Run the query with database logging (:dblog on) or :plan to inspect the executed SQL and row counts.",

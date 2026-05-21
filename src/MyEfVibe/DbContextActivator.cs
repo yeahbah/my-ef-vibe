@@ -669,6 +669,17 @@ internal static class DbContextActivator
 
         var optionsInstanceType = compiledOptionsConcreteInstance.GetType();
 
+        if (providerKey == MyEfVibeProvider.Sqlite
+            && TryCreateUsingOptionsAndDatabaseProviderAccessor(
+                dbContextConcreteType,
+                compiledOptionsConcreteInstance,
+                host,
+                out var accessorContextInstance))
+        {
+            instance = accessorContextInstance;
+            return true;
+        }
+
         var matchingCtor = dbContextConcreteType
             .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .FirstOrDefault(ctorCandidate =>
@@ -687,6 +698,95 @@ internal static class DbContextActivator
         instance = createdContextInstance;
 
         return true;
+    }
+
+    private static bool TryCreateUsingOptionsAndDatabaseProviderAccessor(
+        Type dbContextConcreteType,
+        object compiledOptionsConcreteInstance,
+        WorkspaceHost host,
+        out object instance)
+    {
+        instance = null!;
+
+        var accessor = TryResolveSqliteDatabaseProviderAccessor(host, dbContextConcreteType.Assembly);
+
+        if (accessor is null)
+            return false;
+
+        var accessorType = accessor.GetType();
+        var optionsInstanceType = compiledOptionsConcreteInstance.GetType();
+
+        foreach (var ctor in dbContextConcreteType.GetConstructors(BindingFlags.Instance | BindingFlags.Public
+                                                                     | BindingFlags.NonPublic))
+        {
+            var parameters = ctor.GetParameters();
+
+            if (parameters.Length != 2)
+                continue;
+
+            if (!parameters[0].ParameterType.IsAssignableFrom(optionsInstanceType)
+                && !optionsInstanceType.IsAssignableTo(parameters[0].ParameterType))
+                continue;
+
+            if (!parameters[1].ParameterType.IsAssignableFrom(accessorType))
+                continue;
+
+            var created = ctor.Invoke([compiledOptionsConcreteInstance, accessor]);
+
+            if (created is null)
+                continue;
+
+            instance = created;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static object? TryResolveSqliteDatabaseProviderAccessor(WorkspaceHost host, Assembly contextAssembly)
+    {
+        foreach (var assembly in EnumerateAccessorSearchAssemblies(host, contextAssembly))
+        {
+            foreach (var candidate in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
+            {
+                if (!candidate.Name.EndsWith("SqliteDatabaseProviderAccessor", StringComparison.Ordinal)
+                    || !candidate.IsClass
+                    || candidate.IsAbstract)
+                    continue;
+
+                if (!ImplementsDatabaseProviderAccessor(candidate))
+                    continue;
+
+                var instanceProperty = candidate.GetProperty(
+                    "Instance",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (instanceProperty?.GetValue(null) is { } instance)
+                    return instance;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Assembly> EnumerateAccessorSearchAssemblies(WorkspaceHost host, Assembly contextAssembly)
+    {
+        yield return contextAssembly;
+
+        foreach (var loaded in host.EnumerateLoadedAssemblies())
+            yield return loaded;
+    }
+
+    private static bool ImplementsDatabaseProviderAccessor(Type candidate)
+    {
+        foreach (var iface in candidate.GetInterfaces())
+        {
+            if (string.Equals(iface.Name, "IDatabaseProviderAccessor", StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
     }
 
     private static Assembly? LoadWorkspaceAssembly(WorkspaceHost host, string assemblyName)

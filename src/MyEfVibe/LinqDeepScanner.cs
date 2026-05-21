@@ -14,11 +14,12 @@ internal static class LinqDeepScanner
         string startupProjectPath,
         ScriptSession session,
         WorkspaceHost host,
+        Type selectedDbContextType,
         IProgress<(int Completed, int Total)>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var lite = LinqLiteScanner.Scan(efProjectPath, startupProjectPath);
-        var sites = LinqQuerySiteCollector.Collect(efProjectPath, startupProjectPath);
+        var lite = LinqLiteScanner.Scan(efProjectPath, startupProjectPath, selectedDbContextType);
+        var sites = LinqQuerySiteCollector.Collect(efProjectPath, startupProjectPath, selectedDbContextType);
 
         var uniqueSites = sites
             .GroupBy(static site => $"{site.FilePath}|{site.Line}", StringComparer.OrdinalIgnoreCase)
@@ -68,6 +69,12 @@ internal static class LinqDeepScanner
             var siteKey = $"{finding.FilePath}|{finding.Line}";
             sqlBySite.TryGetValue(siteKey, out var translation);
 
+            if (TryCreateDeepScanReplacementFinding(finding, translation, out var replacement))
+            {
+                findings.Add(replacement);
+                continue;
+            }
+
             findings.Add(finding with
             {
                 TranslatedSql = translation?.Sql,
@@ -90,15 +97,13 @@ internal static class LinqDeepScanner
             if (string.IsNullOrWhiteSpace(translation.Sql) && string.IsNullOrWhiteSpace(translation.Note))
                 continue;
 
-            var message = !string.IsNullOrWhiteSpace(translation.Sql)
-                ? "Queryable call site — translated SQL available."
-                : "Queryable call site — SQL translation failed.";
+            var (ruleId, message) = ResolveQuerySiteRule(translation);
 
             findings.Add(LinqScanFinding.Create(
                 site.FilePath,
                 site.Line,
                 site.Code,
-                "query-site",
+                ruleId,
                 message,
                 translatedSql: translation.Sql,
                 sqlTranslationNote: translation.Note,
@@ -122,5 +127,71 @@ internal static class LinqDeepScanner
             planFailedCount);
 
         return (result, stats);
+    }
+
+    private static bool TryCreateDeepScanReplacementFinding(
+        LinqScanFinding finding,
+        LinqSqlTranslationResult? translation,
+        out LinqScanFinding replacement)
+    {
+        replacement = finding;
+
+        if (LinqSqlTranslationNotes.ShouldReplaceUnboundedMaterializeWithUnmappedEntity(
+                finding.RuleId,
+                translation?.Note))
+        {
+            replacement = LinqScanFinding.Create(
+                finding.FilePath,
+                finding.Line,
+                finding.Code,
+                "unmapped-entity",
+                "Query targets an entity type that is not mapped for the current DbContext configuration.",
+                translatedSql: translation?.Sql,
+                sqlTranslationNote: translation?.Note,
+                queryPlan: translation?.QueryPlan,
+                queryPlanNote: translation?.QueryPlanNote);
+            return true;
+        }
+
+        if (LinqSqlTranslationNotes.ShouldReplaceCartesianWithInvalidInclude(
+                finding.RuleId,
+                translation?.Note))
+        {
+            replacement = LinqScanFinding.Create(
+                finding.FilePath,
+                finding.Line,
+                finding.Code,
+                "invalid-navigation-include",
+                "Include path cannot be translated — navigation may be ignored or misconfigured for this provider.",
+                translatedSql: translation?.Sql,
+                sqlTranslationNote: translation?.Note,
+                queryPlan: translation?.QueryPlan,
+                queryPlanNote: translation?.QueryPlanNote);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static (string RuleId, string Message) ResolveQuerySiteRule(LinqSqlTranslationResult translation)
+    {
+        if (LinqSqlTranslationNotes.IsEntityNotIncludedInModelNote(translation.Note))
+        {
+            return (
+                "unmapped-entity",
+                "Query targets an entity type that is not mapped for the current DbContext configuration.");
+        }
+
+        if (LinqSqlTranslationNotes.IsInvalidIncludeTranslationNote(translation.Note))
+        {
+            return (
+                "invalid-navigation-include",
+                "Include path cannot be translated — navigation may be ignored or misconfigured for this provider.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(translation.Sql))
+            return ("query-site", "Queryable call site — translated SQL available.");
+
+        return ("query-site", "Queryable call site — SQL translation failed.");
     }
 }

@@ -106,7 +106,8 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
             session.Scenario.EfProjectPath,
             session.Scenario.StartupProjectPath,
             session.ScriptSession,
-            session.Host);
+            session.Host,
+            session.DbContext.GetType());
 
         Assert.True(stats.QuerySitesVisited > 0);
         Assert.True(stats.SqlTranslatedCount > 0, "Expected at least one translated SQL site.");

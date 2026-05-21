@@ -224,7 +224,10 @@ internal static class ScanCommandRunner
                 AnsiConsole.MarkupLine("[dim]Scanning project sources (lite)…[/]");
             }
 
-            scanResult = LinqLiteScanner.Scan(resolvedProject.FullName, resolvedStartup.FullName);
+            scanResult = LinqLiteScanner.Scan(
+                resolvedProject.FullName,
+                resolvedStartup.FullName,
+                selectedContextTypeName: contextFullName);
         }
         else
         {
@@ -304,6 +307,7 @@ internal static class ScanCommandRunner
                 resolvedStartup.FullName,
                 session,
                 host,
+                dbContextType,
                 progress: null,
                 cancellationToken);
         }

@@ -34,8 +34,18 @@ internal static class LinqLiteScanner
         "AllAsync",
     };
 
-    internal static LinqLiteScanResult Scan(string efProjectPath, string startupProjectPath)
+    internal static LinqLiteScanResult Scan(
+        string efProjectPath,
+        string startupProjectPath,
+        Type? selectedDbContextType = null,
+        string? selectedContextTypeName = null)
     {
+        DbContextScanScope? scope = null;
+
+        if (selectedDbContextType is not null)
+            scope = DbContextScanScope.Create(efProjectPath, startupProjectPath, selectedDbContextType);
+        else if (!string.IsNullOrWhiteSpace(selectedContextTypeName))
+            scope = DbContextScanScope.Create(efProjectPath, startupProjectPath, selectedContextTypeName);
         var findings = new List<LinqScanFinding>();
         var filesScanned = 0;
         var projectPaths = LinqProjectSourceWalker.CollectScanProjectPaths(efProjectPath, startupProjectPath);
@@ -47,7 +57,7 @@ internal static class LinqLiteScanner
             foreach (var sourcePath in LinqProjectSourceWalker.EnumerateSourceFiles(projectDirectory))
             {
                 filesScanned++;
-                findings.AddRange(ScanSourceFile(sourcePath));
+                findings.AddRange(ScanSourceFile(sourcePath, scope));
             }
         }
 
@@ -61,7 +71,7 @@ internal static class LinqLiteScanner
                 .ToArray());
     }
 
-    private static IEnumerable<LinqScanFinding> ScanSourceFile(string absolutePath)
+    private static IEnumerable<LinqScanFinding> ScanSourceFile(string absolutePath, DbContextScanScope? scope)
     {
         string sourceText;
 
@@ -84,6 +94,9 @@ internal static class LinqLiteScanner
             encoding: System.Text.Encoding.UTF8);
 
         var root = tree.GetCompilationUnitRoot();
+        var containingTypeIndex = scope is null
+            ? new DbContextContainingTypeIndex()
+            : DbContextContainingTypeIndex.Build(sourceText, scope);
         var findings = new List<LinqScanFinding>();
         var reported = new HashSet<string>(StringComparer.Ordinal);
 
@@ -99,10 +112,20 @@ internal static class LinqLiteScanner
             if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement))
                 continue;
 
+            var containingTypeName = GetContainingTypeName(invocation);
+            var containingMethodName = GetContainingMethodName(invocation);
+
+            if (!DbContextQuerySiteFilter.BelongsToSelectedContext(
+                    statement,
+                    scope,
+                    containingTypeName,
+                    containingTypeIndex))
+                continue;
+
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
             var preview = ToPreviewLine(statement);
 
-            foreach (var (ruleId, message) in LinqQueryWarningRules.AnalyzeSnippet(statement))
+            foreach (var (ruleId, message) in LinqQueryWarningRules.AnalyzeSnippet(statement, containingMethodName))
             {
                 var key = $"{line}|{ruleId}|{message}";
 
@@ -119,10 +142,10 @@ internal static class LinqLiteScanner
         }
 
         foreach (var loop in root.DescendantNodes().OfType<ForEachStatementSyntax>())
-            AnalyzeLoop(absolutePath, loop, findings, reported);
+            AnalyzeLoop(absolutePath, loop, findings, reported, scope, containingTypeIndex);
 
         foreach (var loop in root.DescendantNodes().OfType<ForStatementSyntax>())
-            AnalyzeLoop(absolutePath, loop, findings, reported);
+            AnalyzeLoop(absolutePath, loop, findings, reported, scope, containingTypeIndex);
 
         return findings;
     }
@@ -131,11 +154,22 @@ internal static class LinqLiteScanner
         string absolutePath,
         StatementSyntax loopStatement,
         List<LinqScanFinding> findings,
-        HashSet<string> reported)
+        HashSet<string> reported,
+        DbContextScanScope? scope,
+        DbContextContainingTypeIndex containingTypeIndex)
     {
         var bodyText = loopStatement.ToString();
 
         if (!LooksLikeQueryInLoop(bodyText))
+            return;
+
+        var containingTypeName = GetContainingTypeName(loopStatement);
+
+        if (!DbContextQuerySiteFilter.BelongsToSelectedContext(
+                bodyText,
+                scope,
+                containingTypeName,
+                containingTypeIndex))
             return;
 
         var line = loopStatement.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
@@ -177,6 +211,16 @@ internal static class LinqLiteScanner
             IdentifierNameSyntax identifier => identifier.Identifier.Text,
             _ => null,
         };
+
+    private static string? GetContainingTypeName(SyntaxNode node)
+    {
+        var typeDeclaration = node.FirstAncestorOrSelf<TypeDeclarationSyntax>();
+
+        return typeDeclaration?.Identifier.Text;
+    }
+
+    private static string? GetContainingMethodName(SyntaxNode node) =>
+        node.FirstAncestorOrSelf<MethodDeclarationSyntax>()?.Identifier.Text;
 
     private static string GetStatementText(SyntaxNode node)
     {

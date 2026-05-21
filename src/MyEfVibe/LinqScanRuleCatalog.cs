@@ -16,7 +16,10 @@ internal static class LinqScanRuleCatalog
             "cartesian" => LinqScanSeverity.Warning,
             "client-eval" => LinqScanSeverity.Warning,
             "unordered-take" => LinqScanSeverity.Warning,
+            "first-without-take" => LinqScanSeverity.Warning,
             "query-site" => LinqScanSeverity.Info,
+            "unmapped-entity" => LinqScanSeverity.Warning,
+            "invalid-navigation-include" => LinqScanSeverity.Warning,
             _ => LinqScanSeverity.Warning,
         };
 
