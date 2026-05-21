@@ -56,6 +56,16 @@ internal static class DbContextActivator
             provider ??= inferredProvider;
             resolvedConnectionFromConfiguration = true;
         }
+        else if (!string.IsNullOrWhiteSpace(connectionString)
+                 && (provider == MyEfVibeProvider.Sqlite
+                     || SqliteConnectionStringNormalizer.LooksLikeSqliteConnection(connectionString)))
+        {
+            connectionString = SqliteConnectionStringNormalizer.Normalize(
+                connectionString,
+                host.StartupProjectPath,
+                host.OutputDirectory);
+            provider ??= MyEfVibeProvider.Sqlite;
+        }
 
         if (!string.IsNullOrWhiteSpace(connectionString) && provider.HasValue
                                                          && TryCreateUsingOptionsConstructor(selectedDbContextType,

@@ -16,6 +16,9 @@ internal sealed class WorkspaceDepsManifest
     private readonly HashSet<string> _projectAssemblyPaths =
         new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly Dictionary<string, List<NativeAsset>> _nativeAssetsByFileName =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly List<PackageLibrary> _packageLibraries = [];
     private readonly string _nuGetPackagesRoot;
 
@@ -25,6 +28,8 @@ internal sealed class WorkspaceDepsManifest
     }
 
     private sealed record AssemblyAsset(Version? Version, string Path, int Rank);
+
+    private sealed record NativeAsset(string Path, int Rank);
 
     private sealed record PackageLibrary(string PackageId, Version? Version, string PackageFolder);
 
@@ -114,8 +119,15 @@ internal sealed class WorkspaceDepsManifest
                 ? runtimeFallbacks.Count
                 : HostRuntimeIdentifier.GetFallbackRank(runtimeIdentifier, runtimeFallbacks);
 
+            var normalizedRelativePath = runtimeAsset.Name.Replace('/', Path.DirectorySeparatorChar);
+            var fileName = Path.GetFileName(normalizedRelativePath);
+
+            if (!fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             TryAddAsset(
-                runtimeAsset.Name,
+                normalizedRelativePath,
+                fileName,
                 packageFolder,
                 outputDirectory,
                 libraryVersion,
@@ -151,24 +163,104 @@ internal sealed class WorkspaceDepsManifest
             if (rank == int.MaxValue)
                 continue;
 
-            TryAddAsset(runtimeAsset.Name, packageFolder, outputDirectory, libraryVersion, rank, isProjectLibrary);
+            var normalizedRelativePath = runtimeAsset.Name.Replace('/', Path.DirectorySeparatorChar);
+            var fileName = Path.GetFileName(normalizedRelativePath);
+
+            if (fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                TryAddAsset(
+                    normalizedRelativePath,
+                    fileName,
+                    packageFolder,
+                    outputDirectory,
+                    libraryVersion,
+                    rank,
+                    isProjectLibrary);
+            }
+            else if (IsNativeLibraryFileName(fileName))
+            {
+                TryAddNativeAsset(normalizedRelativePath, fileName, packageFolder, outputDirectory, rank);
+            }
         }
     }
 
+    internal bool TryResolveNativeLibrary(out string absolutePath, params string[] candidateFileNames)
+    {
+        absolutePath = string.Empty;
+
+        foreach (var candidateFileName in candidateFileNames)
+        {
+            if (string.IsNullOrWhiteSpace(candidateFileName))
+                continue;
+
+            if (!_nativeAssetsByFileName.TryGetValue(candidateFileName, out var assets)
+                || assets.Count == 0)
+                continue;
+
+            absolutePath = assets
+                .OrderByDescending(static asset => asset.Rank)
+                .First()
+                .Path;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsNativeLibraryFileName(string fileName)
+    {
+        if (fileName.EndsWith(".dylib", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".so", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+               && fileName.Contains("e_sqlite3", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void TryAddNativeAsset(
+        string normalizedRelativePath,
+        string fileName,
+        string? packageFolder,
+        string outputDirectory,
+        int rank)
+    {
+        var absolutePath = packageFolder is null
+            ? Path.Combine(outputDirectory, fileName)
+            : Path.Combine(packageFolder, normalizedRelativePath);
+
+        if (!File.Exists(absolutePath))
+            return;
+
+        if (!_nativeAssetsByFileName.TryGetValue(fileName, out var assets))
+        {
+            assets = [];
+            _nativeAssetsByFileName[fileName] = assets;
+        }
+
+        var duplicatePath = assets.FindIndex(asset =>
+            string.Equals(asset.Path, absolutePath, StringComparison.OrdinalIgnoreCase));
+
+        if (duplicatePath >= 0)
+        {
+            if (assets[duplicatePath].Rank <= rank)
+                return;
+
+            assets.RemoveAt(duplicatePath);
+        }
+
+        assets.Add(new NativeAsset(absolutePath, rank));
+    }
+
     private void TryAddAsset(
-        string relativeAssetPath,
+        string normalizedRelativePath,
+        string fileName,
         string? packageFolder,
         string outputDirectory,
         Version? libraryVersion,
         int rank,
         bool isProjectLibrary)
     {
-        var normalizedRelativePath = relativeAssetPath.Replace('/', Path.DirectorySeparatorChar);
-        var fileName = Path.GetFileName(normalizedRelativePath);
-
-        if (!fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-            return;
-
         var absolutePath = packageFolder is null
             ? Path.Combine(outputDirectory, fileName)
             : Path.Combine(packageFolder, normalizedRelativePath);
@@ -261,6 +353,24 @@ internal sealed class WorkspaceDepsManifest
                 continue;
 
             _packageLibraries.Add(library);
+        }
+
+        foreach (var (fileName, otherAssets) in other._nativeAssetsByFileName)
+        {
+            if (!_nativeAssetsByFileName.TryGetValue(fileName, out var assets))
+            {
+                _nativeAssetsByFileName[fileName] = [..otherAssets];
+                continue;
+            }
+
+            foreach (var asset in otherAssets)
+            {
+                if (assets.Any(existing =>
+                        string.Equals(existing.Path, asset.Path, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                assets.Add(asset);
+            }
         }
     }
 

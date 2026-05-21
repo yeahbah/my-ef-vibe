@@ -66,6 +66,8 @@ internal sealed class WorkspaceHost : IDisposable
         var depsManifest = WorkspaceDepsManifest.TryLoad(workspaceBuild.PrimaryAssemblyDll);
         depsManifest = MergeStartupDepsManifest(workspaceBuild, depsManifest);
 
+        WorkspaceSqliteNativeBootstrap.EnsureRegistered(depsManifest);
+
         var assemblyResolver =
             WorkspaceAssemblyResolver.Install(workspaceBuild.PrimaryAssemblyDll, sharedFrameworkCatalog, depsManifest);
 

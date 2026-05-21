@@ -126,6 +126,8 @@ Typical issues:
 |---------|-------------|
 | `The target principal name is incorrect` / `Cannot generate SSPI context` | Wrong config source — use `-s` for the API (not the persistence library). macOS needs SQL auth in user secrets/appsettings, not Windows integrated security. |
 | `SqlClient is not supported on this platform` | Old `efvibe` build; use a current build with RID-aware dependency loading. |
+| `Unable to load shared library 'e_sqlite3'` / `libe_sqlite3.dylib` (no such file) | SQLite native runtime not in the EF library `bin/`; use a current `efvibe` build (loads `runtimes/osx-*/native/libe_sqlite3.dylib` from `.deps.json`). Rebuild/reinstall the tool after updating. |
+| SQLite Error 14: `unable to open database file` | Relative `Data Source=Source/...` from user secrets or `appsettings.json` — efvibe resolves it from the startup project upward (same idea as AdventureWorks `SqliteConnectionStringResolver`). Prefer an absolute path in `appsettings.Development.json`, or pass `--connection-string` with the full `.db` path. |
 | `LocalAppContextSwitches` / `ConfigurationManager` errors | Host/tool vs workspace assembly conflict; fixed in recent builds (workspace deps preload). |
 | `Method not found: JsonSerializerOptions.get_Web` / incompatible `System.Text.Json` already in memory | An older `System.Text.Json.dll` (project `bin` or tool folder) loaded before the .NET shared-framework copy. **Exit efvibe and start a new process** — assemblies are not unloaded between REPL commands. Update/reinstall efvibe, rebuild with `-f net8.0`, and delete stray `bin/**/System.Text.Json.dll`. |
 | `:plan` — `SET SHOWPLAN` batch error | SQL Server requires `SET SHOWPLAN_ALL` in its own batch; fixed in recent builds. |

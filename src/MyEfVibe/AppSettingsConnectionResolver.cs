@@ -13,20 +13,59 @@ internal static class AppSettingsConnectionResolver
         connectionString = string.Empty;
         provider = null;
 
-        if (UserSecretsConnectionResolver.TryResolve(startupProjectPath, efOutputDirectory, out connectionString, out provider))
-            return true;
-
-        foreach (var settingsPath in EnumerateStartupSettingsPaths(startupProjectPath))
+        if (!TryResolveLayeredAppSettings(startupProjectPath, out connectionString))
         {
-            if (!TryReadConnectionString(settingsPath, out connectionString))
-                continue;
+            foreach (var settingsPath in EnumerateStartupSettingsPaths(startupProjectPath))
+            {
+                if (!TryReadConnectionString(settingsPath, out connectionString))
+                    continue;
 
-            provider = InferProvider(efOutputDirectory, connectionString);
-
-            return !string.IsNullOrWhiteSpace(connectionString);
+                break;
+            }
         }
 
-        return false;
+        if (UserSecretsConnectionResolver.TryResolve(
+                startupProjectPath,
+                efOutputDirectory,
+                out var secretsConnectionString,
+                out var secretsProvider))
+        {
+            connectionString = secretsConnectionString;
+            provider = secretsProvider;
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return false;
+
+        provider ??= InferProvider(efOutputDirectory, connectionString);
+
+        if (provider == MyEfVibeProvider.Sqlite
+            || SqliteConnectionStringNormalizer.LooksLikeSqliteConnection(connectionString))
+        {
+            connectionString = SqliteConnectionStringNormalizer.Normalize(
+                connectionString,
+                startupProjectPath,
+                efOutputDirectory);
+            provider ??= MyEfVibeProvider.Sqlite;
+        }
+
+        return true;
+    }
+
+    private static bool TryResolveLayeredAppSettings(string startupProjectPath, out string connectionString)
+    {
+        connectionString = string.Empty;
+        var startupDirectory = Path.GetDirectoryName(startupProjectPath)!;
+
+        foreach (var settingsFileName in new[] { "appsettings.json", "appsettings.Development.json" })
+        {
+            var settingsPath = Path.Combine(startupDirectory, settingsFileName);
+
+            if (TryReadConnectionString(settingsPath, out var candidate))
+                connectionString = candidate;
+        }
+
+        return !string.IsNullOrWhiteSpace(connectionString);
     }
 
     private static IEnumerable<string> EnumerateStartupSettingsPaths(string startupProjectPath)
