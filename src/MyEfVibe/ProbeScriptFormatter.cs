@@ -15,7 +15,9 @@ internal static class ProbeScriptFormatter
 
         probeExpression = StripLeadingReturnAwait(StripVariableDeclarationPrefix(probeExpression));
 
-        return CollapseWhitespace(probeExpression);
+        probeExpression = CollapseWhitespace(probeExpression);
+
+        return EfProbeExpressionSanitizer.RemoveTranslationNeutralOperators(probeExpression);
     }
 
     private static string CollapseWhitespace(string expression)

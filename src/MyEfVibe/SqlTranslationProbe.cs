@@ -68,6 +68,92 @@ internal static class SqlTranslationProbe
         "AsEnumerable",
     ];
 
+    /// <summary>
+    /// Rewrites terminal <c>First</c>/<c>Single</c> operators on EF queries to include <c>Take(n)</c> before execution
+    /// so providers emit <c>LIMIT</c>/<c>TOP</c> instead of materializing the full result set client-side.
+    /// </summary>
+    internal static string? TryRewriteBoundedTerminalQuery(string snippet)
+    {
+        var trimmed = snippet.Trim().TrimEnd(';').Trim();
+
+        if (string.IsNullOrWhiteSpace(trimmed)
+            || !LinqEfQueryHeuristics.LooksLikeEfQuery(trimmed)
+            || trimmed.Contains(".Take(", StringComparison.Ordinal)
+            || trimmed.Contains(".TakeAsync(", StringComparison.Ordinal))
+            return null;
+
+        foreach (var (suffix, takeLimit) in TerminalMaterializationSuffixes)
+        {
+            if (takeLimit is null || !trimmed.EndsWith(suffix, StringComparison.Ordinal))
+                continue;
+
+            var queryable = trimmed[..^suffix.Length].TrimEnd();
+
+            if (string.IsNullOrWhiteSpace(queryable))
+                return null;
+
+            var bounded = TryFinalizeProbe(queryable, takeLimit);
+
+            var remappedSuffix = RemapTerminalSuffixForExecution(suffix);
+
+            return bounded is null ? null : bounded + remappedSuffix;
+        }
+
+        var terminalRewrite = TryRewriteBoundedTrailingTerminalCall(trimmed);
+
+        return terminalRewrite;
+    }
+
+    private static string? TryRewriteBoundedTrailingTerminalCall(string expression)
+    {
+        foreach (var methodName in TerminalMethodNames)
+        {
+            var takeLimit = TryGetTakeLimitForMethod(methodName);
+
+            if (takeLimit is null)
+                continue;
+
+            var needle = $".{methodName}(";
+            var index = expression.LastIndexOf(needle, StringComparison.Ordinal);
+
+            if (index < 0)
+                continue;
+
+            var openParenIndex = index + needle.Length - 1;
+
+            if (!TryFindClosingParenthesis(expression, openParenIndex, out var closeParenIndex))
+                continue;
+
+            if (!IsEndOfExpression(expression, closeParenIndex + 1))
+                continue;
+
+            var queryable = expression[..index].TrimEnd();
+            var suffix = expression[index..];
+
+            if (string.IsNullOrWhiteSpace(queryable) || !LinqEfQueryHeuristics.LooksLikeEfQuery(expression))
+                continue;
+
+            if (!TryExtractParenthesizedContent(expression, openParenIndex, out var arguments))
+                continue;
+
+            var bounded = TryFinalizeProbe(queryable, takeLimit, arguments);
+
+            var remappedSuffix = RemapTerminalSuffixForExecution(suffix);
+
+            return bounded is null ? null : bounded + remappedSuffix;
+        }
+
+        return null;
+    }
+
+    private static string RemapTerminalSuffixForExecution(string suffix) =>
+        suffix switch
+        {
+            ".First()" => ".FirstOrDefault()",
+            ".FirstAsync()" => ".FirstOrDefaultAsync()",
+            _ => suffix,
+        };
+
     internal static string? TryCreateProbeExpression(string snippet)
     {
         var trimmed = snippet.Trim().TrimEnd(';').Trim();
@@ -238,7 +324,7 @@ internal static class SqlTranslationProbe
             _ => null,
         };
 
-    private static bool IsEndOfExpression(string expression, int startIndex)
+    internal static bool IsEndOfExpression(string expression, int startIndex)
     {
         for (var index = startIndex; index < expression.Length; index++)
         {
@@ -253,7 +339,7 @@ internal static class SqlTranslationProbe
         return true;
     }
 
-    private static bool TryFindClosingParenthesis(string text, int openParenIndex, out int closeParenIndex)
+    internal static bool TryFindClosingParenthesis(string text, int openParenIndex, out int closeParenIndex)
     {
         closeParenIndex = -1;
 

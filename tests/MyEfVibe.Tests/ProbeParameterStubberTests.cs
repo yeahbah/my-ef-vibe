@@ -96,6 +96,20 @@ public sealed class ProbeParameterStubberTests
     }
 
     [Fact]
+    public void Stub_GuidEntityIdComparedToRouteId_UsesGuidEmpty()
+    {
+        const string probe = "db.Notes.Where(n => n.Id == id)";
+
+        var stubbed = ProbeParameterStubber.Stub(
+            probe,
+            new ProbeStubContext(typeof(FakeGuidNoteDbContext), typeof(FakeGuidNote).FullName!));
+
+        Assert.Contains("Id == Guid.Empty", stubbed, StringComparison.Ordinal);
+        Assert.DoesNotContain("Id == 0", stubbed, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(stubbed);
+    }
+
+    [Fact]
     public void Stub_BusinessEntityIdsContains_UsesIntArrayLiteral()
     {
         const string probe =
@@ -107,4 +121,38 @@ public sealed class ProbeParameterStubberTests
         Assert.DoesNotContain("businessEntityIds", stubbed, StringComparison.Ordinal);
         ProbeTestHelper.AssertParsesAsScript(stubbed);
     }
+
+    [Fact]
+    public void Stub_OuterNoteUserIdComparedToUserId_UsesGuidEmpty()
+    {
+        const string probe = "db.Users.Where(u => u.Id == note.UserId)";
+
+        var stubbed = ProbeParameterStubber.Stub(
+            probe,
+            new ProbeStubContext(typeof(FakeGuidNoteDbContext), typeof(FakeGuidUser).FullName!));
+
+        Assert.Contains("u.Id == Guid.Empty", stubbed, StringComparison.Ordinal);
+        Assert.DoesNotContain("note.UserId", stubbed, StringComparison.Ordinal);
+        Assert.DoesNotContain("0.UserId", stubbed, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(stubbed);
+    }
+}
+
+public sealed class FakeGuidNoteDbContext : Microsoft.EntityFrameworkCore.DbContext
+{
+    public Microsoft.EntityFrameworkCore.DbSet<FakeGuidUser> Users => Set<FakeGuidUser>();
+
+    public Microsoft.EntityFrameworkCore.DbSet<FakeGuidNote> Notes => Set<FakeGuidNote>();
+}
+
+public sealed class FakeGuidUser
+{
+    public Guid Id { get; set; }
+}
+
+public sealed class FakeGuidNote
+{
+    public Guid Id { get; set; }
+
+    public Guid UserId { get; set; }
 }

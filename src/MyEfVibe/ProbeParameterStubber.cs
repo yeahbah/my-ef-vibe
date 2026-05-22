@@ -9,7 +9,7 @@ namespace MyEfVibe;
 /// </summary>
 internal static class ProbeParameterStubber
 {
-    internal static string Stub(string probeExpression)
+    internal static string Stub(string probeExpression, ProbeStubContext? context = null)
     {
         if (string.IsNullOrWhiteSpace(probeExpression))
             return probeExpression;
@@ -23,7 +23,7 @@ internal static class ProbeParameterStubber
                 wrapped,
                 CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
 
-            var rewritten = new ParameterStubRewriter().Visit(tree.GetRoot());
+            var rewritten = new ParameterStubRewriter(context).Visit(tree.GetRoot());
 
             if (rewritten is null)
                 return singleLine;
@@ -58,7 +58,11 @@ internal static class ProbeParameterStubber
 
     private sealed class ParameterStubRewriter : CSharpSyntaxRewriter
     {
+        private readonly ProbeStubContext? _context;
         private readonly Stack<HashSet<string>> _lambdaParameters = new();
+
+        internal ParameterStubRewriter(ProbeStubContext? context) =>
+            _context = context;
 
         public override SyntaxNode? VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node)
         {
@@ -85,6 +89,14 @@ internal static class ProbeParameterStubber
             _lambdaParameters.Pop();
 
             return rewritten;
+        }
+
+        public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
+        {
+            if (TryCreateStubFromOuterMemberAccess(node, out var literal))
+                return literal;
+
+            return base.VisitMemberAccessExpression(node);
         }
 
         public override SyntaxNode? VisitInvocationExpression(InvocationExpressionSyntax node)
@@ -142,12 +154,19 @@ internal static class ProbeParameterStubber
             }
             && receiver == node;
 
-        private static ExpressionSyntax CreateStubLiteralForComparison(
+        private ExpressionSyntax CreateStubLiteralForComparison(
             string name,
             BinaryExpressionSyntax binary,
             IdentifierNameSyntax node)
         {
             var other = binary.Left == node ? binary.Right : binary.Left;
+
+            if (TryCreateStubLiteralFromEntityProperty(other, out var entityPropertyLiteral))
+                return entityPropertyLiteral;
+
+            if (other is MemberAccessExpressionSyntax outerMemberAccess
+                && TryCreateStubFromOuterMemberAccess(outerMemberAccess, out var outerMemberLiteral))
+                return outerMemberLiteral;
 
             if (IsComparedToGuidMember(other))
                 return GuidStubLiteral();
@@ -164,6 +183,112 @@ internal static class ProbeParameterStubber
 
             return CreateStubLiteral(name);
         }
+
+        private bool TryCreateStubLiteralFromEntityProperty(
+            ExpressionSyntax other,
+            out ExpressionSyntax literal)
+        {
+            literal = null!;
+
+            if (_context?.DbContextType is not { } dbContextType
+                || string.IsNullOrWhiteSpace(_context.EntityTypeName)
+                || !TryGetEntityMemberName(other, out var memberName)
+                || !EntityPropertyTypeResolver.TryGetPropertyType(
+                    dbContextType,
+                    _context.EntityTypeName,
+                    memberName,
+                    out var propertyType)
+                || propertyType is null)
+                return false;
+
+            literal = CreateStubLiteralForClrType(propertyType);
+
+            return true;
+        }
+
+        private bool TryCreateStubFromOuterMemberAccess(
+            MemberAccessExpressionSyntax memberAccess,
+            out ExpressionSyntax literal)
+        {
+            literal = null!;
+
+            if (memberAccess.Expression is not IdentifierNameSyntax receiver)
+                return false;
+
+            var receiverName = receiver.Identifier.Text;
+
+            if (string.Equals(receiverName, "db", StringComparison.Ordinal)
+                || IsLambdaParameter(receiverName)
+                || IsDeclaredInProbe(receiver))
+                return false;
+
+            if (_context?.DbContextType is not { } dbContextType)
+                return false;
+
+            var memberName = memberAccess.Name.Identifier.Text;
+
+            if (!OuterEntityMemberResolver.TryResolvePropertyType(
+                    dbContextType,
+                    receiverName,
+                    memberName,
+                    out var propertyType)
+                || propertyType is null)
+                return false;
+
+            literal = CreateStubLiteralForClrType(propertyType);
+
+            return true;
+        }
+
+        private static bool TryGetEntityMemberName(ExpressionSyntax other, out string memberName)
+        {
+            memberName = string.Empty;
+
+            if (other is not MemberAccessExpressionSyntax memberAccess)
+                return false;
+
+            memberName = memberAccess.Name.Identifier.Text;
+
+            return !string.IsNullOrWhiteSpace(memberName);
+        }
+
+        private static ExpressionSyntax CreateStubLiteralForClrType(Type propertyType)
+        {
+            var underlying = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
+
+            if (underlying == typeof(Guid))
+                return GuidStubLiteral();
+
+            if (underlying == typeof(string))
+            {
+                return SyntaxFactory.LiteralExpression(
+                    SyntaxKind.StringLiteralExpression,
+                    SyntaxFactory.Literal(string.Empty));
+            }
+
+            if (underlying == typeof(bool))
+            {
+                return SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression);
+            }
+
+            if (underlying == typeof(DateTime) || underlying == typeof(DateTimeOffset))
+                return SyntaxFactory.ParseExpression("DateTime.UtcNow");
+
+            if (IsIntegralNumericType(underlying) || underlying == typeof(decimal) || underlying == typeof(double) || underlying == typeof(float))
+                return NumericStubLiteral();
+
+            return NumericStubLiteral();
+        }
+
+        private static bool IsIntegralNumericType(Type type) =>
+            type == typeof(int)
+            || type == typeof(long)
+            || type == typeof(short)
+            || type == typeof(byte)
+            || type == typeof(uint)
+            || type == typeof(ulong)
+            || type == typeof(ushort)
+            || type == typeof(sbyte);
 
         private static bool IsComparedToGuidMember(ExpressionSyntax other) =>
             other switch

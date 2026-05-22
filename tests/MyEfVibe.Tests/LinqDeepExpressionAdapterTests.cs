@@ -129,6 +129,30 @@ public sealed class LinqDeepExpressionAdapterTests
     }
 
     [Fact]
+    public void TryCreateProbeExpression_SelectUsernameWithNullCoalesce_StripsTerminalAndCoalesce()
+    {
+        const string statement = """
+            var username = await db.Users
+                .Where(u => u.Id == note.UserId)
+                .Select(u => u.Username)
+                .FirstOrDefaultAsync() ?? "Unknown";
+            """;
+
+        var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
+            statement,
+            representativeEntityTypeName: "User",
+            dbContextType: typeof(FakeGuidNoteDbContext),
+            queryEntityTypeName: typeof(FakeGuidUser).FullName);
+
+        Assert.NotNull(probe);
+        Assert.DoesNotContain("FirstOrDefaultAsync", probe, StringComparison.Ordinal);
+        Assert.DoesNotContain("??", probe, StringComparison.Ordinal);
+        Assert.Contains(".Take(1)", probe, StringComparison.Ordinal);
+        Assert.Contains("Select", probe, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(ProbeScriptFormatter.ToScriptExpression(probe));
+    }
+
+    [Fact]
     public void TryCreateProbeExpression_NonQueryableStatement_ReturnsNull()
     {
         const string statement = "return null;";

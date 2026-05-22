@@ -104,13 +104,53 @@ internal sealed class SharedFrameworkCatalog
             if (string.IsNullOrWhiteSpace(frameworkName) || string.IsNullOrWhiteSpace(frameworkVersion))
                 continue;
 
-            IndexFrameworkDirectory(
-                Path.Combine(dotnetRoot, "shared", frameworkName, frameworkVersion));
+            var frameworkDirectory = Path.Combine(dotnetRoot, "shared", frameworkName, frameworkVersion);
+
+            IndexFrameworkDirectory(frameworkDirectory);
         }
+    }
+
+    internal static string ResolveInstalledFrameworkDirectory(string requestedFrameworkDirectory)
+    {
+        if (Directory.Exists(requestedFrameworkDirectory))
+            return requestedFrameworkDirectory;
+
+        var parentDirectory = Path.GetDirectoryName(requestedFrameworkDirectory);
+        var requestedVersionText = Path.GetFileName(requestedFrameworkDirectory);
+
+        if (parentDirectory is null
+            || !Version.TryParse(requestedVersionText, out var requestedVersion)
+            || !Directory.Exists(parentDirectory))
+            return requestedFrameworkDirectory;
+
+        string? bestDirectory = null;
+        Version? bestVersion = null;
+
+        foreach (var candidateDirectory in Directory.EnumerateDirectories(parentDirectory))
+        {
+            var candidateVersionText = Path.GetFileName(candidateDirectory);
+
+            if (!Version.TryParse(candidateVersionText, out var candidateVersion))
+                continue;
+
+            if (candidateVersion.Major != requestedVersion.Major
+                || candidateVersion.Minor < requestedVersion.Minor)
+                continue;
+
+            if (bestVersion is null || candidateVersion > bestVersion)
+            {
+                bestVersion = candidateVersion;
+                bestDirectory = candidateDirectory;
+            }
+        }
+
+        return bestDirectory ?? requestedFrameworkDirectory;
     }
 
     private void IndexFrameworkDirectory(string frameworkDirectory)
     {
+        frameworkDirectory = ResolveInstalledFrameworkDirectory(frameworkDirectory);
+
         if (!Directory.Exists(frameworkDirectory))
             return;
 

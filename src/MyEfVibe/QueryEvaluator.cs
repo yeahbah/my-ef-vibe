@@ -13,7 +13,8 @@ internal static class QueryEvaluator
         IEnumerable<Assembly> inspectionAssemblies,
         CancellationToken cancellationToken = default)
     {
-        var warnings = new List<string>(SnippetWarningsAnalyzer.Analyze(snippet));
+        var normalizedSnippet = SnippetNormalizer.ForEvaluation(snippet, session.DbContextType);
+        var warnings = new List<string>(SnippetWarningsAnalyzer.Analyze(normalizedSnippet));
 
         using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance, dbLogSettings);
 
@@ -21,7 +22,7 @@ internal static class QueryEvaluator
 
         try
         {
-            var result = await session.EvaluateAsync(snippet, cancellationToken);
+            var result = await session.EvaluateAsync(normalizedSnippet, cancellationToken);
 
             stopwatch.Stop();
 
@@ -49,7 +50,7 @@ internal static class QueryEvaluator
             }
 
             var metrics = new EvaluationMetrics(
-                snippet,
+                normalizedSnippet,
                 stopwatch.ElapsedMilliseconds,
                 sqlCapture is { HasEntries: true } ? sqlCapture.TotalDatabaseMilliseconds : null,
                 sqlCapture?.Commands.Count ?? 0,

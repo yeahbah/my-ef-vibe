@@ -32,6 +32,20 @@ public sealed class ProbeScriptFormatterTests
     }
 
     [Fact]
+    public void ToScriptExpression_StripsAsNoTracking()
+    {
+        const string probe =
+            "db.UserNotes.AsNoTracking().Where(n => n.Id == Guid.Empty).Take(1)";
+
+        var script = ProbeScriptFormatter.ToScriptExpression(probe);
+
+        Assert.DoesNotContain("AsNoTracking", script, StringComparison.Ordinal);
+        Assert.Equal(
+            "db.UserNotes.Where(n => n.Id == Guid.Empty).Take(1)",
+            script);
+    }
+
+    [Fact]
     public void ToScriptExpression_VarAssignment_StripsPrefixWithoutBreakingLambdas()
     {
         const string expression =

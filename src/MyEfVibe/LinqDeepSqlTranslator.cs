@@ -49,7 +49,11 @@ internal static class LinqDeepSqlTranslator
                 "Open generic repository query (Set<T>) — no DbSet entity types found on the DbContext.");
         }
 
-        var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statementOrCode, representativeEntity);
+        var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
+            statementOrCode,
+            representativeEntity,
+            session.DbContext.GetType(),
+            queryEntityType);
 
         if (probe is null)
         {
@@ -58,33 +62,32 @@ internal static class LinqDeepSqlTranslator
                 "Could not derive an IQueryable probe (unsupported syntax or terminal operator).");
         }
 
-        var formatterAssemblies = host.EnumerateDiscoveryAssemblies().ToArray();
+        host.EnsureEntityFrameworkRelationalLoaded();
+
+        var inspectionAssemblies = host.EnumerateLoadedAssemblies()
+            .Concat(host.EnumerateDiscoveryAssemblies())
+            .Distinct()
+            .ToArray();
 
         try
         {
             var scriptProbe = ProbeScriptFormatter.ToScriptExpression(probe);
 
-            var sqlLiteral = await session.EvaluateProbeAsync(
-                $"{scriptProbe}.ToQueryString()",
-                cancellationToken);
+            var queryable = await session.EvaluateProbeAsync(scriptProbe, cancellationToken);
 
-            string? sql = null;
-
-            if (sqlLiteral is string sqlFromScript && !string.IsNullOrWhiteSpace(sqlFromScript))
-                sql = sqlFromScript;
-            else
+            if (!RelationalQueryableSqlFormatter.TryGetSql(queryable, inspectionAssemblies, out var sql))
             {
-                var queryable = await session.EvaluateProbeAsync(scriptProbe, cancellationToken);
-
-                if (!RelationalQueryableSqlFormatter.TryGetSql(
-                        queryable,
-                        formatterAssemblies,
-                        out sql))
+                if (queryable is not null
+                    && !typeof(System.Linq.IQueryable).IsAssignableFrom(queryable.GetType()))
                 {
                     return new LinqSqlTranslationResult(
                         null,
-                        "Provider does not support ToQueryString() for this expression.");
+                        "Probe evaluated to IEnumerable — LINQ operators did not bind to IQueryable.");
                 }
+
+                return new LinqSqlTranslationResult(
+                    null,
+                    "Provider does not support ToQueryString() for this expression.");
             }
 
             return await AttachQueryPlanAsync(

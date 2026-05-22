@@ -4,6 +4,27 @@ namespace MyEfVibe;
 
 internal static class DbSetEntityDiscovery
 {
+    internal static IReadOnlyList<Type> DiscoverEntityClrTypes(Type dbContextType)
+    {
+        var types = new List<Type>();
+
+        foreach (var property in dbContextType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!property.PropertyType.IsGenericType)
+                continue;
+
+            if (!typeof(System.Linq.IQueryable).IsAssignableFrom(property.PropertyType))
+                continue;
+
+            types.Add(property.PropertyType.GetGenericArguments()[0]);
+        }
+
+        return types
+            .Distinct()
+            .OrderBy(static type => type.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     internal static IReadOnlyList<string> DiscoverEntityTypeNames(object dbContext)
     {
         var names = new List<string>();

@@ -4,7 +4,9 @@ internal static class LinqDeepExpressionAdapter
 {
     internal static string? TryCreateProbeExpression(
         string statementOrExpression,
-        string? representativeEntityTypeName = null)
+        string? representativeEntityTypeName = null,
+        Type? dbContextType = null,
+        string? queryEntityTypeName = null)
     {
         var normalized = NormalizeStatement(statementOrExpression);
 
@@ -18,7 +20,13 @@ internal static class LinqDeepExpressionAdapter
         if (probe is null)
             return null;
 
-        probe = ProbeParameterStubber.Stub(ProbeScriptFormatter.ToScriptExpression(probe));
+        var stubContext = new ProbeStubContext(
+            dbContextType,
+            queryEntityTypeName ?? representativeEntityTypeName);
+
+        probe = ProbeParameterStubber.Stub(
+            ProbeScriptFormatter.ToScriptExpression(probe),
+            stubContext);
 
         if (string.IsNullOrWhiteSpace(representativeEntityTypeName)
             || !OpenGenericProbeBinder.ContainsOpenGenericTypeParameter(probe))
@@ -70,14 +78,48 @@ internal static class LinqDeepExpressionAdapter
 
     private static string StripNullCoalescingSuffix(string trimmed)
     {
-        const string throwSuffix = "?? throw";
+        var depth = 0;
+        var inString = '\0';
 
-        var index = trimmed.IndexOf(throwSuffix, StringComparison.Ordinal);
+        for (var index = 0; index < trimmed.Length - 1; index++)
+        {
+            var character = trimmed[index];
 
-        if (index < 0)
-            return trimmed;
+            if (inString != '\0')
+            {
+                if (character == inString && trimmed[index - 1] != '\\')
+                    inString = '\0';
 
-        return trimmed[..index].Trim();
+                continue;
+            }
+
+            if (character is '"' or '\'')
+            {
+                inString = character;
+
+                continue;
+            }
+
+            switch (character)
+            {
+                case '(':
+                case '[':
+                case '{':
+                    depth++;
+                    break;
+
+                case ')':
+                case ']':
+                case '}':
+                    depth--;
+                    break;
+
+                case '?' when depth == 0 && trimmed[index + 1] == '?':
+                    return trimmed[..index].Trim();
+            }
+        }
+
+        return trimmed;
     }
 
     private static string StripAssignmentRhs(string trimmed)

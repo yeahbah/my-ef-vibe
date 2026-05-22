@@ -32,9 +32,7 @@ internal static class LinqQueryWarningRules
                 $"Multiple Include calls ({topLevelIncludeCount}) — watch for cartesian explosion."));
         }
 
-        if ((normalized.Contains(".Take(", StringComparison.Ordinal)
-             || normalized.Contains(".TakeAsync(", StringComparison.Ordinal))
-            && !normalized.Contains("OrderBy", StringComparison.Ordinal))
+        if (HasUnorderedTakeWithoutRowCap(normalized))
         {
             warnings.Add((
                 "unordered-take",
@@ -251,6 +249,25 @@ internal static class LinqQueryWarningRules
 
         return text.Length - 1;
     }
+
+    private static bool HasUnorderedTakeWithoutRowCap(string normalized)
+    {
+        if (!normalized.Contains(".Take(", StringComparison.Ordinal)
+            && !normalized.Contains(".TakeAsync(", StringComparison.Ordinal)
+            && !normalized.Contains("Queryable.Take(", StringComparison.Ordinal))
+            return false;
+
+        if (normalized.Contains("OrderBy", StringComparison.Ordinal))
+            return false;
+
+        return !IsSingleRowCapTake(normalized);
+    }
+
+    private static bool IsSingleRowCapTake(string normalized) =>
+        normalized.Contains(".Take(1)", StringComparison.Ordinal)
+        || normalized.Contains(".Take( 1)", StringComparison.Ordinal)
+        || normalized.Contains("Queryable.Take(", StringComparison.Ordinal)
+            && normalized.Contains(", 1)", StringComparison.Ordinal);
 
     private static bool MaterializesWithoutTake(string normalized) =>
         (normalized.Contains(".ToList()", StringComparison.Ordinal)

@@ -14,6 +14,9 @@ internal static class QueryResultWriter
     {
         var useSpectre = output is null || output == Console.Out;
 
+        host.EnsureEntityFrameworkRelationalLoaded();
+        host.EnsureAspNetCoreSharedFrameworkLoaded();
+
         try
         {
             var (result, metrics) = await QueryEvaluator.EvaluateAsync(

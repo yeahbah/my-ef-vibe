@@ -23,6 +23,8 @@ internal sealed class ScriptSession
 
     internal ImmutableArray<MetadataReference> MetadataReferences { get; }
 
+    internal Type DbContextType => _dbContextType;
+
     internal object DbContext => _globalsType.GetProperty("db")!.GetValue(_globals)!;
 
     internal CSharpCompilationOptions CompilationOptions { get; } =
@@ -132,7 +134,7 @@ internal sealed class ScriptSession
 
     internal async Task<object?> EvaluateAsync(string code, CancellationToken cancellationToken = default)
     {
-        var trimmed = SnippetNormalizer.ForEvaluation(code);
+        var trimmed = SnippetNormalizer.ForEvaluation(code, _dbContextType);
 
         if (string.IsNullOrEmpty(trimmed))
             return null;
@@ -182,7 +184,9 @@ internal sealed class ScriptSession
     /// </summary>
     internal async Task<object?> EvaluateProbeAsync(string code, CancellationToken cancellationToken = default)
     {
-        var trimmed = SnippetNormalizer.ForEvaluation(ProbeScriptFormatter.ToScriptExpression(code));
+        var trimmed = SnippetNormalizer.ForEvaluation(
+            ProbeScriptFormatter.ToScriptExpression(code),
+            _dbContextType);
 
         if (string.IsNullOrEmpty(trimmed))
             return null;

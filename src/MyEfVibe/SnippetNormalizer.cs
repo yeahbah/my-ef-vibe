@@ -6,7 +6,7 @@ internal static class SnippetNormalizer
     /// Prepares REPL input for Roslyn scripting. Trailing <c>;</c> on a final expression is removed so the
     /// script returns a value; statement forms (e.g. <c>var</c> declarations) keep their terminator.
     /// </summary>
-    internal static string ForEvaluation(string snippet)
+    internal static string ForEvaluation(string snippet, Type? dbContextType = null)
     {
         var trimmed = snippet.Trim();
 
@@ -20,7 +20,7 @@ internal static class SnippetNormalizer
             return trimmed;
 
         if (lines.Length == 1)
-            return NormalizeFinalLine(lines[0].TrimEnd());
+            return RewriteBoundedEfQuery(NormalizeFinalLine(lines[0].TrimEnd()), dbContextType);
 
         var normalized = new string[lines.Length];
 
@@ -40,7 +40,22 @@ internal static class SnippetNormalizer
                 : line;
         }
 
-        return InputLineUtilities.JoinLines(normalized);
+        return RewriteBoundedEfQuery(InputLineUtilities.JoinLines(normalized), dbContextType);
+    }
+
+    private static string RewriteBoundedEfQuery(string snippet, Type? dbContextType)
+    {
+        if (dbContextType is null)
+            return snippet;
+
+        var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(snippet, dbContextType)
+            ?? snippet;
+
+        rewritten = EfReplQueryableRewriter.TryCastDbSetRoots(rewritten, dbContextType)
+            ?? rewritten;
+
+        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten)
+            ?? rewritten;
     }
 
     private static int IndexOfLastNonEmptyLine(string[] lines)

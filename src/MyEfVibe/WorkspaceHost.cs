@@ -189,6 +189,43 @@ internal sealed class WorkspaceHost : IDisposable
             + $" or use the API host project with `-p` so dependencies are available.");
     }
 
+    internal void EnsureEntityFrameworkRelationalLoaded()
+    {
+        EnsureEntityFrameworkCoreLoaded();
+
+        if (AppDomain.CurrentDomain.GetAssemblies().Any(static assembly =>
+                string.Equals(
+                    assembly.GetName().Name,
+                    "Microsoft.EntityFrameworkCore.Relational",
+                    StringComparison.Ordinal)))
+            return;
+
+        if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore.Relational", out var relationalPath) == true)
+        {
+            LoadOrGetAssembly(relationalPath);
+            return;
+        }
+
+        var outputCandidate = Path.Combine(OutputDirectory, "Microsoft.EntityFrameworkCore.Relational.dll");
+
+        if (File.Exists(outputCandidate))
+            LoadOrGetAssembly(outputCandidate);
+    }
+
+    internal void EnsureAspNetCoreSharedFrameworkLoaded()
+    {
+        foreach (var assemblySimpleName in new[]
+                 {
+                     "Microsoft.AspNetCore.Mvc.Core",
+                     "Microsoft.AspNetCore.Routing",
+                     "Microsoft.AspNetCore.Http.Abstractions",
+                     "Microsoft.AspNetCore.OpenApi",
+                 })
+        {
+            _ = LoadAssembly(assemblySimpleName);
+        }
+    }
+
     internal IEnumerable<Assembly> EnumerateDiscoveryAssemblies()
         => EnumerateAssembliesFromPaths(EnumerateEfDiscoveryAssemblyPaths());
 

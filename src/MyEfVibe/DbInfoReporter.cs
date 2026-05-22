@@ -55,6 +55,9 @@ internal static class DbInfoReporter
 
         rows.Add(("DbSets", dbSetCount.ToString()));
 
+        host.EnsureEntityFrameworkRelationalLoaded();
+        host.EnsureAspNetCoreSharedFrameworkLoaded();
+
         if (!RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
                 host.EnumerateLoadedAssemblies(),
