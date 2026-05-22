@@ -103,6 +103,10 @@ export function resolveToolInvocation(
   };
 }
 
+export function buildServeArgs(settings: EfvibeSettings): string[] {
+  return ['serve', ...buildEfvibeArgs(settings)];
+}
+
 export function buildEfvibeArgs(settings: EfvibeSettings): string[] {
   const args: string[] = [];
 
@@ -158,6 +162,7 @@ export function buildReplCommand(settings: EfvibeSettings, searchDirectory: stri
 export interface ExpressionRunOptions {
   format?: 'text' | 'json';
   noBanner?: boolean;
+  withPlan?: boolean;
 }
 
 export function buildExpressionArgs(
@@ -171,6 +176,10 @@ export function buildExpressionArgs(
     args.push('--format', 'json', '--no-banner');
   } else if (options.noBanner) {
     args.push('--no-banner');
+  }
+
+  if (options.withPlan) {
+    args.push('--with-plan');
   }
 
   return args;
@@ -202,13 +211,32 @@ export async function runExpressionJson(
   searchDirectory: string,
   cwd: string,
   expression: string,
+  options?: Pick<ExpressionRunOptions, 'withPlan'> & { preferDaemon?: boolean },
 ): Promise<ExpressionRunResult> {
+  if (options?.preferDaemon !== false) {
+    try {
+      const { runExpressionViaDaemon } = await import('./daemonClient');
+      return await runExpressionViaDaemon(
+        settings,
+        searchDirectory,
+        cwd,
+        expression,
+        options?.withPlan ?? false,
+      );
+    } catch {
+      // Fall back to one-shot when serve is unavailable or the daemon crashed.
+    }
+  }
+
   const invocation = resolveToolInvocation(
     searchDirectory,
     settings.toolPath,
     settings.dotnetFramework,
   );
-  const args = buildExpressionArgs(settings, expression, { format: 'json' });
+  const args = buildExpressionArgs(settings, expression, {
+    format: 'json',
+    withPlan: options?.withPlan,
+  });
 
   try {
     const { stdout, stderr } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {

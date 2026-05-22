@@ -13,6 +13,8 @@ export interface EvaluationJsonPayload {
   rows?: Array<Record<string, string>>;
   sql: string[];
   translatedSql?: string;
+  queryPlan?: string;
+  queryPlanNote?: string;
   metrics: EvaluationJsonMetrics;
   warnings: string[];
   error?: string;

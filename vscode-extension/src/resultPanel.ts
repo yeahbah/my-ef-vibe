@@ -3,13 +3,34 @@ import type { EvaluationJsonPayload } from './evaluationTypes';
 
 const VIEW_TYPE = 'efvibe.result';
 
+export interface PanelRunRequest {
+  expression: string;
+  withPlan: boolean;
+}
+
+export type PanelRunHandler = (request: PanelRunRequest) => Promise<void>;
+
 export class EfvibeResultPanel {
   private static current: EfvibeResultPanel | undefined;
 
   private readonly panel: vscode.WebviewPanel;
 
-  private constructor(panel: vscode.WebviewPanel) {
+  private onRun: PanelRunHandler;
+
+  private constructor(panel: vscode.WebviewPanel, onRun: PanelRunHandler) {
     this.panel = panel;
+    this.onRun = onRun;
+
+    panel.webview.onDidReceiveMessage(async (message: { type?: string; expression?: string }) => {
+      if (message.type === 'run' || message.type === 'plan') {
+        const expression = typeof message.expression === 'string' ? message.expression : '';
+        await this.onRun({
+          expression,
+          withPlan: message.type === 'plan',
+        });
+      }
+    });
+
     panel.onDidDispose(() => {
       if (EfvibeResultPanel.current === this) {
         EfvibeResultPanel.current = undefined;
@@ -17,32 +38,48 @@ export class EfvibeResultPanel {
     });
   }
 
-  static show(payload: EvaluationJsonPayload, expression: string): void {
+  static show(
+    context: vscode.ExtensionContext,
+    payload: EvaluationJsonPayload,
+    expression: string,
+    onRun: PanelRunHandler,
+  ): void {
     const showIn = resolveSplitViewColumn();
+    const { html } = buildHtml(context.extensionUri, payload, expression);
 
     if (EfvibeResultPanel.current) {
+      EfvibeResultPanel.current.onRun = onRun;
+
       if (typeof showIn === 'number') {
         EfvibeResultPanel.current.panel.reveal(showIn);
       } else {
         EfvibeResultPanel.current.panel.reveal(showIn.viewColumn, showIn.preserveFocus);
       }
-      EfvibeResultPanel.current.panel.webview.html = buildHtml(payload, expression);
+
+      EfvibeResultPanel.current.panel.webview.html = html;
       return;
     }
 
     const panel = vscode.window.createWebviewPanel(
       VIEW_TYPE,
-      'efvibe result',
+      'My EF Vibe result',
       showIn,
-      { enableScripts: false, retainContextWhenHidden: true },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [context.extensionUri],
+      },
     );
 
-    EfvibeResultPanel.current = new EfvibeResultPanel(panel);
-    panel.webview.html = buildHtml(payload, expression);
+    panel.webview.html = html;
+    EfvibeResultPanel.current = new EfvibeResultPanel(panel, onRun);
+  }
+
+  static isOpen(): boolean {
+    return EfvibeResultPanel.current !== undefined;
   }
 }
 
-/** Open beside the active editor (split tab), keeping keyboard focus in the editor. */
 function resolveSplitViewColumn(): vscode.ViewColumn | {
   viewColumn: vscode.ViewColumn;
   preserveFocus?: boolean;
@@ -54,7 +91,12 @@ function resolveSplitViewColumn(): vscode.ViewColumn | {
   return vscode.ViewColumn.Active;
 }
 
-function buildHtml(payload: EvaluationJsonPayload, expression: string): string {
+function buildHtml(
+  _extensionUri: vscode.Uri,
+  payload: EvaluationJsonPayload,
+  expression: string,
+): { html: string } {
+  const nonce = getNonce();
   const resultSection = payload.success
     ? formatResultBody(payload)
     : `<pre class="error">${escapeHtml(payload.error ?? 'Evaluation failed.')}</pre>`;
@@ -65,6 +107,8 @@ function buildHtml(payload: EvaluationJsonPayload, expression: string): string {
         return `<section><h3>${title}</h3><pre>${escapeHtml(sql)}</pre></section>`;
       }).join('')
     : '<p class="muted">No SQL captured for this run.</p>';
+
+  const planSection = buildPlanSection(payload);
 
   const warnings = payload.warnings.length > 0
     ? `<section><h3>Warnings</h3><ul>${payload.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul></section>`
@@ -78,18 +122,51 @@ function buildHtml(payload: EvaluationJsonPayload, expression: string): string {
     payload.metrics.resultKind ? payload.metrics.resultKind : undefined,
   ].filter((entry): entry is string => Boolean(entry));
 
-  return `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
   <style>
-    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 12px 16px; }
+    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 12px 16px; margin: 0; }
     h2, h3 { font-weight: 600; margin: 0 0 8px; }
-    pre { background: var(--vscode-textCodeBlock-background); padding: 10px; overflow: auto; white-space: pre-wrap; border-radius: 4px; }
+    pre { background: var(--vscode-textCodeBlock-background); padding: 10px; overflow: auto; white-space: pre-wrap; border-radius: 4px; margin: 0; }
     .muted { color: var(--vscode-descriptionForeground); }
     .error { color: var(--vscode-errorForeground); }
     .expr { margin-bottom: 16px; }
+    .expr textarea {
+      width: 100%;
+      min-height: 7rem;
+      box-sizing: border-box;
+      font-family: var(--vscode-editor-font-family);
+      font-size: var(--vscode-editor-font-size);
+      color: var(--vscode-editor-foreground);
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+      border-radius: 4px;
+      padding: 8px 10px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+    button {
+      font-family: var(--vscode-font-family);
+      font-size: 0.9rem;
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: 1px solid var(--vscode-button-border, transparent);
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+    button.secondary {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+    button:disabled { opacity: 0.55; cursor: default; }
+    .hint { color: var(--vscode-descriptionForeground); font-size: 0.85rem; margin: 6px 0 0; }
     .metrics { color: var(--vscode-descriptionForeground); margin-bottom: 16px; }
     table { border-collapse: collapse; width: 100%; margin-top: 8px; }
     th, td { border: 1px solid var(--vscode-panel-border); padding: 4px 8px; text-align: left; }
@@ -100,7 +177,12 @@ function buildHtml(payload: EvaluationJsonPayload, expression: string): string {
 <body>
   <section class="expr">
     <h2>Expression</h2>
-    <pre>${escapeHtml(expression)}</pre>
+    <textarea id="expression" spellcheck="false">${escapeHtml(expression)}</textarea>
+    <div class="toolbar">
+      <button class="primary" id="run">Run</button>
+      <button class="secondary" id="plan">Run :plan</button>
+    </div>
+    <p class="hint">Edit parameter values and re-run. Read-only: Add/Update/Remove, SaveChanges, ExecuteSql, and destructive SQL are blocked.</p>
   </section>
   <p class="metrics">${escapeHtml(metrics.join(' · '))}</p>
   <section>
@@ -111,9 +193,45 @@ function buildHtml(payload: EvaluationJsonPayload, expression: string): string {
     <h2>SQL</h2>
     ${sqlBlocks}
   </section>
+  ${planSection}
   ${warnings}
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    const expressionEl = document.getElementById('expression');
+    const runBtn = document.getElementById('run');
+    const planBtn = document.getElementById('plan');
+
+    function post(type) {
+      runBtn.disabled = true;
+      planBtn.disabled = true;
+      vscode.postMessage({ type, expression: expressionEl.value });
+    }
+
+    runBtn.addEventListener('click', () => post('run'));
+    planBtn.addEventListener('click', () => post('plan'));
+    expressionEl.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        post('run');
+      }
+    });
+  </script>
 </body>
 </html>`;
+
+  return { html };
+}
+
+function buildPlanSection(payload: EvaluationJsonPayload): string {
+  if (payload.queryPlan) {
+    return `<section><h2>Query plan (:plan)</h2><pre>${escapeHtml(payload.queryPlan)}</pre></section>`;
+  }
+
+  if (payload.queryPlanNote) {
+    return `<section><h2>Query plan (:plan)</h2><pre class="error">${escapeHtml(payload.queryPlanNote)}</pre></section>`;
+  }
+
+  return '';
 }
 
 function formatResultBody(payload: EvaluationJsonPayload): string {
@@ -159,6 +277,17 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function getNonce(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let text = '';
+
+  for (let index = 0; index < 32; index++) {
+    text += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return text;
+}
+
 export function formatEvaluationForOutput(
   payload: EvaluationJsonPayload,
   expression: string,
@@ -192,6 +321,15 @@ export function formatEvaluationForOutput(
       lines.push(sql);
       lines.push('');
     }
+  }
+
+  if (payload.queryPlan) {
+    lines.push('');
+    lines.push('Query plan:');
+    lines.push(payload.queryPlan);
+  } else if (payload.queryPlanNote) {
+    lines.push('');
+    lines.push(`Query plan: ${payload.queryPlanNote}`);
   }
 
   if (payload.warnings.length > 0) {

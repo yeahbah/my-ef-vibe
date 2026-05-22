@@ -10,6 +10,7 @@ internal static class QueryResultWriter
         WorkspaceHost host,
         SessionAnalytics analytics,
         CliOutputFormat outputFormat = CliOutputFormat.Text,
+        bool withPlan = false,
         TextWriter? output = null,
         CancellationToken cancellationToken = default)
     {
@@ -35,7 +36,18 @@ internal static class QueryResultWriter
 
             if (outputFormat == CliOutputFormat.Json)
             {
-                EvaluationJsonReporter.WriteSuccess(result, metrics);
+                QueryPlanResult? planResult = null;
+
+                if (withPlan)
+                {
+                    planResult = await QueryPlanRunner.TryExplainAsync(
+                        dbContextInstance,
+                        AnalyticsPresenter.GetPlanSql(metrics),
+                        host.EnumerateLoadedAssemblies(),
+                        cancellationToken);
+                }
+
+                EvaluationJsonReporter.WriteSuccess(result, metrics, planResult);
                 return;
             }
 

@@ -46,6 +46,9 @@ internal sealed class EfvibeCliOptions
     [Option("no-banner", HelpText = "Suppress workspace and build banners (recommended with --format json).")]
     public bool NoBanner { get; set; }
 
+    [Option("with-plan", HelpText = "With -e --format json, include EXPLAIN / SHOWPLAN for the evaluated SQL.")]
+    public bool WithPlan { get; set; }
+
     [Option('f', "framework", HelpText = "Target framework moniker for building the workspace project (e.g. net8.0).")]
     public string? Framework { get; set; }
 

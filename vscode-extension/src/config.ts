@@ -15,6 +15,7 @@ export interface EfvibeSettings {
   dbLog: boolean;
   dotnetFramework: string;
   resultDestination: EfvibeResultDestination;
+  useDaemon: boolean;
 }
 
 export function getWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
@@ -50,6 +51,7 @@ export function readSettings(workspaceFolder?: vscode.WorkspaceFolder): EfvibeSe
     dbLog: config.get<boolean>('dbLog', config.get<boolean>('showSql', true)),
     dotnetFramework: config.get<string>('dotnetFramework', '').trim(),
     resultDestination: config.get<EfvibeResultDestination>('resultDestination', 'panel'),
+    useDaemon: config.get<boolean>('useDaemon', true),
   };
 }
 

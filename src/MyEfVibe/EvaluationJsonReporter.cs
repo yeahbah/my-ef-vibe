@@ -18,9 +18,9 @@ internal static class EvaluationJsonReporter
         WriteIndented = false,
     };
 
-    internal static void WriteSuccess(object? result, EvaluationMetrics metrics)
+    internal static void WriteSuccess(object? result, EvaluationMetrics metrics, QueryPlanResult? plan = null)
     {
-        var payload = BuildSuccess(result, metrics);
+        var payload = BuildSuccess(result, metrics, plan);
         Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
     }
 
@@ -30,7 +30,10 @@ internal static class EvaluationJsonReporter
         Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
     }
 
-    internal static EvaluationJsonPayload BuildSuccess(object? result, EvaluationMetrics metrics)
+    internal static EvaluationJsonPayload BuildSuccess(
+        object? result,
+        EvaluationMetrics metrics,
+        QueryPlanResult? plan = null)
     {
         var (_, _, _, _, _, exportRows) = ResultAnalyzer.Analyze(result);
         var sql = BuildSql(metrics);
@@ -42,6 +45,8 @@ internal static class EvaluationJsonReporter
             Rows = BuildRows(exportRows),
             Sql = sql,
             TranslatedSql = metrics.TranslatedSql,
+            QueryPlan = string.IsNullOrWhiteSpace(plan?.PlanText) ? null : plan.PlanText,
+            QueryPlanNote = string.IsNullOrWhiteSpace(plan?.PlanText) ? plan?.Note : null,
             Metrics = EvaluationJsonMetrics.From(metrics),
             Warnings = metrics.Warnings,
             Snippet = metrics.Snippet,
@@ -122,6 +127,10 @@ internal static class EvaluationJsonReporter
         public IReadOnlyList<string> Sql { get; init; } = Array.Empty<string>();
 
         public string? TranslatedSql { get; init; }
+
+        public string? QueryPlan { get; init; }
+
+        public string? QueryPlanNote { get; init; }
 
         public EvaluationJsonMetrics Metrics { get; init; } = new();
 

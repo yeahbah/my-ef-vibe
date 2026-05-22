@@ -9,6 +9,7 @@ internal static class QueryRunner
         DbLogSettings dbLogSettings,
         string expression,
         CliOutputFormat outputFormat = CliOutputFormat.Text,
+        bool withPlan = false,
         CancellationToken cancellationToken = default)
     {
         var analytics = new SessionAnalytics();
@@ -23,6 +24,7 @@ internal static class QueryRunner
                 host,
                 analytics,
                 outputFormat,
+                withPlan,
                 cancellationToken: cancellationToken);
 
             return 0;

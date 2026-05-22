@@ -15,6 +15,14 @@ internal static class Program
                     (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
         }
 
+        if (args.Length > 0 && string.Equals(args[0], "serve", StringComparison.OrdinalIgnoreCase))
+        {
+            return Parser.Default.ParseArguments<ServeCliOptions>(args[1..])
+                .MapResult(
+                    (ServeCliOptions options) => ServeCommandRunner.RunFromOptionsAsync(options),
+                    (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+        }
+
         return Parser.Default.ParseArguments<EfvibeCliOptions>(args)
             .MapResult(
                 (EfvibeCliOptions options) => RunEfvibeAsync(options),
@@ -40,6 +48,7 @@ internal static class Program
             options.AboutJson,
             options.Format,
             options.NoBanner,
+            options.WithPlan,
             options.Framework,
             options.ExpressionParts);
     }
@@ -59,6 +68,7 @@ internal static class Program
         bool aboutJson,
         string? formatRaw,
         bool noBanner,
+        bool withPlan,
         string? frameworkOrNull,
         IEnumerable<string>? expressionParts)
     {
@@ -232,7 +242,8 @@ internal static class Program
                 host,
                 dbLogSettings,
                 oneShotExpression,
-                outputFormat);
+                outputFormat,
+                withPlan);
 
         var repl = new QueryRepl(session, host, dbContextInstance, dbLogSettings, projectLabel);
 

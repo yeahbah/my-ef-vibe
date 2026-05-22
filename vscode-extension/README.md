@@ -1,6 +1,6 @@
-# efvibe VS Code extension (Phase 1, v0.2.1)
+# efvibe VS Code extension (Phase 1, v0.2.2)
 
-Run the [efvibe](https://github.com/yeahbah/my-ef-vibe) EF Core LINQ REPL from VS Code with workspace settings for `-p`, `-s`, and `-c`. Phase 1 adds **editor-integrated queries** with JSON results and a **split-tab** result + SQL panel.
+Run the [efvibe](https://github.com/yeahbah/my-ef-vibe) EF Core LINQ REPL from VS Code with workspace settings for `-p`, `-s`, and `-c`. Phase 1 adds **editor-integrated queries** with JSON results and a **split-tab** result + SQL panel. The result panel lets you **edit the expression** (e.g. parameter values), **re-run**, and run **`:plan`** (EXPLAIN) with read-only guards blocking mutations.
 
 ![efvibe VS Code: Run Selection with result and SQL beside your C# code](../screenshots/vscode1.png)
 
@@ -9,7 +9,9 @@ Run the [efvibe](https://github.com/yeahbah/my-ef-vibe) EF Core LINQ REPL from V
 - [.NET SDK](https://dotnet.net/download)
 - `efvibe` built from this repo or installed as a [global/local tool](https://www.nuget.org/packages/efvibe)
 
-Phase 1 requires CLI support for `efvibe -e --format json --no-banner` (included when you build `MyEfVibe` from this repository).
+Phase 1 requires CLI support for `efvibe -e --format json --no-banner` and **`efvibe serve`** (daemon, faster Run Selection). Build `MyEfVibe` from this repository for both.
+
+**Run Selection** uses `efvibe serve` by default (`efvibe.useDaemon`: true) so build + DbContext stay warm. Set `efvibe.useDaemon`: false to force one-shot `efvibe -e` per run.
 
 ## Commands
 
@@ -48,6 +50,7 @@ Configure in `.vscode/settings.json`:
 | `efvibe.resultDestination` | `panel` (split webview with result + SQL), `output`, or `terminal` |
 | `efvibe.dbLog` | When `true` (default), CLI database logging is on; when `false`, passes `--no-dblog` |
 | `efvibe.toolPath` | Optional path to `myefvibe` / `efvibe` (use a local build for latest CLI features) |
+| `efvibe.useDaemon` | When `true` (default), Run Selection uses `efvibe serve`; falls back to one-shot if unavailable |
 
 Deprecated: `efvibe.showSql` (renamed to `efvibe.dbLog`; the CLI flag is `--dblog`, not `--sql`).
 

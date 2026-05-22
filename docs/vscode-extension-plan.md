@@ -191,6 +191,7 @@ Publish as **`efvibe.vscode-efvibe`** on Open VSX and the Visual Studio Marketpl
 |----------|--------|----------|
 | P0 | `--version`, clear exit codes | Extension health checks |
 | P1 | `-e --format json` ✅ | Run selection; results panel |
+| P1 | `efvibe serve` ✅ | Long-running daemon for fast editor eval (see [efvibe-daemon-and-vscode.md](./efvibe-daemon-and-vscode.md)) |
 | P1 | `scan --no-repl` / headless scan | CI; editor diagnostics |
 | P2 | `scan dismiss` / `scan note` CLI | Editor actions without REPL |
 | P2 | `--about-json` (context, paths, provider) | Status bar; tree labels |
@@ -258,5 +259,7 @@ The extension can consume today’s scan files without waiting for new formats. 
 
 ## Related docs
 
+- [visual-studio-extension-plan.md](./visual-studio-extension-plan.md) — Visual Studio 2022+ VSIX roadmap
+- [rider-extension-plan.md](./rider-extension-plan.md) — JetBrains Rider plugin roadmap
 - [features.md](../features.md) — REPL commands, scan behavior, session layout
 - [linq-scan-feasibility.md](./linq-scan-feasibility.md) — scan rules and deep-scan limitations

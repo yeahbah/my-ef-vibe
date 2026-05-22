@@ -3,7 +3,9 @@ import { buildExpressionCommand, buildReplCommand, runExpressionJson } from './c
 import { getSearchDirectory, getWorkspaceFolder, readSettings } from './config';
 import { getExpressionFromEditor, type ExpressionSelectionKind } from './expressionSelection';
 import { checkPrerequisites, formatPrerequisiteMessage } from './prerequisites';
-import { EfvibeResultPanel, formatEvaluationForOutput } from './resultPanel';
+import { invalidateEfvibeDaemon } from './daemonClient';
+import { validateReadOnlyExpression } from './expressionGuard';
+import { EfvibeResultPanel, formatEvaluationForOutput, type PanelRunRequest } from './resultPanel';
 import { generateReplTask } from './replTask';
 import { EfvibeStatusBar } from './statusBar';
 
@@ -13,7 +15,10 @@ let statusBar: EfvibeStatusBar | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
 let lastSql: string[] = [];
 
+let extensionContext: vscode.ExtensionContext | undefined;
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  extensionContext = context;
   outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
   context.subscriptions.push(outputChannel);
 
@@ -32,6 +37,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('efvibe.refreshStatus', () => statusBar?.refresh()),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('efvibe')) {
+        if (event.affectsConfiguration('efvibe.project')
+          || event.affectsConfiguration('efvibe.startupProject')
+          || event.affectsConfiguration('efvibe.context')
+          || event.affectsConfiguration('efvibe.workspaceRoot')
+          || event.affectsConfiguration('efvibe.toolPath')
+          || event.affectsConfiguration('efvibe.dotnetFramework')
+          || event.affectsConfiguration('efvibe.dbLog')
+          || event.affectsConfiguration('efvibe.connectionString')
+          || event.affectsConfiguration('efvibe.provider')
+          || event.affectsConfiguration('efvibe.useDaemon')) {
+          invalidateEfvibeDaemon();
+        }
+
         statusBar?.showConfigured();
       }
     }),
@@ -44,6 +62,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export function deactivate(): void {
+  invalidateEfvibeDaemon();
   statusBar?.dispose();
   statusBar = undefined;
 }
@@ -198,9 +217,17 @@ async function evaluateExpression(
     searchDirectory: string;
   },
 ): Promise<void> {
+  const guard = validateReadOnlyExpression(expression);
+  if (!guard.ok) {
+    vscode.window.showErrorMessage(guard.reason ?? 'Expression is not allowed.');
+    return;
+  }
+
   const destination = context.settings.resultDestination;
 
   if (destination === 'terminal') {
+    invalidateEfvibeDaemon();
+
     const commandLine = buildExpressionCommand(
       context.settings,
       context.searchDirectory,
@@ -225,6 +252,10 @@ async function evaluateExpression(
         context.searchDirectory,
         context.folder.uri.fsPath,
         expression,
+        {
+          preferDaemon: context.settings.useDaemon
+            && context.settings.resultDestination !== 'terminal',
+        },
       );
 
       lastSql = result.payload?.sql ?? [];
@@ -244,7 +275,16 @@ async function evaluateExpression(
       }
 
       if (destination === 'panel') {
-        EfvibeResultPanel.show(result.payload, expression);
+        if (!extensionContext) {
+          return;
+        }
+
+        EfvibeResultPanel.show(
+          extensionContext,
+          result.payload,
+          expression,
+          (request) => runFromResultPanel(request, context),
+        );
 
         if (!result.payload.success) {
           vscode.window.showErrorMessage(result.payload.error ?? 'efvibe evaluation failed.');
@@ -261,6 +301,69 @@ async function evaluateExpression(
 
       if (!result.payload.success) {
         vscode.window.showErrorMessage(result.payload.error ?? 'efvibe evaluation failed.');
+      }
+    },
+  );
+}
+
+async function runFromResultPanel(
+  request: PanelRunRequest,
+  context: {
+    folder: vscode.WorkspaceFolder;
+    settings: ReturnType<typeof readSettings>;
+    searchDirectory: string;
+  },
+): Promise<void> {
+  const expression = request.expression.trim();
+  if (!expression) {
+    vscode.window.showWarningMessage('Enter an expression to run.');
+    return;
+  }
+
+  const guard = validateReadOnlyExpression(expression);
+  if (!guard.ok) {
+    vscode.window.showErrorMessage(guard.reason ?? 'Expression is not allowed.');
+    return;
+  }
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: request.withPlan ? 'efvibe :plan' : 'efvibe',
+      cancellable: false,
+    },
+    async () => {
+      const result = await runExpressionJson(
+        context.settings,
+        context.searchDirectory,
+        context.folder.uri.fsPath,
+        expression,
+        { withPlan: request.withPlan, preferDaemon: context.settings.useDaemon },
+      );
+
+      lastSql = result.payload?.sql ?? [];
+      void vscode.commands.executeCommand('setContext', 'efvibe.hasLastSql', lastSql.length > 0);
+
+      if (!result.payload) {
+        vscode.window.showErrorMessage('efvibe did not return JSON. Check the output channel.');
+        return;
+      }
+
+      if (!extensionContext) {
+        return;
+      }
+
+      EfvibeResultPanel.show(
+        extensionContext,
+        result.payload,
+        expression,
+        (next) => runFromResultPanel(next, context),
+      );
+
+      if (!result.payload.success) {
+        vscode.window.showErrorMessage(result.payload.error ?? 'efvibe evaluation failed.');
+      } else if (request.withPlan && result.payload.queryPlanNote && !result.payload.queryPlan) {
+        vscode.window.showWarningMessage(result.payload.queryPlanNote);
       }
     },
   );
