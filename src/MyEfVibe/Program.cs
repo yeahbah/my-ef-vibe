@@ -37,6 +37,8 @@ internal static class Program
             options.DbLogLevel,
             options.DbLogVerbose,
             options.AboutJson,
+            options.Format,
+            options.NoBanner,
             options.Framework,
             options.ExpressionParts);
     }
@@ -53,9 +55,19 @@ internal static class Program
         string? dbLogLevelRaw,
         bool dbLogVerbose,
         bool aboutJson,
+        string? formatRaw,
+        bool noBanner,
         string? frameworkOrNull,
         IEnumerable<string>? expressionParts)
     {
+        if (!TryParseOutputFormat(formatRaw, out var outputFormat, out var formatError))
+        {
+            CliUi.WriteError(formatError!);
+            return 1;
+        }
+
+        var quietOutput = noBanner || outputFormat == CliOutputFormat.Json || aboutJson;
+
         var dbLogSettings = new DbLogSettings { Enabled = dbLogEnabled, Verbose = dbLogVerbose };
 
         if (!string.IsNullOrWhiteSpace(dbLogLevelRaw)
@@ -109,31 +121,45 @@ internal static class Program
         var projectLabel = Path.GetRelativePath(searchDirectory, resolvedProject.FullName);
         var startupLabel = Path.GetRelativePath(searchDirectory, resolvedStartup.FullName);
 
-        AnsiConsole.MarkupLine($"[dim]Workspace root:[/] [cyan]{Markup.Escape(workspaceRoot)}[/]");
-        AnsiConsole.MarkupLine($"[dim]EF project:[/] [cyan]{Markup.Escape(projectLabel)}[/]");
+        if (!quietOutput)
+        {
+            AnsiConsole.MarkupLine($"[dim]Workspace root:[/] [cyan]{Markup.Escape(workspaceRoot)}[/]");
+            AnsiConsole.MarkupLine($"[dim]EF project:[/] [cyan]{Markup.Escape(projectLabel)}[/]");
 
-        if (!string.Equals(resolvedStartup.FullName, resolvedProject.FullName, StringComparison.OrdinalIgnoreCase))
-            AnsiConsole.MarkupLine($"[dim]Startup project (config):[/] [cyan]{Markup.Escape(startupLabel)}[/]");
+            if (!string.Equals(resolvedStartup.FullName, resolvedProject.FullName, StringComparison.OrdinalIgnoreCase))
+                AnsiConsole.MarkupLine($"[dim]Startup project (config):[/] [cyan]{Markup.Escape(startupLabel)}[/]");
+        }
 
         var pendingSessionDirectory = SessionPaths.EnsurePendingSessionDirectory(workspaceRoot);
 
         try
         {
-            workspaceBuild = CliUi.RunWithStatus(
-                "Building EF project…",
-                () => WorkspaceBuilder.BuildResolvedProject(
+            workspaceBuild = quietOutput
+                ? WorkspaceBuilder.BuildResolvedProject(
                     pendingSessionDirectory,
                     resolvedProject,
                     resolvedStartup,
-                    frameworkOrNull));
+                    frameworkOrNull)
+                : CliUi.RunWithStatus(
+                    "Building EF project…",
+                    () => WorkspaceBuilder.BuildResolvedProject(
+                        pendingSessionDirectory,
+                        resolvedProject,
+                        resolvedStartup,
+                        frameworkOrNull));
         }
         catch (WorkspaceException workspaceFailure)
         {
-            CliUi.WriteErrorPanel("Workspace failure", workspaceFailure.Message);
+            if (quietOutput)
+                Console.Error.WriteLine(workspaceFailure.Message);
+            else
+                CliUi.WriteErrorPanel("Workspace failure", workspaceFailure.Message);
+
             return 10;
         }
 
-        AnsiConsole.MarkupLine($"[green]✓[/] Built [cyan]{Markup.Escape(projectLabel)}[/]");
+        if (!quietOutput)
+            AnsiConsole.MarkupLine($"[green]✓[/] Built [cyan]{Markup.Escape(projectLabel)}[/]");
 
         using var host = WorkspaceHost.Load(workspaceBuild);
 
@@ -158,8 +184,11 @@ internal static class Program
             dbContextType.Name);
         host.SetSessionDirectory(sessionDirectory);
 
-        AnsiConsole.MarkupLine($"[dim]DbContext:[/] [cyan]{Markup.Escape(dbContextType.Name)}[/]");
-        AnsiConsole.MarkupLine($"[dim]Session directory:[/] [cyan]{Markup.Escape(sessionDirectory)}[/]");
+        if (!quietOutput)
+        {
+            AnsiConsole.MarkupLine($"[dim]DbContext:[/] [cyan]{Markup.Escape(dbContextType.Name)}[/]");
+            AnsiConsole.MarkupLine($"[dim]Session directory:[/] [cyan]{Markup.Escape(sessionDirectory)}[/]");
+        }
 
         object dbContextInstance;
 
@@ -191,12 +220,46 @@ internal static class Program
         }
 
         if (!string.IsNullOrWhiteSpace(oneShotExpression))
-            return await QueryRunner.RunOnceAsync(dbContextInstance, session, host, dbLogSettings, oneShotExpression);
+            return await QueryRunner.RunOnceAsync(
+                dbContextInstance,
+                session,
+                host,
+                dbLogSettings,
+                oneShotExpression,
+                outputFormat);
 
         var repl = new QueryRepl(session, host, dbContextInstance, dbLogSettings, projectLabel);
 
         await repl.RunAsync();
 
         return 0;
+    }
+
+    private static bool TryParseOutputFormat(string? formatRaw, out CliOutputFormat format, out string? error)
+    {
+        if (string.IsNullOrWhiteSpace(formatRaw))
+        {
+            format = CliOutputFormat.Text;
+            error = null;
+            return true;
+        }
+
+        if (string.Equals(formatRaw, "json", StringComparison.OrdinalIgnoreCase))
+        {
+            format = CliOutputFormat.Json;
+            error = null;
+            return true;
+        }
+
+        if (string.Equals(formatRaw, "text", StringComparison.OrdinalIgnoreCase))
+        {
+            format = CliOutputFormat.Text;
+            error = null;
+            return true;
+        }
+
+        format = CliOutputFormat.Text;
+        error = $"Unknown output format '{formatRaw}'. Use text or json.";
+        return false;
     }
 }

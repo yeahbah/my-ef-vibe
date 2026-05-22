@@ -37,6 +37,12 @@ internal sealed class EfvibeCliOptions
     [Option("about-json", HelpText = "Write session metadata as JSON to stdout and exit (no REPL).")]
     public bool AboutJson { get; set; }
 
+    [Option("format", HelpText = "Output format for one-shot -e runs: text (default) or json.")]
+    public string? Format { get; set; }
+
+    [Option("no-banner", HelpText = "Suppress workspace and build banners (recommended with --format json).")]
+    public bool NoBanner { get; set; }
+
     [Option('f', "framework", HelpText = "Target framework moniker for building the workspace project (e.g. net8.0).")]
     public string? Framework { get; set; }
 

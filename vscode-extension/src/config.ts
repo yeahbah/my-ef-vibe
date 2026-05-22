@@ -2,6 +2,8 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { getDefaultWorkspaceRoot } from './sessionPaths';
 
+export type EfvibeResultDestination = 'panel' | 'output' | 'terminal';
+
 export interface EfvibeSettings {
   workspaceRoot: string;
   project: string;
@@ -12,6 +14,7 @@ export interface EfvibeSettings {
   toolPath: string;
   showSql: boolean;
   dotnetFramework: string;
+  resultDestination: EfvibeResultDestination;
 }
 
 export function getWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
@@ -46,6 +49,7 @@ export function readSettings(workspaceFolder?: vscode.WorkspaceFolder): EfvibeSe
     toolPath: resolveSettingPath(config.get<string>('toolPath', ''), folder),
     showSql: config.get<boolean>('showSql', true),
     dotnetFramework: config.get<string>('dotnetFramework', '').trim(),
+    resultDestination: config.get<EfvibeResultDestination>('resultDestination', 'panel'),
   };
 }
 

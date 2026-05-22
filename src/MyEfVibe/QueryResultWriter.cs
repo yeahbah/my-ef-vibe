@@ -9,10 +9,12 @@ internal static class QueryResultWriter
         DbLogSettings dbLogSettings,
         WorkspaceHost host,
         SessionAnalytics analytics,
+        CliOutputFormat outputFormat = CliOutputFormat.Text,
         TextWriter? output = null,
         CancellationToken cancellationToken = default)
     {
-        var useSpectre = output is null || output == Console.Out;
+        var useSpectre = outputFormat == CliOutputFormat.Text
+            && (output is null || output == Console.Out);
 
         host.EnsureEntityFrameworkRelationalLoaded();
         host.EnsureAspNetCoreSharedFrameworkLoaded();
@@ -30,6 +32,13 @@ internal static class QueryResultWriter
             var (_, _, _, _, _, exportRows) = ResultAnalyzer.Analyze(result);
 
             analytics.Record(metrics, result, exportRows);
+
+            if (outputFormat == CliOutputFormat.Json)
+            {
+                EvaluationJsonReporter.WriteSuccess(result, metrics);
+                return;
+            }
+
             AnalyticsPresenter.WriteEvaluation(result, metrics, dbLogSettings, useSpectre);
         }
         catch (EvaluationFailedException failure)

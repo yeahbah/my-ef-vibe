@@ -1,8 +1,8 @@
 {
   "name": "vscode-efvibe",
   "displayName": "efvibe",
-  "description": "Run the efvibe EF Core LINQ REPL from VS Code with workspace-aware project settings.",
-  "version": "0.1.0",
+  "description": "Run EF Core LINQ from VS Code: REPL terminal, editor evaluation with SQL panel, and workspace-aware project settings.",
+  "version": "0.2.0",
   "publisher": "efvibe",
   "license": "Apache-2.0",
   "repository": {
@@ -25,34 +25,99 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "workspaceContains:**/*.csproj",
-    "onCommand:efvibe.startRepl",
-    "onCommand:efvibe.runExpression",
-    "onCommand:efvibe.checkPrerequisites",
-    "onCommand:efvibe.refreshStatus"
+    "workspaceContains:**/*.csproj"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "efvibe.startRepl",
-        "title": "efvibe: Start REPL",
+        "title": "Start REPL",
         "category": "efvibe"
       },
       {
         "command": "efvibe.runExpression",
-        "title": "efvibe: Run Expression",
+        "title": "Run Expression",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.runSelection",
+        "title": "Run Selection",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.runLineAtCursor",
+        "title": "Run Line at Cursor",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.runStatementAtCursor",
+        "title": "Run Statement at Cursor",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.showLastSql",
+        "title": "Show Last SQL",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.generateReplTask",
+        "title": "Generate REPL Task",
         "category": "efvibe"
       },
       {
         "command": "efvibe.checkPrerequisites",
-        "title": "efvibe: Check Prerequisites",
+        "title": "Check Prerequisites",
         "category": "efvibe"
       },
       {
         "command": "efvibe.refreshStatus",
-        "title": "efvibe: Refresh Status",
+        "title": "Refresh Status",
         "category": "efvibe"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "efvibe.runSelection",
+          "when": "editorLangId == csharp && editorHasSelection",
+          "group": "efvibe@1"
+        },
+        {
+          "command": "efvibe.runLineAtCursor",
+          "when": "editorLangId == csharp",
+          "group": "efvibe@2"
+        },
+        {
+          "command": "efvibe.runStatementAtCursor",
+          "when": "editorLangId == csharp",
+          "group": "efvibe@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "efvibe.runSelection",
+          "when": "editorLangId == csharp"
+        },
+        {
+          "command": "efvibe.runLineAtCursor",
+          "when": "editorLangId == csharp"
+        },
+        {
+          "command": "efvibe.runStatementAtCursor",
+          "when": "editorLangId == csharp"
+        },
+        {
+          "command": "efvibe.showLastSql",
+          "when": "efvibe.hasLastSql"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "efvibe.runSelection",
+        "key": "shift+alt+e",
+        "when": "editorLangId == csharp && editorTextFocus"
       }
     ],
     "configuration": {
@@ -111,6 +176,21 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Target framework for your EF project build (for example `net8.0`). Passed as `dotnet efvibe -f` and `efvibe --framework`."
+        },
+        "efvibe.resultDestination": {
+          "type": "string",
+          "default": "panel",
+          "enum": [
+            "panel",
+            "output",
+            "terminal"
+          ],
+          "enumDescriptions": [
+            "Webview panel with result table and SQL (uses `efvibe -e --format json`).",
+            "efvibe output channel with formatted text.",
+            "Integrated terminal with plain `efvibe -e` output."
+          ],
+          "description": "Where to show one-shot expression results from the editor."
         }
       }
     }

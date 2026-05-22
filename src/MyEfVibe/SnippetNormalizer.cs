@@ -20,7 +20,9 @@ internal static class SnippetNormalizer
             return trimmed;
 
         if (lines.Length == 1)
-            return RewriteBoundedEfQuery(NormalizeFinalLine(lines[0].TrimEnd()), dbContextType);
+            return RewriteBoundedEfQuery(
+                NormalizeFinalLine(ReplaceContextAliases(lines[0].TrimEnd())),
+                dbContextType);
 
         var normalized = new string[lines.Length];
 
@@ -40,7 +42,21 @@ internal static class SnippetNormalizer
                 : line;
         }
 
-        return RewriteBoundedEfQuery(InputLineUtilities.JoinLines(normalized), dbContextType);
+        return RewriteBoundedEfQuery(
+            ReplaceContextAliases(InputLineUtilities.JoinLines(normalized)),
+            dbContextType);
+    }
+
+    private static string ReplaceContextAliases(string snippet)
+    {
+        try
+        {
+            return DbContextAliasSyntaxRewriter.Rewrite(snippet);
+        }
+        catch (Exception)
+        {
+            return snippet;
+        }
     }
 
     private static string RewriteBoundedEfQuery(string snippet, Type? dbContextType)

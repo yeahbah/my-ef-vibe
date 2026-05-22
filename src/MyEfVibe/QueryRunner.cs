@@ -8,6 +8,7 @@ internal static class QueryRunner
         WorkspaceHost host,
         DbLogSettings dbLogSettings,
         string expression,
+        CliOutputFormat outputFormat = CliOutputFormat.Text,
         CancellationToken cancellationToken = default)
     {
         var analytics = new SessionAnalytics();
@@ -21,12 +22,19 @@ internal static class QueryRunner
                 dbLogSettings,
                 host,
                 analytics,
+                outputFormat,
                 cancellationToken: cancellationToken);
 
             return 0;
         }
         catch (EvaluationFailedException evaluationFailure)
         {
+            if (outputFormat == CliOutputFormat.Json)
+            {
+                EvaluationJsonReporter.WriteFailure(evaluationFailure.Metrics, evaluationFailure.Message);
+                return 20;
+            }
+
             AnalyticsPresenter.WriteFooter(evaluationFailure.Metrics);
             CliUi.WriteErrorPanel("Evaluation error", evaluationFailure.Message);
 
@@ -34,12 +42,30 @@ internal static class QueryRunner
         }
         catch (CompilationEvaluationException compilationFailure)
         {
+            if (outputFormat == CliOutputFormat.Json)
+            {
+                EvaluationJsonReporter.WriteFailure(
+                    EvaluationMetrics.Failed(expression, 0, compilationFailure.Message),
+                    compilationFailure.Message);
+
+                return 20;
+            }
+
             CliUi.WriteErrorPanel("Compilation error", compilationFailure.Message);
 
             return 20;
         }
         catch (Exception failure)
         {
+            if (outputFormat == CliOutputFormat.Json)
+            {
+                EvaluationJsonReporter.WriteFailure(
+                    EvaluationMetrics.Failed(expression, 0, failure.Message),
+                    failure.Message);
+
+                return 21;
+            }
+
             CliUi.WriteErrorPanel("Query failed", failure.ToString());
 
             return 21;

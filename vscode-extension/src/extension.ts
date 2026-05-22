@@ -1,13 +1,17 @@
 import * as vscode from 'vscode';
-import { buildExpressionCommand, buildReplCommand } from './cliRunner';
+import { buildExpressionCommand, buildReplCommand, runExpressionJson } from './cliRunner';
 import { getSearchDirectory, getWorkspaceFolder, readSettings } from './config';
+import { getExpressionFromEditor, type ExpressionSelectionKind } from './expressionSelection';
 import { checkPrerequisites, formatPrerequisiteMessage } from './prerequisites';
+import { EfvibeResultPanel, formatEvaluationForOutput } from './resultPanel';
+import { generateReplTask } from './replTask';
 import { EfvibeStatusBar } from './statusBar';
 
 const OUTPUT_CHANNEL_NAME = 'efvibe';
 
 let statusBar: EfvibeStatusBar | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
+let lastSql: string[] = [];
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
@@ -19,6 +23,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand('efvibe.startRepl', () => startRepl()),
     vscode.commands.registerCommand('efvibe.runExpression', () => runExpression()),
+    vscode.commands.registerCommand('efvibe.runSelection', () => runEditorExpression('selection')),
+    vscode.commands.registerCommand('efvibe.runLineAtCursor', () => runEditorExpression('line')),
+    vscode.commands.registerCommand('efvibe.runStatementAtCursor', () => runEditorExpression('statement')),
+    vscode.commands.registerCommand('efvibe.showLastSql', () => showLastSql()),
+    vscode.commands.registerCommand('efvibe.generateReplTask', () => generateReplTaskCommand()),
     vscode.commands.registerCommand('efvibe.checkPrerequisites', () => checkPrerequisitesCommand()),
     vscode.commands.registerCommand('efvibe.refreshStatus', () => statusBar?.refresh()),
     vscode.workspace.onDidChangeConfiguration((event) => {
@@ -80,11 +89,15 @@ async function checkPrerequisitesCommand(): Promise<void> {
   }
 }
 
-async function startRepl(): Promise<void> {
+async function requireWorkspaceAndSettings(): Promise<{
+  folder: vscode.WorkspaceFolder;
+  settings: ReturnType<typeof readSettings>;
+  searchDirectory: string;
+} | undefined> {
   const folder = getWorkspaceFolder();
   if (!folder) {
-    vscode.window.showErrorMessage('Open a workspace folder before starting efvibe.');
-    return;
+    vscode.window.showErrorMessage('Open a workspace folder before using efvibe.');
+    return undefined;
   }
 
   const settings = readSettings(folder);
@@ -101,20 +114,29 @@ async function startRepl(): Promise<void> {
       );
     }
 
-    return;
+    return undefined;
   }
 
   const searchDirectory = getSearchDirectory(settings, folder);
   const prereq = await checkPrerequisites(searchDirectory);
   if (!prereq.ok) {
     await checkPrerequisitesCommand();
+    return undefined;
+  }
+
+  return { folder, settings, searchDirectory };
+}
+
+async function startRepl(): Promise<void> {
+  const context = await requireWorkspaceAndSettings();
+  if (!context) {
     return;
   }
 
-  const commandLine = buildReplCommand(settings, searchDirectory);
+  const commandLine = buildReplCommand(context.settings, context.searchDirectory);
   const terminal = vscode.window.createTerminal({
     name: 'efvibe',
-    cwd: folder.uri.fsPath,
+    cwd: context.folder.uri.fsPath,
   });
 
   terminal.show();
@@ -122,15 +144,8 @@ async function startRepl(): Promise<void> {
 }
 
 async function runExpression(): Promise<void> {
-  const folder = getWorkspaceFolder();
-  if (!folder) {
-    vscode.window.showErrorMessage('Open a workspace folder before running an expression.');
-    return;
-  }
-
-  const settings = readSettings(folder);
-  if (!settings.project) {
-    vscode.window.showErrorMessage('Set efvibe.project in settings before running expressions.');
+  const context = await requireWorkspaceAndSettings();
+  if (!context) {
     return;
   }
 
@@ -148,38 +163,134 @@ async function runExpression(): Promise<void> {
     return;
   }
 
-  const searchDirectory = getSearchDirectory(settings, folder);
-  const commandLine = buildExpressionCommand(settings, searchDirectory, expression.trim());
+  await evaluateExpression(expression.trim(), context);
+}
 
-  const useOutput = await vscode.window.showQuickPick(
-    [
-      { label: 'Integrated terminal', value: 'terminal' as const },
-      { label: 'Output channel', value: 'output' as const },
-    ],
-    { title: 'Run efvibe expression' },
-  );
-
-  if (!useOutput) {
+async function runEditorExpression(kind: ExpressionSelectionKind): Promise<void> {
+  const context = await requireWorkspaceAndSettings();
+  if (!context) {
     return;
   }
 
-  if (useOutput.value === 'terminal') {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document.languageId !== 'csharp') {
+    vscode.window.showErrorMessage('Open a C# file and place the cursor on a LINQ expression.');
+    return;
+  }
+
+  const expression = getExpressionFromEditor(editor, kind);
+  if (!expression) {
+    const hint = kind === 'selection'
+      ? 'Select a LINQ expression to run with efvibe.'
+      : 'No expression found at the cursor.';
+    vscode.window.showWarningMessage(hint);
+    return;
+  }
+
+  await evaluateExpression(expression, context);
+}
+
+async function evaluateExpression(
+  expression: string,
+  context: {
+    folder: vscode.WorkspaceFolder;
+    settings: ReturnType<typeof readSettings>;
+    searchDirectory: string;
+  },
+): Promise<void> {
+  const destination = context.settings.resultDestination;
+
+  if (destination === 'terminal') {
+    const commandLine = buildExpressionCommand(
+      context.settings,
+      context.searchDirectory,
+      expression,
+    );
     const terminal = vscode.window.terminals.find((t) => t.name === 'efvibe')
-      ?? vscode.window.createTerminal({ name: 'efvibe', cwd: folder.uri.fsPath });
+      ?? vscode.window.createTerminal({ name: 'efvibe', cwd: context.folder.uri.fsPath });
     terminal.show();
     terminal.sendText(commandLine, true);
     return;
   }
 
-  if (outputChannel) {
-    outputChannel.clear();
-    outputChannel.appendLine(`> ${commandLine}`);
-    outputChannel.appendLine('');
-    outputChannel.appendLine('(Run in terminal for interactive output; JSON output arrives in Phase 1.)');
-    outputChannel.show(true);
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'efvibe',
+      cancellable: false,
+    },
+    async () => {
+      const result = await runExpressionJson(
+        context.settings,
+        context.searchDirectory,
+        context.folder.uri.fsPath,
+        expression,
+      );
+
+      lastSql = result.payload?.sql ?? [];
+      void vscode.commands.executeCommand('setContext', 'efvibe.hasLastSql', lastSql.length > 0);
+
+      if (!result.payload) {
+        if (outputChannel) {
+          outputChannel.clear();
+          outputChannel.appendLine(`> ${expression}`);
+          outputChannel.appendLine('');
+          outputChannel.appendLine(result.stderr || result.stdout || 'No JSON output from efvibe.');
+          outputChannel.show(true);
+        }
+
+        vscode.window.showErrorMessage('efvibe did not return JSON. Check the output channel.');
+        return;
+      }
+
+      if (destination === 'panel') {
+        EfvibeResultPanel.show(result.payload, expression);
+
+        if (!result.payload.success) {
+          vscode.window.showErrorMessage(result.payload.error ?? 'efvibe evaluation failed.');
+        }
+
+        return;
+      }
+
+      if (outputChannel) {
+        outputChannel.clear();
+        outputChannel.appendLine(formatEvaluationForOutput(result.payload, expression));
+        outputChannel.show(true);
+      }
+
+      if (!result.payload.success) {
+        vscode.window.showErrorMessage(result.payload.error ?? 'efvibe evaluation failed.');
+      }
+    },
+  );
+}
+
+async function showLastSql(): Promise<void> {
+  if (!lastSql.length) {
+    vscode.window.showInformationMessage('Run an expression first to capture SQL.');
+    return;
   }
 
-  const terminal = vscode.window.createTerminal({ name: 'efvibe', cwd: folder.uri.fsPath });
-  terminal.show();
-  terminal.sendText(commandLine, true);
+  if (outputChannel) {
+    outputChannel.clear();
+    outputChannel.appendLine('Last efvibe SQL:');
+    outputChannel.appendLine('');
+
+    for (const sql of lastSql) {
+      outputChannel.appendLine(sql);
+      outputChannel.appendLine('');
+    }
+
+    outputChannel.show(true);
+  }
+}
+
+async function generateReplTaskCommand(): Promise<void> {
+  const context = await requireWorkspaceAndSettings();
+  if (!context) {
+    return;
+  }
+
+  await generateReplTask(context.settings, context.searchDirectory, context.folder);
 }

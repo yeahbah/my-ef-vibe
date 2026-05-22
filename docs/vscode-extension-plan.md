@@ -60,20 +60,20 @@ flowchart LR
 - `--version` / `--about-json` — session metadata without parsing Spectre markup (`--about-json` added)
 - Consistent non-zero exit codes on build / DbContext failure (existing: 1 parse, 3 provider, 10 workspace, 14 DbContext)
 
-### Phase 1 — Editor-integrated queries (4–6 weeks)
+### Phase 1 — Editor-integrated queries (4–6 weeks) ✅ implemented in `vscode-extension/` v0.2.0
 
 **Goal:** Run LINQ from the editor without manually typing in the terminal.
 
 | Feature | Behavior |
 |---------|----------|
-| Run selection / line | Context menu → `efvibe -e` with selected text; result in Output or Webview |
-| Run at cursor | Optional adapter for terminal operators (same rules as deep scan) or send raw selection |
-| SQL panel | Translated and executed SQL after run (requires structured output) |
-| Launch config | `tasks.json` / snippet for REPL with `-p` / `-s` from solution |
+| Run selection / line | Context menu → `efvibe -e --format json`; result in webview panel or output channel |
+| Run at cursor | Statement expansion + `dbContext` → `db` alias rewrite (CLI `SnippetNormalizer`) |
+| SQL panel | Webview shows executed/translated SQL from JSON payload |
+| Launch config | **efvibe: Generate REPL Task** writes `.vscode/tasks.json` shell task |
 
-**CLI gaps:**
+**CLI gaps (closed in repo):**
 
-- `--json` / `--format json` on `-e` — one-shot evaluation result, for example:
+- `--format json` / `--no-banner` on `-e` — one-shot evaluation result, for example:
 
 ```json
 {
@@ -189,7 +189,7 @@ Publish as **`efvibe.vscode-efvibe`** on Open VSX and the Visual Studio Marketpl
 | Priority | Change | Unblocks |
 |----------|--------|----------|
 | P0 | `--version`, clear exit codes | Extension health checks |
-| P1 | `-e --format json` | Run selection; results panel |
+| P1 | `-e --format json` ✅ | Run selection; results panel |
 | P1 | `scan --no-repl` / headless scan | CI; editor diagnostics |
 | P2 | `scan dismiss` / `scan note` CLI | Editor actions without REPL |
 | P2 | `--about-json` (context, paths, provider) | Status bar; tree labels |

@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { EfvibeSettings } from './config';
+import { parseEvaluationJson, type EvaluationJsonPayload } from './evaluationTypes';
 
 const execFileAsync = promisify(execFile);
 
@@ -154,17 +155,93 @@ export function buildReplCommand(settings: EfvibeSettings, searchDirectory: stri
   return buildCommandLine(invocation, buildEfvibeArgs(settings));
 }
 
+export interface ExpressionRunOptions {
+  format?: 'text' | 'json';
+  noBanner?: boolean;
+}
+
+export function buildExpressionArgs(
+  settings: EfvibeSettings,
+  expression: string,
+  options: ExpressionRunOptions = {},
+): string[] {
+  const args = [...buildEfvibeArgs(settings), '-e', expression];
+
+  if (options.format === 'json') {
+    args.push('--format', 'json', '--no-banner');
+  } else if (options.noBanner) {
+    args.push('--no-banner');
+  }
+
+  return args;
+}
+
 export function buildExpressionCommand(
   settings: EfvibeSettings,
   searchDirectory: string,
   expression: string,
+  options: ExpressionRunOptions = {},
 ): string {
   const invocation = resolveToolInvocation(
     searchDirectory,
     settings.toolPath,
     settings.dotnetFramework,
   );
-  return buildCommandLine(invocation, [...buildEfvibeArgs(settings), '-e', expression]);
+  return buildCommandLine(invocation, buildExpressionArgs(settings, expression, options));
+}
+
+export interface ExpressionRunResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  payload?: EvaluationJsonPayload;
+}
+
+export async function runExpressionJson(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+  expression: string,
+): Promise<ExpressionRunResult> {
+  const invocation = resolveToolInvocation(
+    searchDirectory,
+    settings.toolPath,
+    settings.dotnetFramework,
+  );
+  const args = buildExpressionArgs(settings, expression, { format: 'json' });
+
+  try {
+    const { stdout, stderr } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
+      cwd,
+      timeout: 10 * 60_000,
+      maxBuffer: 8 * 1024 * 1024,
+      windowsHide: true,
+    });
+
+    return {
+      exitCode: 0,
+      stdout,
+      stderr,
+      payload: parseEvaluationJson(stdout),
+    };
+  } catch (error) {
+    const execError = error as NodeJS.ErrnoException & {
+      stdout?: string;
+      stderr?: string;
+      code?: number;
+    };
+
+    const stdout = execError.stdout ?? '';
+    const stderr = execError.stderr ?? '';
+    const payload = parseEvaluationJson(stdout);
+
+    return {
+      exitCode: typeof execError.code === 'number' ? execError.code : 1,
+      stdout,
+      stderr,
+      payload,
+    };
+  }
 }
 
 export function buildAboutJsonCommand(settings: EfvibeSettings, searchDirectory: string): string {

@@ -182,7 +182,7 @@ Highlights:
 |-----|-------------|
 | [features.md](features.md) | Full REPL and CLI reference |
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md) | Install the VS Code extension locally (not on Marketplace yet) |
-| [vscode-extension/README.md](vscode-extension/README.md) | VS Code extension (Phase 0: REPL terminal, settings, status bar) |
+| [vscode-extension/README.md](vscode-extension/README.md) | VS Code extension (Phase 1: run selection, JSON results, SQL panel) |
 | [docs/vscode-extension-plan.md](docs/vscode-extension-plan.md) | VS Code extension roadmap (phases, CLI hooks, diagnostics) |
 | [docs/linq-scan-feasibility.md](docs/linq-scan-feasibility.md) | How project LINQ scanning works |
 
