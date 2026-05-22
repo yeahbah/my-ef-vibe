@@ -621,12 +621,12 @@ internal static class DbContextActivator
     {
         instance = null!;
 
+        host.EnsureProviderDependenciesLoaded(providerKey);
+
         var efAssembly = LoadWorkspaceAssembly(host, "Microsoft.EntityFrameworkCore");
 
         if (efAssembly is null)
             return false;
-
-        _ = LoadWorkspaceAssembly(host, "Microsoft.EntityFrameworkCore.Relational");
 
         var openBuilderType =
             efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContextOptionsBuilder`1");

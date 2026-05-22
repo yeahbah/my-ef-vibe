@@ -202,7 +202,7 @@ internal sealed class WorkspaceHost : IDisposable
 
         if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore.Relational", out var relationalPath) == true)
         {
-            LoadOrGetAssembly(relationalPath);
+            PreloadPackageWithClosure(relationalPath);
             return;
         }
 
@@ -210,6 +210,36 @@ internal sealed class WorkspaceHost : IDisposable
 
         if (File.Exists(outputCandidate))
             LoadOrGetAssembly(outputCandidate);
+    }
+
+    internal void EnsureProviderDependenciesLoaded(MyEfVibeProvider provider)
+    {
+        EnsureEntityFrameworkRelationalLoaded();
+
+        foreach (var assemblySimpleName in ProviderAssemblyNames.For(provider))
+            PreloadPackageByName(assemblySimpleName);
+    }
+
+    internal void PreloadPackageByName(string assemblySimpleName)
+    {
+        if (_resolver.DepsManifest?.TryResolve(assemblySimpleName, out var path) == true)
+            PreloadPackageWithClosure(path);
+    }
+
+    private void PreloadPackageWithClosure(string assemblyPath)
+    {
+        if (_resolver.DepsManifest is null)
+        {
+            LoadOrGetAssembly(assemblyPath);
+            return;
+        }
+
+        WorkspaceDependencyLoader.PreloadAssemblyReferenceClosure(
+            AssemblyLoadContext.Default,
+            _resolver.DepsManifest,
+            assemblyPath);
+
+        LoadOrGetAssembly(assemblyPath);
     }
 
     internal void EnsureAspNetCoreSharedFrameworkLoaded()

@@ -16,6 +16,13 @@ internal static class WorkspaceDependencyLoader
                  {
                      "System.Configuration.ConfigurationManager",
                      "Microsoft.Data.SqlClient",
+                     "Microsoft.Extensions.Caching.Abstractions",
+                     "Microsoft.Extensions.Caching.Memory",
+                     "Microsoft.Extensions.DependencyInjection",
+                     "Microsoft.Extensions.DependencyInjection.Abstractions",
+                     "Microsoft.Extensions.Logging",
+                     "Microsoft.Extensions.Logging.Abstractions",
+                     "Microsoft.Extensions.Options",
                      "Microsoft.EntityFrameworkCore.Abstractions",
                      "Microsoft.EntityFrameworkCore",
                      "Microsoft.EntityFrameworkCore.Relational",
