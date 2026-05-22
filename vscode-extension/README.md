@@ -2,6 +2,8 @@
 
 Run the [efvibe](https://github.com/yeahbah/my-ef-vibe) EF Core LINQ REPL from VS Code with workspace settings for `-p`, `-s`, and `-c`. Phase 1 adds **editor-integrated queries** with JSON results and a **split-tab** result + SQL panel.
 
+![efvibe VS Code: Run Selection with result and SQL beside your C# code](../screenshots/vscode1.png)
+
 ## Prerequisites
 
 - [.NET SDK](https://dotnet.net/download)

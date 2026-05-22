@@ -25,6 +25,10 @@ Startup banner, session panel, and a LINQ query with translated SQL, results, an
 
 ![efvibe :scan deep with translated SQL and query plan](screenshots/scan-deep.png)
 
+VS Code extension — **Run Selection** with split result + SQL panel ([vscode-extension/README.md](vscode-extension/README.md)):
+
+![efvibe VS Code extension: editor, result panel, and SQL](screenshots/vscode1.png)
+
 ## Install
 
 From NuGet (when published):
