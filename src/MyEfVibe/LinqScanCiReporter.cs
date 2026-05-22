@@ -17,16 +17,13 @@ internal static class LinqScanCiReporter
         LinqScanCiSummary summary,
         string scanMode,
         string savedPath,
-        LinqScanSeverity? minSeverity)
+        LinqScanSeverity? reportMinSeverity)
     {
-        var minLine = minSeverity is null
-            ? string.Empty
-            : $" · min severity [cyan]{LinqScanRuleCatalog.ToDisplayString(minSeverity.Value)}[/]";
+        var severityCounts = FormatSeverityCounts(summary, reportMinSeverity);
 
         AnsiConsole.MarkupLine(
             $"[bold]efvibe scan {scanMode}[/] — [yellow]{summary.TotalFindings}[/] finding(s)"
-            + $" ([red]{summary.CriticalCount}[/] critical · [red]{summary.ErrorCount}[/] error · [yellow]{summary.WarningCount}[/] warning · [cyan]{summary.InfoCount}[/] info)"
-            + minLine);
+            + (severityCounts.Length > 0 ? $" ({severityCounts})" : string.Empty));
 
         AnsiConsole.MarkupLine($"[grey]Saved to[/] [cyan]{Markup.Escape(savedPath)}[/]");
 
@@ -68,6 +65,27 @@ internal static class LinqScanCiReporter
             deepStats?.QueryPlanFailedCount);
 
         Console.WriteLine(JsonSerializer.Serialize(document, JsonOptions));
+    }
+
+    private static string FormatSeverityCounts(
+        LinqScanCiSummary summary,
+        LinqScanSeverity? reportMinSeverity)
+    {
+        var parts = new List<string>();
+
+        if (reportMinSeverity is null || reportMinSeverity <= LinqScanSeverity.Critical)
+            parts.Add($"[red]{summary.CriticalCount}[/] critical");
+
+        if (reportMinSeverity is null || reportMinSeverity <= LinqScanSeverity.Error)
+            parts.Add($"[red]{summary.ErrorCount}[/] error");
+
+        if (reportMinSeverity is null || reportMinSeverity <= LinqScanSeverity.Warning)
+            parts.Add($"[yellow]{summary.WarningCount}[/] warning");
+
+        if (reportMinSeverity is null || reportMinSeverity <= LinqScanSeverity.Info)
+            parts.Add($"[cyan]{summary.InfoCount}[/] info");
+
+        return string.Join(" · ", parts);
     }
 
     private sealed record LinqScanCiOutputDocument(

@@ -49,11 +49,13 @@ internal static class ScanCommandRunner
 
         var failOnOption = new Option<string?>(
             aliases: new[] { "--fail-on" },
-            description: "Exit code 1 when any finding has this severity or higher (info | warning | error | critical).");
+            description: "Exit code 1 when any finding has this severity or higher (info | warning | error | critical). "
+                + "Also limits printed/saved findings to that level unless --min-severity is set.");
 
         var minSeverityOption = new Option<string?>(
             aliases: new[] { "--min-severity" },
-            description: "Only report findings at or above this severity (info | warning | error | critical).");
+            description: "Only report findings at or above this severity (info | warning | error | critical). "
+                + "Overrides the report filter implied by --fail-on.");
 
         var respectDismissalsOption = new Option<bool>(
             aliases: new[] { "--respect-dismissals" },
@@ -326,7 +328,8 @@ internal static class ScanCommandRunner
             (findings, _) = LinqScanDismissalStore.FilterFindings(findings, sessionDirectoryForArtifacts);
         }
 
-        findings = LinqScanCiGate.Filter(findings, minSeverity);
+        var reportMinSeverity = ResolveReportMinSeverity(minSeverity, failOn);
+        findings = LinqScanCiGate.Filter(findings, reportMinSeverity);
 
         var filteredResult = new LinqLiteScanResult(
             scanResult.FilesScanned,
@@ -345,10 +348,15 @@ internal static class ScanCommandRunner
         if (jsonOutput)
             LinqScanCiReporter.WriteJsonSummary(filteredResult, summary, scanMode == LinqScanMode.Deep ? "deep" : "lite", savedPath, deepStats);
         else
-            LinqScanCiReporter.WriteTextSummary(summary, scanMode == LinqScanMode.Deep ? "deep" : "lite", savedPath, minSeverity);
+            LinqScanCiReporter.WriteTextSummary(summary, scanMode == LinqScanMode.Deep ? "deep" : "lite", savedPath, reportMinSeverity);
 
         return LinqScanCiGate.GetExitCode(summary);
     }
+
+    internal static LinqScanSeverity? ResolveReportMinSeverity(
+        LinqScanSeverity? minSeverity,
+        LinqScanSeverity? failOn) =>
+        minSeverity ?? failOn;
 
     private static bool TryParseMode(string? raw, out LinqScanMode mode)
     {

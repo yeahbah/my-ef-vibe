@@ -44,6 +44,41 @@ public sealed class LinqScanCiGateTests
     }
 
     [Fact]
+    public void ResolveReportMinSeverity_UsesFailOnWhenMinSeverityUnset()
+    {
+        Assert.Equal(
+            LinqScanSeverity.Critical,
+            ScanCommandRunner.ResolveReportMinSeverity(null, LinqScanSeverity.Critical));
+
+        Assert.Null(ScanCommandRunner.ResolveReportMinSeverity(null, null));
+    }
+
+    [Fact]
+    public void ResolveReportMinSeverity_MinSeverityOverridesFailOn()
+    {
+        Assert.Equal(
+            LinqScanSeverity.Warning,
+            ScanCommandRunner.ResolveReportMinSeverity(LinqScanSeverity.Warning, LinqScanSeverity.Critical));
+    }
+
+    [Fact]
+    public void Filter_FailOnCriticalLevel_ExcludesInfoAndWarning()
+    {
+        var findings = new[]
+        {
+            Finding(LinqScanSeverity.Info),
+            Finding(LinqScanSeverity.Warning),
+            Finding(LinqScanSeverity.Critical),
+        };
+
+        var reportMin = ScanCommandRunner.ResolveReportMinSeverity(null, LinqScanSeverity.Critical);
+        var filtered = LinqScanCiGate.Filter(findings, reportMin);
+
+        Assert.Single(filtered);
+        Assert.Equal(LinqScanSeverity.Critical, filtered[0].Severity);
+    }
+
+    [Fact]
     public void Summarize_FailOnCritical_WithUnboundedMaterializeRule_FailsCi()
     {
         var findings = new[]

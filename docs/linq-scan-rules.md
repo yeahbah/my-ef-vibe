@@ -22,6 +22,8 @@ efvibe scan lite -p path/to/Project.csproj --fail-on critical
 efvibe scan lite -p ... --min-severity warning --fail-on error
 ```
 
+`--fail-on` sets both the **CI exit gate** and the **report filter** (findings below that level are omitted from JSON and summary). Use `--min-severity` to report a different cutoff than the gate, e.g. `--min-severity warning --fail-on critical` shows warnings+ but only fails on critical.
+
 ## Scan modes
 
 | Mode | Rules detected |
