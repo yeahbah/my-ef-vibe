@@ -3,7 +3,7 @@
   "isRoot": true,
   "tools": {
     "efvibe": {
-      "version": "0.1.47",
+      "version": "0.1.48",
       "commands": [
         "efvibe"
       ]
