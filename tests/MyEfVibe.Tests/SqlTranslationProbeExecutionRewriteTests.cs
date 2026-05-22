@@ -6,16 +6,13 @@ namespace MyEfVibe.Tests;
 public sealed class SqlTranslationProbeExecutionRewriteTests
 {
     [Fact]
-    public void TryRewriteToEfStaticCalls_First_UsesEntityFrameworkQueryableExtensions()
+    public void TryRewriteToEfStaticCalls_First_UsesReplQueryableRuntime()
     {
         const string snippet = "db.Users.First()";
 
         var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(snippet, typeof(FakeRewriterDbContext));
 
-        Assert.Equal(
-            "System.Linq.Queryable.FirstOrDefault("
-            + "((System.Linq.IQueryable<MyEfVibe.Tests.FakeRewriterUser>)db.Users))",
-            rewritten);
+        Assert.Equal("global::MyEfVibe.ReplQueryableRuntime.First(db.Users)", rewritten);
     }
 
     [Fact]
@@ -33,37 +30,32 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
 
         var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls("db.Users.First()", contextType);
 
-        Assert.Equal(
-            "System.Linq.Queryable.FirstOrDefault("
-            + "((System.Linq.IQueryable<CursorPagination.Models.User>)db.Users))",
-            rewritten);
+        Assert.Equal("global::MyEfVibe.ReplQueryableRuntime.First(db.Users)", rewritten);
     }
 
     [Fact]
-    public void TryCastDbSetRoots_Take_AddsQueryableCast()
+    public void TryCastDbSetRoots_Take_UsesReplQueryableRuntime()
     {
         var rewritten = EfReplQueryableRewriter.TryCastDbSetRoots(
             "db.Users.Take(10)",
             typeof(FakeRewriterDbContext));
 
-        Assert.Equal(
-            "((System.Linq.IQueryable<MyEfVibe.Tests.FakeRewriterUser>)db.Users).Take(10)",
-            rewritten);
+        Assert.Equal("global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)", rewritten);
     }
 
     [Fact]
-    public void SnippetNormalizer_ForEvaluation_UsersProbe_AddsQueryableCast()
+    public void SnippetNormalizer_ForEvaluation_UsersProbe_AddsQueryablePipeline()
     {
         const string probe = "db.Users.Where(u => u.Id == Guid.Empty).Take(1)";
 
         var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
 
         Assert.StartsWith(
-            "System.Linq.Queryable.Take(System.Linq.Queryable.Where("
-            + "((System.Linq.IQueryable<MyEfVibe.Tests.FakeRewriterUser>)db.Users)",
+            "global::MyEfVibe.ReplQueryableRuntime.Take(global::MyEfVibe.ReplQueryableRuntime.Where(db.Users",
             normalized,
             StringComparison.Ordinal);
         Assert.Contains(", 1)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("IQueryable<", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("AsNoTracking", normalized, StringComparison.Ordinal);
     }
 
@@ -75,9 +67,9 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
 
         var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeGuidNoteDbContext));
 
-        Assert.Contains("System.Linq.Queryable.Take", normalized, StringComparison.Ordinal);
-        Assert.Contains("System.Linq.Queryable.Select", normalized, StringComparison.Ordinal);
-        Assert.Contains("System.Linq.Queryable.Where", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Select", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Where", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("FirstOrDefaultAsync", normalized, StringComparison.Ordinal);
     }
 
@@ -105,8 +97,8 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
             ProbeScriptFormatter.ToScriptExpression(probe),
             typeof(FakeGuidNoteDbContext));
 
-        Assert.Contains("System.Linq.Queryable.Where", script, StringComparison.Ordinal);
-        Assert.Contains("System.Linq.Queryable.Take", script, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Where", script, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -114,8 +106,8 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     {
         var normalized = SnippetNormalizer.ForEvaluation("db.Users.Take(10);", typeof(FakeRewriterDbContext));
 
-        Assert.Contains("IQueryable<MyEfVibe.Tests.FakeRewriterUser>", normalized);
-        Assert.Contains(".Take(10)", normalized);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)", normalized);
+        Assert.DoesNotContain("IQueryable<", normalized, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -123,13 +115,22 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     {
         var normalized = SnippetNormalizer.ForEvaluation("db.Users.First();", typeof(FakeRewriterDbContext));
 
-        Assert.Contains("System.Linq.Queryable.FirstOrDefault", normalized);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.First(db.Users)", normalized);
         Assert.DoesNotContain("Queryable.Take", normalized);
     }
 }
 
 public sealed class FakeRewriterDbContext : DbContext
 {
+    public FakeRewriterDbContext()
+    {
+    }
+
+    public FakeRewriterDbContext(DbContextOptions<FakeRewriterDbContext> options)
+        : base(options)
+    {
+    }
+
     public DbSet<FakeRewriterUser> Users => Set<FakeRewriterUser>();
 }
 

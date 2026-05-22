@@ -4,20 +4,20 @@ using System.Text.RegularExpressions;
 namespace MyEfVibe;
 
 /// <summary>
-/// Rewrites REPL <c>db.*</c> queries so LINQ operators bind to <see cref="System.Linq.IQueryable{T}"/>
-/// (not <see cref="System.Linq.Enumerable"/>), so EF translates them to SQL.
+/// Rewrites REPL <c>db.*</c> queries so LINQ operators bind to <see cref="Queryable"/> / EF extensions
+/// (not <see cref="Enumerable"/>), so EF translates them to SQL.
 /// </summary>
 internal static partial class EfReplQueryableRewriter
 {
-    private const string Queryable = "System.Linq.Queryable";
+    private const string Runtime = "global::MyEfVibe.ReplQueryableRuntime";
 
     [GeneratedRegex(
         @"^db\.(\w+)(.*)\.(First|FirstOrDefault|FirstAsync|FirstOrDefaultAsync)\(\)$",
         RegexOptions.CultureInvariant)]
     private static partial Regex SimpleTerminalRegex();
 
-    [GeneratedRegex(@"db\.(\w+)\b", RegexOptions.CultureInvariant)]
-    private static partial Regex DbSetAccessRegex();
+    [GeneratedRegex(@"db\.(\w+)\.Take\((.+)\)$", RegexOptions.CultureInvariant)]
+    private static partial Regex SimpleTakeRegex();
 
     internal static string? TryRewriteToEfStaticCalls(string snippet, Type? dbContextType)
     {
@@ -28,61 +28,36 @@ internal static partial class EfReplQueryableRewriter
 
         if (string.IsNullOrWhiteSpace(trimmed)
             || !LinqEfQueryHeuristics.LooksLikeEfQuery(trimmed)
-            || trimmed.Contains("System.Linq.Queryable.", StringComparison.Ordinal))
+            || trimmed.Contains(Runtime, StringComparison.Ordinal))
             return null;
 
-        if (!trimmed.Contains("IQueryable<", StringComparison.Ordinal))
+        var simple = SimpleTerminalRegex().Match(trimmed);
+
+        if (simple.Success)
         {
-            var simple = SimpleTerminalRegex().Match(trimmed);
+            var propertyName = simple.Groups[1].Value;
+            var middle = simple.Groups[2].Value;
+            var terminal = simple.Groups[3].Value;
 
-            if (simple.Success)
-            {
-                var propertyName = simple.Groups[1].Value;
-                var middle = simple.Groups[2].Value;
-                var terminal = simple.Groups[3].Value;
+            var terminalRewrite = TryBuildTerminalCall(dbContextType, propertyName, middle, terminal, predicate: null);
 
-                var terminalRewrite = TryBuildTerminalCall(dbContextType, propertyName, middle, terminal, predicate: null);
-
-                if (terminalRewrite is not null)
-                    return terminalRewrite;
-            }
-
-            var terminalWithArgs = TryRewriteTerminalCallWithArguments(trimmed, dbContextType);
-
-            if (terminalWithArgs is not null)
-                return terminalWithArgs;
+            if (terminalRewrite is not null)
+                return terminalRewrite;
         }
 
-        return TryCastDbSetRoots(trimmed, dbContextType);
+        var terminalWithArgs = TryRewriteTerminalCallWithArguments(trimmed, dbContextType);
+
+        if (terminalWithArgs is not null)
+            return terminalWithArgs;
+
+        return TryRewriteSimpleTake(trimmed);
     }
 
-    internal static string? TryCastDbSetRoots(string snippet, Type dbContextType)
-    {
-        if (snippet.Contains("IQueryable<", StringComparison.Ordinal))
-            return null;
-
-        var changed = false;
-
-        var result = DbSetAccessRegex().Replace(
-            snippet,
-            match =>
-            {
-                var propertyName = match.Groups[1].Value;
-
-                if (!TryResolveDbSetEntityTypeName(dbContextType, propertyName, out var entityTypeName))
-                    return match.Value;
-
-                changed = true;
-
-                return $"((System.Linq.IQueryable<{entityTypeName}>)db.{propertyName})";
-            });
-
-        return changed ? result : null;
-    }
+    internal static string? TryCastDbSetRoots(string snippet, Type dbContextType) =>
+        TryRewriteSimpleTake(snippet);
 
     /// <summary>
-    /// Rewrites <c>.Where(...).Take(n)</c> on a cast DbSet root to <see cref="Queryable"/> static calls
-    /// so the probe stays an EF-translatable <see cref="IQueryable{T}"/>.
+    /// Rewrites <c>.Where(...).Take(n)</c> on a <c>db.Set</c> root to runtime <see cref="Queryable"/> calls.
     /// </summary>
     internal static string? TryRewriteWhereTakePipeline(string snippet)
     {
@@ -97,15 +72,25 @@ internal static partial class EfReplQueryableRewriter
         if (!TryParseTrailingCall(beforeTake, "Where", out var predicate, out var source))
             return null;
 
-        if (!source.Contains("IQueryable<", StringComparison.Ordinal))
+        if (!source.StartsWith("db.", StringComparison.Ordinal))
             return null;
 
-        var rewritten = $"{Queryable}.Where({source}, {predicate})";
+        var rewritten = $"{Runtime}.Where({source}, {predicate})";
 
         if (!string.IsNullOrWhiteSpace(selectArgument))
-            rewritten = $"{Queryable}.Select({rewritten}, {selectArgument})";
+            rewritten = $"{Runtime}.Select({rewritten}, {selectArgument})";
 
-        return $"{Queryable}.Take({rewritten}, {takeArgument})";
+        return $"{Runtime}.Take({rewritten}, {takeArgument})";
+    }
+
+    private static string? TryRewriteSimpleTake(string snippet)
+    {
+        var match = SimpleTakeRegex().Match(snippet.Trim().TrimEnd(';').Trim());
+
+        if (!match.Success)
+            return null;
+
+        return $"{Runtime}.Take(db.{match.Groups[1].Value}, {match.Groups[2].Value.Trim()})";
     }
 
     private static bool TryParseTrailingCall(
@@ -180,66 +165,58 @@ internal static partial class EfReplQueryableRewriter
         string terminal,
         string? predicate)
     {
-        if (!TryResolveDbSetEntityTypeName(dbContextType, propertyName, out var entityTypeName))
+        if (!TryResolveDbSetProperty(dbContextType, propertyName))
             return null;
 
         var source = string.IsNullOrEmpty(middle)
             ? $"db.{propertyName}"
             : $"db.{propertyName}{middle}";
 
-        var castSource = $"((System.Linq.IQueryable<{entityTypeName}>){source})";
-
         if (terminal is "FirstAsync" or "FirstOrDefaultAsync" or "SingleAsync" or "SingleOrDefaultAsync")
-            return BuildAsyncExtensionCall(castSource, terminal, predicate);
+            return BuildAsyncRuntimeCall(terminal, source, predicate);
 
-        var queryableMethod = MapToQueryableMethod(terminal);
+        var runtimeMethod = MapToRuntimeMethod(terminal);
 
-        if (queryableMethod is null)
+        if (runtimeMethod is null)
             return null;
 
         if (string.IsNullOrWhiteSpace(predicate))
-            return $"{Queryable}.{queryableMethod}({castSource})";
+            return $"{Runtime}.{runtimeMethod}({source})";
 
-        return $"{Queryable}.{queryableMethod}({castSource}, {predicate.Trim()})";
+        return $"{Runtime}.{runtimeMethod}({source}, {predicate.Trim()})";
     }
 
-    private static string? MapToQueryableMethod(string terminal) =>
+    private static string? MapToRuntimeMethod(string terminal) =>
         terminal switch
         {
-            "First" => "FirstOrDefault",
-            "FirstOrDefault" => "FirstOrDefault",
-            "Single" => "SingleOrDefault",
-            "SingleOrDefault" => "SingleOrDefault",
+            "First" => nameof(ReplQueryableRuntime.First),
+            "FirstOrDefault" => nameof(ReplQueryableRuntime.FirstOrDefault),
+            "Single" => nameof(ReplQueryableRuntime.Single),
+            "SingleOrDefault" => nameof(ReplQueryableRuntime.SingleOrDefault),
             _ => null,
         };
 
-    private static string BuildAsyncExtensionCall(string castSource, string terminal, string? predicate)
+    private static string BuildAsyncRuntimeCall(string terminal, string source, string? predicate)
     {
         var asyncMethod = terminal switch
         {
-            "First" => "FirstOrDefaultAsync",
-            "FirstAsync" => "FirstOrDefaultAsync",
-            "FirstOrDefault" => "FirstOrDefaultAsync",
-            "FirstOrDefaultAsync" => "FirstOrDefaultAsync",
-            "Single" => "SingleOrDefaultAsync",
-            "SingleAsync" => "SingleOrDefaultAsync",
-            "SingleOrDefault" => "SingleOrDefaultAsync",
-            "SingleOrDefaultAsync" => "SingleOrDefaultAsync",
-            _ => terminal,
+            "FirstAsync" => nameof(ReplQueryableRuntime.FirstAsync),
+            "FirstOrDefaultAsync" => nameof(ReplQueryableRuntime.FirstOrDefaultAsync),
+            "SingleAsync" => nameof(ReplQueryableRuntime.SingleAsync),
+            "SingleOrDefaultAsync" => nameof(ReplQueryableRuntime.SingleOrDefaultAsync),
+            _ => null,
         };
 
+        if (asyncMethod is null)
+            return string.Empty;
+
         return string.IsNullOrWhiteSpace(predicate)
-            ? $"{castSource}.{asyncMethod}()"
-            : $"{castSource}.{asyncMethod}({predicate.Trim()})";
+            ? $"{Runtime}.{asyncMethod}({source})"
+            : $"{Runtime}.{asyncMethod}({source}, {predicate.Trim()})";
     }
 
-    private static bool TryResolveDbSetEntityTypeName(
-        Type dbContextType,
-        string propertyName,
-        out string entityTypeName)
+    private static bool TryResolveDbSetProperty(Type dbContextType, string propertyName)
     {
-        entityTypeName = string.Empty;
-
         var property = dbContextType.GetProperty(
             propertyName,
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
@@ -247,16 +224,7 @@ internal static partial class EfReplQueryableRewriter
         if (property is null || !property.PropertyType.IsGenericType)
             return false;
 
-        var genericDefinition = property.PropertyType.GetGenericTypeDefinition();
-
-        if (genericDefinition.FullName?
-                .StartsWith("Microsoft.EntityFrameworkCore.DbSet`1", StringComparison.Ordinal) != true)
-            return false;
-
-        var entityType = property.PropertyType.GetGenericArguments()[0];
-
-        entityTypeName = entityType.FullName ?? entityType.Name;
-
-        return true;
+        return property.PropertyType.GetGenericTypeDefinition().FullName?
+            .StartsWith("Microsoft.EntityFrameworkCore.DbSet`1", StringComparison.Ordinal) == true;
     }
 }
