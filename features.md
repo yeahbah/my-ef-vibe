@@ -60,13 +60,17 @@ db.JsonBlobDocuments
 |--------|-------------|
 | `-w`, `--workspace` | Workspace root; session path is `<ProjectName>/<DbContextName>/` beneath it; default `~/.efvibe` or `%APPDATA%\efvibe` |
 | `-p`, `--project` | EF Core `.csproj` to build (DbContext assembly) |
-| `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--sql` or `:sql`. |
+| `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--dblog` or `:dblog`. |
 | `-c`, `--context` | `DbContext` type name (e.g. `MyDbContext`) or fully qualified name |
 | `--connection-string`, `-cs` | Connection string for manual `DbContextOptions` construction |
 | `--provider` | Provider with `-cs`: `sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb` |
 | `-e`, `--expression` | Run one expression and exit |
 | `expression` (positional) | Same as `-e` when passed as trailing arguments |
-| `--sql` | Show SQL (default: **on**; toggle in REPL with `:sql`) |
+| `--format` | One-shot output format: `text` (default) or `json` (for editors and scripts) |
+| `--no-banner` | Suppress workspace/build banners (recommended with `--format json`) |
+| `--dblog` | Show executed SQL via EF database logging (default: **on**; use `--no-dblog` to disable; toggle in REPL with `:dblog`) |
+| `--no-dblog` | Disable database command logging for this run |
+| `--about-json` | Write session metadata as JSON to stdout and exit (no REPL) |
 
 Install as a .NET tool: `dotnet tool install --global efvibe`, then run `efvibe`.
 Requires .NET 8+ (package includes net8.0, net9.0, and net10.0 tool assets).
@@ -97,6 +101,27 @@ db.Orders.Where(o => o.Total > 100).Count()
 
 `:reset` clears script variables but leaves `db` unchanged.
 
+### Repository snippets (from your codebase)
+
+You can paste or run selections copied from repositories and handlers — not only `db.*` written for the REPL. When a snippet looks like repository code (multiline, `await`, `DbContext` / `dbContext`, `*Async(`, `cancellationToken`), efvibe prepares it before evaluation:
+
+| Transformation | Example |
+|----------------|---------|
+| `DbContext` / `dbContext` → `db` | `await DbContext.Orders` → `db.Orders` |
+| Strip `await` / `return` / `var x =` | `await query.FirstOrDefaultAsync()` → `query.FirstOrDefault()` |
+| Stub method parameters | `entraObjectId` compared to `Rowguid` → `Guid.Empty` |
+| Remove `cancellationToken` | `FirstOrDefaultAsync(cancellationToken)` → `FirstOrDefault()` |
+| Async terminals → sync | `ToListAsync()` → `ToList()` |
+| Drop translation-neutral ops | `AsNoTracking()` removed for probes |
+
+**Limits:** stubbed parameters mean you see **SQL shape and sample execution**, not the same rows as production unless you declare variables in the REPL first (e.g. `var entraObjectId = Guid.Parse("...");`). Heavy `Include` / `SelectMany` chains may still fail at runtime depending on provider and data.
+
+One-shot JSON for tools and the VS Code extension:
+
+```bash
+efvibe -p ... -c MyDbContext -e "db.Products.Count()" --format json --no-banner
+```
+
 ## SQL output
 
 When SQL display is on (default):
@@ -104,7 +129,7 @@ When SQL display is on (default):
 - **Translated SQL** — `IQueryable` SQL from EF Core (`ToQueryString()`), including parameter comments.
 - **Executed SQL** — commands captured via EF Core logging while the snippet runs.
 
-Toggle in the REPL: `:sql`, `:sql on`, `:sql off`.
+Toggle in the REPL: `:dblog`, `:dblog on`, `:dblog off` (optional `verbose` for full EF logs).
 
 ## Results and footer
 
@@ -134,7 +159,7 @@ Re-show with `:warnings`.
 | `:about` | Tool version, license, repository, and current session summary |
 | `:clear`, `:cls` | Clear the terminal |
 | `:reset` | Clear script variables (`db` unchanged) |
-| `:sql` | Toggle SQL output |
+| `:dblog` | Toggle database command logging (sql-only by default) |
 | `:stats` | Session evaluation table and aggregates |
 | `:tracked` | Change tracker summary by state |
 | `:tables` | DbSets with row counts |

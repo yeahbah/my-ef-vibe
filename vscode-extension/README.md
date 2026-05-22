@@ -1,6 +1,6 @@
-# efvibe VS Code extension (Phase 1)
+# efvibe VS Code extension (Phase 1, v0.2.1)
 
-Run the [efvibe](https://github.com/yeahbah/my-ef-vibe) EF Core LINQ REPL from VS Code with workspace settings for `-p`, `-s`, and `-c`. Phase 1 adds **editor-integrated queries** with JSON results and an SQL panel.
+Run the [efvibe](https://github.com/yeahbah/my-ef-vibe) EF Core LINQ REPL from VS Code with workspace settings for `-p`, `-s`, and `-c`. Phase 1 adds **editor-integrated queries** with JSON results and a **split-tab** result + SQL panel.
 
 ## Prerequisites
 
@@ -35,13 +35,23 @@ Configure in `.vscode/settings.json`:
   "efvibe.startupProject": "${workspaceFolder}/src/MyApp.Api/MyApp.Api.csproj",
   "efvibe.context": "AppDbContext",
   "efvibe.dotnetFramework": "net8.0",
-  "efvibe.resultDestination": "panel"
+  "efvibe.dbLog": true,
+  "efvibe.resultDestination": "panel",
+  "efvibe.toolPath": "${workspaceFolder}/../my-ef-vibe/src/MyEfVibe/bin/Debug/net10.0/myefvibe"
 }
 ```
 
-`efvibe.resultDestination`: `panel` (webview with result + SQL), `output`, or `terminal`.
+| Setting | Description |
+|---------|-------------|
+| `efvibe.resultDestination` | `panel` (split webview with result + SQL), `output`, or `terminal` |
+| `efvibe.dbLog` | When `true` (default), CLI database logging is on; when `false`, passes `--no-dblog` |
+| `efvibe.toolPath` | Optional path to `myefvibe` / `efvibe` (use a local build for latest CLI features) |
 
-Repository code using `dbContext` / `_dbContext` is rewritten to `db` automatically (same rules as the CLI deep scan).
+Deprecated: `efvibe.showSql` (renamed to `efvibe.dbLog`; the CLI flag is `--dblog`, not `--sql`).
+
+### Running repository code from the editor
+
+Select a full handler query (including `await`, `DbContext`, and `cancellationToken`) and use **Run Selection**. The CLI adapts it the same way as deep-scan probes: `DbContext` → `db`, parameters stubbed, async terminals converted to sync. See [features.md](../features.md#repository-snippets-from-your-codebase) for details and limits.
 
 ## Install (required)
 

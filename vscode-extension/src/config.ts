@@ -12,7 +12,7 @@ export interface EfvibeSettings {
   connectionString: string;
   provider: string;
   toolPath: string;
-  showSql: boolean;
+  dbLog: boolean;
   dotnetFramework: string;
   resultDestination: EfvibeResultDestination;
 }
@@ -47,7 +47,7 @@ export function readSettings(workspaceFolder?: vscode.WorkspaceFolder): EfvibeSe
     connectionString: config.get<string>('connectionString', '').trim(),
     provider: config.get<string>('provider', '').trim(),
     toolPath: resolveSettingPath(config.get<string>('toolPath', ''), folder),
-    showSql: config.get<boolean>('showSql', true),
+    dbLog: config.get<boolean>('dbLog', config.get<boolean>('showSql', true)),
     dotnetFramework: config.get<string>('dotnetFramework', '').trim(),
     resultDestination: config.get<EfvibeResultDestination>('resultDestination', 'panel'),
   };

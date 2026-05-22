@@ -28,6 +28,9 @@ internal sealed class EfvibeCliOptions
     [Option("dblog", Default = true, HelpText = "Enable EF database command logging (default: on; toggle in REPL with :dblog).")]
     public bool DbLog { get; set; }
 
+    [Option("no-dblog", HelpText = "Disable EF database command logging.")]
+    public bool NoDbLog { get; set; }
+
     [Option("dblog-level", HelpText = "Database log level: trace | debug | information | warning | error | critical | none.")]
     public string? DbLogLevel { get; set; }
 

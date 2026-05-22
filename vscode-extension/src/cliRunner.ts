@@ -130,8 +130,8 @@ export function buildEfvibeArgs(settings: EfvibeSettings): string[] {
     args.push('--provider', settings.provider);
   }
 
-  if (settings.showSql) {
-    args.push('--dblog');
+  if (!settings.dbLog) {
+    args.push('--no-dblog');
   }
 
   if (settings.dotnetFramework) {

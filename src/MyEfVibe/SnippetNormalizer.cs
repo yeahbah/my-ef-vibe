@@ -13,6 +13,9 @@ internal static class SnippetNormalizer
         if (string.IsNullOrEmpty(trimmed))
             return trimmed;
 
+        if (dbContextType is not null && LooksLikeRepositorySnippet(trimmed))
+            return RepositorySnippetAdapter.PrepareForEvaluation(trimmed, dbContextType);
+
         var lines = InputLineUtilities.SplitLines(trimmed);
         var lastNonEmptyIndex = IndexOfLastNonEmptyLine(lines);
 
@@ -157,6 +160,14 @@ internal static class SnippetNormalizer
 
         return false;
     }
+
+    private static bool LooksLikeRepositorySnippet(string snippet) =>
+        snippet.Contains("await ", StringComparison.Ordinal)
+        || snippet.Contains("DbContext", StringComparison.Ordinal)
+        || snippet.Contains("dbContext", StringComparison.Ordinal)
+        || snippet.Contains("Async(", StringComparison.Ordinal)
+        || snippet.Contains("cancellationToken", StringComparison.OrdinalIgnoreCase)
+        || InputLineUtilities.SplitLines(snippet).Length > 1;
 
     private static bool LooksLikeTypeDeclaration(string text)
     {

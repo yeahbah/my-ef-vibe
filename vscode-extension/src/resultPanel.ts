@@ -18,10 +18,14 @@ export class EfvibeResultPanel {
   }
 
   static show(payload: EvaluationJsonPayload, expression: string): void {
-    const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.Beside;
+    const showIn = resolveSplitViewColumn();
 
     if (EfvibeResultPanel.current) {
-      EfvibeResultPanel.current.panel.reveal(column);
+      if (typeof showIn === 'number') {
+        EfvibeResultPanel.current.panel.reveal(showIn);
+      } else {
+        EfvibeResultPanel.current.panel.reveal(showIn.viewColumn, showIn.preserveFocus);
+      }
       EfvibeResultPanel.current.panel.webview.html = buildHtml(payload, expression);
       return;
     }
@@ -29,13 +33,25 @@ export class EfvibeResultPanel {
     const panel = vscode.window.createWebviewPanel(
       VIEW_TYPE,
       'efvibe result',
-      column,
+      showIn,
       { enableScripts: false, retainContextWhenHidden: true },
     );
 
     EfvibeResultPanel.current = new EfvibeResultPanel(panel);
     panel.webview.html = buildHtml(payload, expression);
   }
+}
+
+/** Open beside the active editor (split tab), keeping keyboard focus in the editor. */
+function resolveSplitViewColumn(): vscode.ViewColumn | {
+  viewColumn: vscode.ViewColumn;
+  preserveFocus?: boolean;
+} {
+  if (vscode.window.activeTextEditor) {
+    return { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true };
+  }
+
+  return vscode.ViewColumn.Active;
 }
 
 function buildHtml(payload: EvaluationJsonPayload, expression: string): string {

@@ -2,7 +2,7 @@
   "name": "vscode-efvibe",
   "displayName": "efvibe",
   "description": "Run EF Core LINQ from VS Code: REPL terminal, editor evaluation with SQL panel, and workspace-aware project settings.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "efvibe",
   "license": "Apache-2.0",
   "repository": {
@@ -167,10 +167,16 @@
           "default": "",
           "markdownDescription": "Optional path to the `efvibe` executable. When empty, uses `dotnet efvibe` from `dotnet-tools.json` or global `efvibe` on PATH."
         },
+        "efvibe.dbLog": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable EF database command logging. When off, passes `--no-dblog` to the CLI (default is on)."
+        },
         "efvibe.showSql": {
           "type": "boolean",
           "default": true,
-          "description": "Pass `--dblog` to the efvibe CLI (show database command log)."
+          "markdownDescription": "**Deprecated.** Use `#efvibe.dbLog#` instead. Previously passed the removed `--sql` flag; now maps to `--dblog` / `--no-dblog`.",
+          "deprecationMessage": "Renamed to efvibe.dbLog (CLI flag is --dblog, not --sql)."
         },
         "efvibe.dotnetFramework": {
           "type": "string",

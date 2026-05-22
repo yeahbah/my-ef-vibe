@@ -60,16 +60,17 @@ flowchart LR
 - `--version` / `--about-json` — session metadata without parsing Spectre markup (`--about-json` added)
 - Consistent non-zero exit codes on build / DbContext failure (existing: 1 parse, 3 provider, 10 workspace, 14 DbContext)
 
-### Phase 1 — Editor-integrated queries (4–6 weeks) ✅ implemented in `vscode-extension/` v0.2.0
+### Phase 1 — Editor-integrated queries (4–6 weeks) ✅ implemented in `vscode-extension/` v0.2.1
 
 **Goal:** Run LINQ from the editor without manually typing in the terminal.
 
 | Feature | Behavior |
 |---------|----------|
-| Run selection / line | Context menu → `efvibe -e --format json`; result in webview panel or output channel |
-| Run at cursor | Statement expansion + `dbContext` → `db` alias rewrite (CLI `SnippetNormalizer`) |
-| SQL panel | Webview shows executed/translated SQL from JSON payload |
+| Run selection / line | Context menu → `efvibe -e --format json`; result in split webview panel or output channel |
+| Run at cursor | Statement expansion + repository snippet adapter (CLI `RepositorySnippetAdapter`) |
+| SQL panel | Webview beside editor shows executed/translated SQL from JSON payload |
 | Launch config | **efvibe: Generate REPL Task** writes `.vscode/tasks.json` shell task |
+| Settings | `efvibe.dbLog` → `--dblog` / `--no-dblog` (not deprecated `--sql`) |
 
 **CLI gaps (closed in repo):**
 
@@ -155,7 +156,7 @@ efvibe already writes under the session folder:
   "efvibe.project": "${workspaceFolder}/src/MyApp.Persistence/MyApp.Persistence.csproj",
   "efvibe.startupProject": "${workspaceFolder}/src/MyApp.Api/MyApp.Api.csproj",
   "efvibe.context": "MyApp.Persistence.AppDbContext",
-  "efvibe.showSql": true,
+  "efvibe.dbLog": true,
   "efvibe.scan.onSave": false,
   "efvibe.scan.mode": "lite"
 }
@@ -220,9 +221,9 @@ The extension can consume today’s scan files without waiting for new formats. 
 
 ### Flow 2 — Debug a query in a repository
 
-1. User selects `return await dbContext.Orders.Where(...).ToListAsync();`
-2. **Run with efvibe** adapts `dbContext` → `db`, runs, returns JSON.
-3. Editor shows result rows, SQL tab, and warnings.
+1. User selects a multiline handler query (`await DbContext....FirstOrDefaultAsync(cancellationToken)`).
+2. **Run Selection** runs `efvibe -e --format json --no-banner`; CLI strips `await`, rewrites `DbContext` → `db`, stubs parameters (`entraObjectId` → `Guid.Empty`, etc.), converts async terminals to sync.
+3. Split webview shows result rows, SQL, and warnings (stubbed values — SQL shape, not production rows).
 
 ### Flow 3 — Scan-driven refactor
 

@@ -34,6 +34,7 @@ internal static class Program
             options.Provider,
             options.Expression,
             options.DbLog,
+            options.NoDbLog,
             options.DbLogLevel,
             options.DbLogVerbose,
             options.AboutJson,
@@ -52,6 +53,7 @@ internal static class Program
         string? providerRaw,
         string? expressionOptionValue,
         bool dbLogEnabled,
+        bool noDbLog,
         string? dbLogLevelRaw,
         bool dbLogVerbose,
         bool aboutJson,
@@ -68,7 +70,11 @@ internal static class Program
 
         var quietOutput = noBanner || outputFormat == CliOutputFormat.Json || aboutJson;
 
-        var dbLogSettings = new DbLogSettings { Enabled = dbLogEnabled, Verbose = dbLogVerbose };
+        var dbLogSettings = new DbLogSettings
+        {
+            Enabled = noDbLog ? false : dbLogEnabled,
+            Verbose = dbLogVerbose,
+        };
 
         if (!string.IsNullOrWhiteSpace(dbLogLevelRaw)
             && DbLogLevelParser.TryParse(dbLogLevelRaw, out var parsedLevel))
