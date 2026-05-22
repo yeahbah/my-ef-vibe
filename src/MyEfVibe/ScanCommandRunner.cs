@@ -1,143 +1,26 @@
-using System.CommandLine;
 using Spectre.Console;
 
 namespace MyEfVibe;
 
 internal static class ScanCommandRunner
 {
-    private sealed record ScanCommandDefinition(
-        Command Command,
-        Argument<string> ModeArgument,
-        Option<DirectoryInfo?> WorkspaceOption,
-        Option<FileInfo?> ProjectOption,
-        Option<FileInfo?> StartupProjectOption,
-        Option<string?> ContextOption,
-        Option<string?> FrameworkOption,
-        Option<string?> FailOnOption,
-        Option<string?> MinSeverityOption,
-        Option<bool> RespectDismissalsOption,
-        Option<bool> JsonOption,
-        Option<string?> ConnectionOption,
-        Option<string?> ProviderOption);
-
-    private static ScanCommandDefinition CreateDefinition()
-    {
-        var modeArgument = new Argument<string>("mode")
-        {
-            Description = "Scan mode: lite (static heuristics) or deep (heuristics + SQL translation).",
-        };
-
-        var workspaceOption = new Option<DirectoryInfo?>(
-            aliases: new[] { "-w", "--workspace" },
-            description: "Workspace root for scan artifacts.");
-
-        var projectOption = new Option<FileInfo?>(
-            aliases: new[] { "-p", "--project" },
-            description: "EF Core project (.csproj) to scan.");
-
-        var startupProjectOption = new Option<FileInfo?>(
-            aliases: new[] { "-s", "--startup-project" },
-            description: "Startup project for configuration (optional).");
-
-        var contextOption = new Option<string?>(
-            aliases: new[] { "-c", "--context" },
-            description: "DbContext type name (required for deep scan when multiple contexts exist).");
-
-        var frameworkOption = new Option<string?>(
-            aliases: new[] { "-f", "--framework" },
-            description: "Target framework moniker for building the project (e.g. net10.0).");
-
-        var failOnOption = new Option<string?>(
-            aliases: new[] { "--fail-on" },
-            description: "Exit code 1 when any finding has this severity or higher (info | warning | error | critical). "
-                + "Also limits printed/saved findings to that level unless --min-severity is set.");
-
-        var minSeverityOption = new Option<string?>(
-            aliases: new[] { "--min-severity" },
-            description: "Only report findings at or above this severity (info | warning | error | critical). "
-                + "Overrides the report filter implied by --fail-on.");
-
-        var respectDismissalsOption = new Option<bool>(
-            aliases: new[] { "--respect-dismissals" },
-            description: "Exclude findings previously dismissed in the REPL session.",
-            getDefaultValue: () => false);
-
-        var jsonOption = new Option<bool>(
-            aliases: new[] { "--json" },
-            description: "Write scan summary and findings as JSON to stdout.",
-            getDefaultValue: () => false);
-
-        var connectionOption = new Option<string?>(
-            aliases: new[] { "--connection-string", "-cs" },
-            description: "Connection string for deep scan (requires --provider).");
-
-        var providerOption = new Option<string?>(
-            aliases: new[] { "--provider" },
-            description: "Database provider for deep scan with --connection-string.");
-
-        var command = new Command("scan", "Run LINQ scan for CI (lite or deep) and optionally fail on severity.")
-        {
-            modeArgument,
-            workspaceOption,
-            projectOption,
-            startupProjectOption,
-            contextOption,
-            frameworkOption,
-            failOnOption,
-            minSeverityOption,
-            respectDismissalsOption,
-            jsonOption,
-            connectionOption,
-            providerOption,
-        };
-
-        return new ScanCommandDefinition(
-            command,
-            modeArgument,
-            workspaceOption,
-            projectOption,
-            startupProjectOption,
-            contextOption,
-            frameworkOption,
-            failOnOption,
-            minSeverityOption,
-            respectDismissalsOption,
-            jsonOption,
-            connectionOption,
-            providerOption);
-    }
-
-    internal static async Task<int> RunFromArgsAsync(string[] scanArgs, CancellationToken cancellationToken = default)
-    {
-        CliUi.Configure();
-
-        var definition = CreateDefinition();
-        var parseResult = definition.Command.Parse(scanArgs);
-
-        if (parseResult.Errors.Count > 0)
-        {
-            foreach (var error in parseResult.Errors)
-                AnsiConsole.MarkupLine($"[red]{Markup.Escape(error.Message)}[/]");
-
-            return 1;
-        }
-
-        return await RunAsync(
-            parseResult.GetValueForArgument(definition.ModeArgument),
-            parseResult.GetValueForOption(definition.WorkspaceOption)
-                ?? new DirectoryInfo(SessionPaths.GetDefaultWorkspaceDirectory()),
-            parseResult.GetValueForOption(definition.ProjectOption),
-            parseResult.GetValueForOption(definition.StartupProjectOption),
-            parseResult.GetValueForOption(definition.ContextOption),
-            parseResult.GetValueForOption(definition.FrameworkOption),
-            parseResult.GetValueForOption(definition.FailOnOption),
-            parseResult.GetValueForOption(definition.MinSeverityOption),
-            parseResult.GetValueForOption(definition.RespectDismissalsOption),
-            parseResult.GetValueForOption(definition.JsonOption),
-            parseResult.GetValueForOption(definition.ConnectionOption),
-            parseResult.GetValueForOption(definition.ProviderOption),
+    internal static Task<int> RunFromOptionsAsync(
+        ScanCliOptions options,
+        CancellationToken cancellationToken = default) =>
+        RunAsync(
+            options.Mode,
+            CliPathHelper.ResolveWorkspace(options.Workspace),
+            CliPathHelper.ToFileInfo(options.Project),
+            CliPathHelper.ToFileInfo(options.StartupProject),
+            options.Context,
+            options.Framework,
+            options.FailOn,
+            options.MinSeverity,
+            options.RespectDismissals,
+            options.Json,
+            options.ConnectionString,
+            options.Provider,
             cancellationToken);
-    }
 
     internal static async Task<int> RunAsync(
         string? modeRaw,

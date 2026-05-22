@@ -1,142 +1,44 @@
-using System.CommandLine;
-using System.Diagnostics;
+using CommandLine;
 using Spectre.Console;
 
 namespace MyEfVibe;
 
 internal static class Program
 {
-    public static async Task<int> Main(string[] args)
+    public static Task<int> Main(string[] args)
     {
-        if (IsVersionRequest(args))
+        if (args.Length > 0 && string.Equals(args[0], "scan", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine(ToolInfo.GetVersion());
-            return 0;
+            return Parser.Default.ParseArguments<ScanCliOptions>(args[1..])
+                .MapResult(
+                    (ScanCliOptions options) => ScanCommandRunner.RunFromOptionsAsync(options),
+                    (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
         }
 
-        if (args.Length > 0 && string.Equals(args[0], "scan", StringComparison.OrdinalIgnoreCase))
-            return await ScanCommandRunner.RunFromArgsAsync(args[1..]);
+        return Parser.Default.ParseArguments<EfvibeCliOptions>(args)
+            .MapResult(
+                (EfvibeCliOptions options) => RunEfvibeAsync(options),
+                (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+    }
 
+    private static async Task<int> RunEfvibeAsync(EfvibeCliOptions options)
+    {
         CliUi.Configure();
 
-        var workspaceOption = new Option<DirectoryInfo?>(
-            aliases: new[] { "-w", "--workspace" },
-            description:
-                "Session directory for exports and other artifacts (created if missing). "
-                + "Default: ~/.efvibe on macOS/Linux, %APPDATA%/efvibe on Windows.");
-
-        var projectOption = new Option<FileInfo?>(
-            aliases: new[] { "-p", "--project" },
-            description: "EF Core project to build (`.csproj` with the DbContext).");
-
-        var startupProjectOption = new Option<FileInfo?>(
-            aliases: new[] { "-s", "--startup-project" },
-            description: "Startup project for configuration (user secrets, appsettings). Auto-inferred from project references when omitted.");
-
-        var contextOption = new Option<string?>(
-            aliases: new[] { "-c", "--context" },
-            description: "DbContext type name (e.g. MyDbContext) or fully qualified name when multiple contexts are present.");
-
-        var connectionOption = new Option<string?>(
-            aliases: new[] { "--connection-string", "-cs" },
-            description: "Connection string used when constructing `DbContextOptions<TContext>` manually.");
-
-        var providerOption = new Option<string?>(
-            aliases: new[] { "--provider" },
-            description: "Database provider key used with `--connection-string`: sqlserver | npgsql | sqlite | oracle | mysql | mariadb.");
-
-        var expressionOption = new Option<string?>(
-            aliases: new[] { "-e", "--expression" },
-            description: "Run a single expression and exit (non-interactive).");
-
-        var dbLogOption = new Option<bool>(
-            aliases: new[] { "--dblog" },
-            description: "Enable EF database command logging (default: on; toggle in REPL with :dblog).",
-            getDefaultValue: () => true);
-
-        var dbLogLevelOption = new Option<string?>(
-            aliases: new[] { "--dblog-level" },
-            description: "Database log level: trace | debug | information | warning | error | critical | none.");
-
-        var dbLogVerboseOption = new Option<bool>(
-            aliases: new[] { "--dblog-verbose" },
-            description: "Show full EF diagnostic logs (default: sql-only executed commands).");
-
-        var versionOption = new Option<bool>(
-            aliases: new[] { "--version", "-V" },
-            description: "Show tool version and exit.");
-
-        var aboutJsonOption = new Option<bool>(
-            aliases: new[] { "--about-json" },
-            description: "Write session metadata as JSON to stdout and exit (no REPL).");
-
-        var frameworkOption = new Option<string?>(
-            aliases: new[] { "-f", "--framework" },
-            description:
-                "Target framework moniker for building the workspace project (for example net8.0). "
-                + "Defaults to a framework listed in the project file, not the efvibe tool runtime.");
-
-        var expressionArgument = new Argument<string[]>("expression")
-
-        {
-            Arity = ArgumentArity.ZeroOrMore,
-            Description = "Optional one-shot expression when `-e` is omitted but arguments are provided.",
-        };
-
-        var rootCommand = new RootCommand(
-            "Interactive EF Core LINQ shell against another project's DbContext.")
-        {
-            workspaceOption,
-            projectOption,
-            startupProjectOption,
-            contextOption,
-            connectionOption,
-            providerOption,
-            expressionOption,
-            dbLogOption,
-            dbLogLevelOption,
-            dbLogVerboseOption,
-            versionOption,
-            aboutJsonOption,
-            frameworkOption,
-            expressionArgument,
-        };
-
-        rootCommand.Name = "efvibe";
-
-        var parseResult = rootCommand.Parse(args);
-
-        if (parseResult.Errors.Count > 0)
-        {
-            foreach (var error in parseResult.Errors)
-                AnsiConsole.MarkupLine($"[red]{Markup.Escape(error.Message)}[/]");
-
-            return 1;
-        }
-
-        if (parseResult.GetValueForOption(versionOption))
-        {
-            Console.WriteLine(ToolInfo.GetVersion());
-            return 0;
-        }
-
-        var workspace = parseResult.GetValueForOption(workspaceOption)
-            ?? new DirectoryInfo(SessionPaths.GetDefaultWorkspaceDirectory());
-
         return await InvokeAsync(
-            workspace,
-            parseResult.GetValueForOption(projectOption),
-            parseResult.GetValueForOption(startupProjectOption),
-            parseResult.GetValueForOption(contextOption),
-            parseResult.GetValueForOption(connectionOption),
-            parseResult.GetValueForOption(providerOption),
-            parseResult.GetValueForOption(expressionOption),
-            parseResult.GetValueForOption(dbLogOption),
-            parseResult.GetValueForOption(dbLogLevelOption),
-            parseResult.GetValueForOption(dbLogVerboseOption),
-            parseResult.GetValueForOption(aboutJsonOption),
-            parseResult.GetValueForOption(frameworkOption),
-            parseResult.GetValueForArgument(expressionArgument));
+            CliPathHelper.ResolveWorkspace(options.Workspace),
+            CliPathHelper.ToFileInfo(options.Project),
+            CliPathHelper.ToFileInfo(options.StartupProject),
+            options.Context,
+            options.ConnectionString,
+            options.Provider,
+            options.Expression,
+            options.DbLog,
+            options.DbLogLevel,
+            options.DbLogVerbose,
+            options.AboutJson,
+            options.Framework,
+            options.ExpressionParts);
     }
 
     private static async Task<int> InvokeAsync(
@@ -152,7 +54,7 @@ internal static class Program
         bool dbLogVerbose,
         bool aboutJson,
         string? frameworkOrNull,
-        string[]? expressionArgumentTokens)
+        IEnumerable<string>? expressionParts)
     {
         var dbLogSettings = new DbLogSettings { Enabled = dbLogEnabled, Verbose = dbLogVerbose };
 
@@ -170,7 +72,7 @@ internal static class Program
             return 3;
         }
 
-        var oneShotExpression = ResolveOneShotExpression(expressionOptionValue, expressionArgumentTokens);
+        var oneShotExpression = CliPathHelper.ResolveOneShotExpression(expressionOptionValue, expressionParts);
 
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
         var searchDirectory = ProjectPathResolver.ResolveSearchDirectory(
@@ -296,34 +198,5 @@ internal static class Program
         await repl.RunAsync();
 
         return 0;
-    }
-
-    private static string? ResolveOneShotExpression(string? expressionOptionValue, string[]? expressionArgumentTokens)
-    {
-        if (!string.IsNullOrWhiteSpace(expressionOptionValue))
-            return expressionOptionValue.Trim();
-
-        if (expressionArgumentTokens is not { Length: > 0 })
-            return null;
-
-        return string.Join(' ', expressionArgumentTokens).Trim();
-    }
-
-    private static bool IsVersionRequest(string[] args)
-    {
-        if (args.Length is 0 or > 2)
-            return false;
-
-        foreach (var arg in args)
-        {
-            if (string.Equals(arg, "--version", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(arg, "-V", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(arg, "-v", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            return false;
-        }
-
-        return args.Length > 0;
     }
 }
