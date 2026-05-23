@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { EvaluationJsonPayload } from './evaluationTypes';
+import { canExportPayload, exportEvaluationPayload } from './resultExport';
 
 const VIEW_TYPE = 'efvibe.result';
 
@@ -17,17 +18,45 @@ export class EfvibeResultPanel {
 
   private onRun: PanelRunHandler;
 
-  private constructor(panel: vscode.WebviewPanel, onRun: PanelRunHandler) {
+  private lastPayload: EvaluationJsonPayload | undefined;
+
+  private exportDirectory: string | undefined;
+
+  private constructor(
+    panel: vscode.WebviewPanel,
+    onRun: PanelRunHandler,
+    exportDirectory?: string,
+  ) {
     this.panel = panel;
     this.onRun = onRun;
+    this.exportDirectory = exportDirectory;
 
-    panel.webview.onDidReceiveMessage(async (message: { type?: string; expression?: string }) => {
+    panel.webview.onDidReceiveMessage(async (message: { type?: string; expression?: string; text?: string }) => {
       if (message.type === 'run' || message.type === 'plan') {
         const expression = typeof message.expression === 'string' ? message.expression : '';
         await this.onRun({
           expression,
           withPlan: message.type === 'plan',
         });
+        return;
+      }
+
+      if (message.type === 'exportCsv' || message.type === 'exportJson') {
+        if (!this.lastPayload) {
+          return;
+        }
+
+        await exportEvaluationPayload(
+          this.lastPayload,
+          message.type === 'exportCsv' ? 'csv' : 'json',
+          this.exportDirectory,
+        );
+        return;
+      }
+
+      if (message.type === 'copy' && typeof message.text === 'string') {
+        await vscode.env.clipboard.writeText(message.text);
+        void vscode.window.setStatusBarMessage('efvibe: Copied to clipboard.', 2000);
       }
     });
 
@@ -43,12 +72,15 @@ export class EfvibeResultPanel {
     payload: EvaluationJsonPayload,
     expression: string,
     onRun: PanelRunHandler,
+    exportDirectory?: string,
   ): void {
     const showIn = resolveSplitViewColumn();
-    const { html } = buildHtml(context.extensionUri, payload, expression);
+    const { html } = buildHtml(payload, expression);
 
     if (EfvibeResultPanel.current) {
       EfvibeResultPanel.current.onRun = onRun;
+      EfvibeResultPanel.current.lastPayload = payload;
+      EfvibeResultPanel.current.exportDirectory = exportDirectory;
 
       if (typeof showIn === 'number') {
         EfvibeResultPanel.current.panel.reveal(showIn);
@@ -72,11 +104,17 @@ export class EfvibeResultPanel {
     );
 
     panel.webview.html = html;
-    EfvibeResultPanel.current = new EfvibeResultPanel(panel, onRun);
+    const instance = new EfvibeResultPanel(panel, onRun, exportDirectory);
+    instance.lastPayload = payload;
+    EfvibeResultPanel.current = instance;
   }
 
   static isOpen(): boolean {
     return EfvibeResultPanel.current !== undefined;
+  }
+
+  static getLastPayload(): EvaluationJsonPayload | undefined {
+    return EfvibeResultPanel.current?.lastPayload;
   }
 }
 
@@ -92,19 +130,19 @@ function resolveSplitViewColumn(): vscode.ViewColumn | {
 }
 
 function buildHtml(
-  _extensionUri: vscode.Uri,
   payload: EvaluationJsonPayload,
   expression: string,
 ): { html: string } {
   const nonce = getNonce();
+  const exportEnabled = canExportPayload(payload);
   const resultSection = payload.success
     ? formatResultBody(payload)
-    : `<pre class="error">${escapeHtml(payload.error ?? 'Evaluation failed.')}</pre>`;
+    : copyablePreBlock(payload.error ?? 'Evaluation failed.', 'error');
 
   const sqlBlocks = payload.sql.length > 0
     ? payload.sql.map((sql, index) => {
         const title = payload.sql.length > 1 ? `SQL ${index + 1}` : 'SQL';
-        return `<section><h3>${title}</h3><pre>${escapeHtml(sql)}</pre></section>`;
+        return copyableSection(title, sql, 'h3');
       }).join('')
     : '<p class="muted">No SQL captured for this run.</p>';
 
@@ -130,11 +168,42 @@ function buildHtml(
   <style>
     body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 12px 16px; margin: 0; }
     h2, h3 { font-weight: 600; margin: 0 0 8px; }
-    pre { background: var(--vscode-textCodeBlock-background); padding: 10px; overflow: auto; white-space: pre-wrap; border-radius: 4px; margin: 0; }
+    pre { background: var(--vscode-textCodeBlock-background); overflow: auto; white-space: pre-wrap; border-radius: 4px; margin: 0; }
+    .copyable-box { position: relative; margin: 0; }
+    .copyable-box pre.copyable-content {
+      padding: 32px 12px 10px 10px;
+      border: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
+      font-size: 0.85rem;
+    }
+    .copyable-box.copyable-box-input .expr-input {
+      padding-top: 32px;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      z-index: 1;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 4px 7px;
+      border-radius: 4px;
+      background: var(--vscode-editor-background);
+      color: var(--vscode-foreground);
+      border: 1px solid var(--vscode-panel-border);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: var(--vscode-list-hoverBackground); }
+    .copy-btn.copied {
+      color: var(--vscode-testing-iconPassed, var(--vscode-gitDecoration-addedResourceForeground));
+      border-color: var(--vscode-testing-iconPassed, var(--vscode-gitDecoration-addedResourceForeground));
+    }
     .muted { color: var(--vscode-descriptionForeground); }
     .error { color: var(--vscode-errorForeground); }
+    pre.error.copyable-content { color: var(--vscode-errorForeground); }
     .expr { margin-bottom: 16px; }
-    .expr textarea {
+    .expr .expr-input {
       width: 100%;
       min-height: 7rem;
       box-sizing: border-box;
@@ -177,12 +246,17 @@ function buildHtml(
 <body>
   <section class="expr">
     <h2>Expression</h2>
-    <textarea id="expression" spellcheck="false">${escapeHtml(expression)}</textarea>
+    <div class="copyable-box copyable-box-input">
+      <button type="button" class="copy-btn" data-copy-from="expression" title="Copy to clipboard" aria-label="Copy to clipboard">📋</button>
+      <textarea id="expression" class="expr-input" spellcheck="false">${escapeHtml(expression)}</textarea>
+    </div>
     <div class="toolbar">
       <button class="primary" id="run">Run</button>
-      <button class="secondary" id="plan">Run :plan</button>
+      <button class="secondary" id="plan">Run Plan</button>
+      <button class="secondary" id="exportCsv" ${exportEnabled ? '' : 'disabled'}>Export CSV</button>
+      <button class="secondary" id="exportJson" ${exportEnabled ? '' : 'disabled'}>Export JSON</button>
     </div>
-    <p class="hint">Edit parameter values and re-run. Read-only: Add/Update/Remove, SaveChanges, ExecuteSql, and destructive SQL are blocked.</p>
+    <p class="hint">Edit parameter values and re-run. Export last result like REPL <code>:export csv|json</code>. Read-only: mutations are blocked.</p>
   </section>
   <p class="metrics">${escapeHtml(metrics.join(' · '))}</p>
   <section>
@@ -200,20 +274,55 @@ function buildHtml(
     const expressionEl = document.getElementById('expression');
     const runBtn = document.getElementById('run');
     const planBtn = document.getElementById('plan');
+    const exportCsvBtn = document.getElementById('exportCsv');
+    const exportJsonBtn = document.getElementById('exportJson');
 
     function post(type) {
       runBtn.disabled = true;
       planBtn.disabled = true;
+      if (exportCsvBtn) exportCsvBtn.disabled = true;
+      if (exportJsonBtn) exportJsonBtn.disabled = true;
       vscode.postMessage({ type, expression: expressionEl.value });
     }
 
     runBtn.addEventListener('click', () => post('run'));
     planBtn.addEventListener('click', () => post('plan'));
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener('click', () => vscode.postMessage({ type: 'exportCsv' }));
+    }
+
+    if (exportJsonBtn) {
+      exportJsonBtn.addEventListener('click', () => vscode.postMessage({ type: 'exportJson' }));
+    }
     expressionEl.addEventListener('keydown', (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
         post('run');
       }
+    });
+    document.querySelectorAll('.copy-btn').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const targetId = button.getAttribute('data-copy-from');
+        const box = button.closest('.copyable-box');
+        const fromInput = targetId ? document.getElementById(targetId) : null;
+        const text = fromInput instanceof HTMLTextAreaElement
+          ? fromInput.value
+          : (box?.querySelector('.copyable-content')?.textContent ?? '');
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          button.textContent = '✓';
+          button.classList.add('copied');
+          button.setAttribute('title', 'Copied');
+          setTimeout(() => {
+            button.textContent = '📋';
+            button.classList.remove('copied');
+            button.setAttribute('title', 'Copy to clipboard');
+          }, 1500);
+        } catch {
+          vscode.postMessage({ type: 'copy', text });
+        }
+      });
     });
   </script>
 </body>
@@ -224,11 +333,11 @@ function buildHtml(
 
 function buildPlanSection(payload: EvaluationJsonPayload): string {
   if (payload.queryPlan) {
-    return `<section><h2>Query plan (:plan)</h2><pre>${escapeHtml(payload.queryPlan)}</pre></section>`;
+    return copyableSection('Query plan (:plan)', payload.queryPlan, 'h2');
   }
 
   if (payload.queryPlanNote) {
-    return `<section><h2>Query plan (:plan)</h2><pre class="error">${escapeHtml(payload.queryPlanNote)}</pre></section>`;
+    return `<section><h2>Query plan (:plan)</h2>${copyablePreBlock(payload.queryPlanNote, 'error')}</section>`;
   }
 
   return '';
@@ -254,7 +363,23 @@ function formatResultBody(payload: EvaluationJsonPayload): string {
     return '<p class="muted">&lt;null&gt;</p>';
   }
 
-  return `<pre>${escapeHtml(payload.value)}</pre>`;
+  return copyablePreBlock(String(payload.value));
+}
+
+function copyableSection(title: string, content: string, titleTag: 'h2' | 'h3' = 'h3'): string {
+  return `<section>
+      <${titleTag}>${escapeHtml(title)}</${titleTag}>
+      ${copyablePreBlock(content)}
+    </section>`;
+}
+
+function copyablePreBlock(content: string, extraClass = ''): string {
+  const classNames = ['copyable-content', extraClass].filter(Boolean).join(' ');
+
+  return `<div class="copyable-box">
+        <button type="button" class="copy-btn" title="Copy to clipboard" aria-label="Copy to clipboard">📋</button>
+        <pre class="${classNames}">${escapeHtml(content)}</pre>
+      </div>`;
 }
 
 function collectColumns(rows: Array<Record<string, string>>): string[] {

@@ -8,63 +8,66 @@ namespace MyEfVibe;
 /// Invokes <see cref="Queryable"/> and EF async operators on workspace <see cref="IQueryable{T}"/>
 /// instances without compile-time casts (avoids InvalidCastException on <c>InternalDbSet&lt;T&gt;</c>).
 /// </summary>
-internal static class ReplQueryableRuntime
+/// <remarks>
+/// Public so Roslyn script submissions (separate dynamic assemblies) can call rewritten <c>db.*</c> terminals.
+/// </remarks>
+public static class ReplQueryableRuntime
 {
-    internal static object First(object source) =>
+    public static object First(object source) =>
         InvokeQueryable("First", source);
 
-    internal static object? FirstOrDefault(object source) =>
+    public static object? FirstOrDefault(object source) =>
         InvokeQueryable("FirstOrDefault", source);
 
-    internal static object Single(object source) =>
+    public static object Single(object source) =>
         InvokeQueryable("Single", source);
 
-    internal static object? SingleOrDefault(object source) =>
+    public static object? SingleOrDefault(object source) =>
         InvokeQueryable("SingleOrDefault", source);
 
-    internal static object First(object source, object predicate) =>
+    public static object First(object source, object predicate) =>
         InvokeQueryable("First", source, predicate);
 
-    internal static object? FirstOrDefault(object source, object predicate) =>
+    public static object? FirstOrDefault(object source, object predicate) =>
         InvokeQueryable("FirstOrDefault", source, predicate);
 
-    internal static object Single(object source, object predicate) =>
+    public static object Single(object source, object predicate) =>
         InvokeQueryable("Single", source, predicate);
 
-    internal static object? SingleOrDefault(object source, object predicate) =>
+    public static object? SingleOrDefault(object source, object predicate) =>
         InvokeQueryable("SingleOrDefault", source, predicate);
 
-    internal static object Where(object source, object predicate) =>
+    public static object Where(object source, object predicate) =>
         InvokeQueryable("Where", source, predicate);
 
-    internal static object Select(object source, object selector) =>
+    public static object Select(object source, object selector) =>
         InvokeQueryable("Select", source, selector);
 
-    internal static object Take(object source, object count) =>
+    public static object Take(object source, object count) =>
         InvokeQueryable("Take", source, count);
 
-    internal static Task<object?> FirstAsync(object source, CancellationToken cancellationToken = default) =>
+    public static Task<object?> FirstAsync(object source, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("FirstAsync", source, cancellationToken);
 
-    internal static Task<object?> FirstOrDefaultAsync(object source, CancellationToken cancellationToken = default) =>
+    public static Task<object?> FirstOrDefaultAsync(object source, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("FirstOrDefaultAsync", source, cancellationToken);
 
-    internal static Task<object?> SingleAsync(object source, CancellationToken cancellationToken = default) =>
+    public static Task<object?> SingleAsync(object source, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("SingleAsync", source, cancellationToken);
 
-    internal static Task<object?> SingleOrDefaultAsync(object source, CancellationToken cancellationToken = default) =>
+    public static Task<object?> SingleOrDefaultAsync(object source, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("SingleOrDefaultAsync", source, cancellationToken);
 
-    internal static Task<object?> FirstAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
+    public static Task<object?> FirstAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("FirstAsync", source, cancellationToken, predicate);
 
-    internal static Task<object?> FirstOrDefaultAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
+    public static Task<object?> FirstOrDefaultAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("FirstOrDefaultAsync", source, cancellationToken, predicate);
 
-    internal static Task<object?> SingleAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
+    public static Task<object?> SingleAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("SingleAsync", source, cancellationToken, predicate);
 
-    internal static Task<object?> SingleOrDefaultAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
+    public static Task<object?> SingleOrDefaultAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("SingleOrDefaultAsync", source, cancellationToken, predicate);
 
     private static object InvokeQueryable(string methodName, object source, object? secondArgument = null)

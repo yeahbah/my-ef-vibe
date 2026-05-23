@@ -60,17 +60,18 @@ flowchart LR
 - `--version` / `--about-json` — session metadata without parsing Spectre markup (`--about-json` added)
 - Consistent non-zero exit codes on build / DbContext failure (existing: 1 parse, 3 provider, 10 workspace, 14 DbContext)
 
-### Phase 1 — Editor-integrated queries (4–6 weeks) ✅ implemented in `vscode-extension/` v0.2.1
+### Phase 1 — Editor-integrated queries (4–6 weeks) ✅ implemented in `vscode-extension/` v0.2.2
 
 **Goal:** Run LINQ from the editor without manually typing in the terminal.
 
 | Feature | Behavior |
 |---------|----------|
-| Run selection / line | Context menu → `efvibe -e --format json`; result in split webview panel or output channel |
+| Run selection / line | `efvibe serve` daemon (default) or `efvibe -e --format json` fallback; split webview panel or output channel |
 | Run at cursor | Statement expansion + repository snippet adapter (CLI `RepositorySnippetAdapter`) |
+| Editable result panel | Edit expression (e.g. parameter stubs), **Run**, **Run :plan** (`--with-plan`); read-only guard blocks mutations |
 | SQL panel | Webview beside editor shows executed/translated SQL from JSON payload |
 | Launch config | **efvibe: Generate REPL Task** writes `.vscode/tasks.json` shell task |
-| Settings | `efvibe.dbLog` → `--dblog` / `--no-dblog` (not deprecated `--sql`) |
+| Settings | `efvibe.dbLog`, `efvibe.useDaemon` (default true), `efvibe.resultDestination` |
 
 **CLI gaps (closed in repo):**
 
@@ -88,29 +89,32 @@ flowchart LR
 
 - Optional `--no-banner` for clean parsing
 
-### Phase 2 — Scan in the editor (4–5 weeks)
+### Phase 2 — Scan in the editor (4–5 weeks) ✅ implemented in `vscode-extension/` v0.3.1
 
-**Goal:** `:scan lite` / `:scan deep` as first-class IDE diagnostics.
+**Goal:** `:scan lite` / `:scan deep` as a first-class IDE review flow.
 
-efvibe already writes under the session folder:
+efvibe writes under the session folder:
 
 - `myefvibe-scan-lite.json` / `myefvibe-scan-deep.json`
 - `myefvibe-scan-dismissals.json`, `myefvibe-scan-notes.json`
 
 | Feature | Behavior |
 |---------|----------|
-| Scan workspace command | Batch mode (new flag) writes JSON under session dir |
-| Problems panel | Findings → `vscode.Diagnostic` (file, line, rule id as `code`, recommendation in `relatedInformation`) |
-| CodeLens | “efvibe: N+1 risk” / “View SQL” on deep-scan `query-site` lines |
-| Hover | `translatedSql`, `sqlTranslationNote`, saved note from JSON |
-| Dismiss / note | Commands update same JSON stores as CLI (`:dismiss`, `:note`) |
-| Watch | `FileSystemWatcher` on scan JSON → refresh diagnostics after REPL scan |
+| Scan workspace command | `efvibe scan lite\|deep --json --no-banner` from **Scan Workspace** / **Scan Workspace (Deep)** |
+| **Scan Review** tab | Carousel UI — one finding at a time, **Previous/Next**, clickable location, **Dismiss**, **Note**, **📋 copy** on code/SQL/plan |
+| Optional Problems panel | `efvibe.scan.problemsPanel` (default `false`) — avoids C# LSP conflicts on squiggled lines |
+| Watch | `FileSystemWatcher` on scan JSON → refresh review after REPL `:scan` |
 
-**CLI gaps:**
+**Deferred to Phase 2+ / Phase 3:**
 
-- `efvibe scan lite|deep --non-interactive` (no REPL; exit 0/1; write JSON only)
-- `efvibe scan dismiss|note` subcommands for extension parity
+- CodeLens on `query-site` lines
+- `efvibe scan note` CLI subcommand (REPL `:note` only today)
 - Stable **rule id → docs URL** map for “Learn more” in hovers
+
+**CLI (closed in repo):**
+
+- Headless `efvibe scan lite|deep` with `--json`, `--no-banner`, `--respect-dismissals`
+- Public `ReplQueryableRuntime` for repository-snippet evaluation in Roslyn scripts
 
 ### Phase 3 — Rich REPL experience (6+ weeks)
 
@@ -223,7 +227,7 @@ The extension can consume today’s scan files without waiting for new formats. 
 ### Flow 2 — Debug a query in a repository
 
 1. User selects a multiline handler query (`await DbContext....FirstOrDefaultAsync(cancellationToken)`).
-2. **Run Selection** runs `efvibe -e --format json --no-banner`; CLI strips `await`, rewrites `DbContext` → `db`, stubs parameters (`entraObjectId` → `Guid.Empty`, etc.), converts async terminals to sync.
+2. **Run Selection** sends the snippet to `efvibe serve` (or one-shot `efvibe -e --format json`); CLI strips `await`, rewrites `DbContext` → `db`, stubs parameters, converts async terminals to sync. User edits values in the panel and re-runs without a full rebuild.
 3. Split webview shows result rows, SQL, and warnings (stubbed values — SQL shape, not production rows).
 
 ### Flow 3 — Scan-driven refactor

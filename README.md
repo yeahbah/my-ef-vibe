@@ -25,7 +25,7 @@ Startup banner, session panel, and a LINQ query with translated SQL, results, an
 
 ![efvibe :scan deep with translated SQL and query plan](screenshots/scan-deep.png)
 
-VS Code extension — **Run Selection** with split result + SQL panel ([vscode-extension/README.md](vscode-extension/README.md)):
+VS Code extension (v0.3.1) — **Run Selection** via `efvibe serve`, editable result panel with **📋 copy** on SQL/plan blocks, **Scan Review** carousel ([vscode-extension/README.md](vscode-extension/README.md)):
 
 ![efvibe VS Code extension: editor, result panel, and SQL](screenshots/vscode1.png)
 
@@ -186,7 +186,7 @@ Highlights:
 |-----|-------------|
 | [features.md](features.md) | Full REPL and CLI reference |
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md) | Install the VS Code extension locally (not on Marketplace yet) |
-| [vscode-extension/README.md](vscode-extension/README.md) | VS Code extension (Phase 1: run selection, repository snippets, split SQL panel) |
+| [vscode-extension/README.md](vscode-extension/README.md) | VS Code extension (run selection, `efvibe serve`, scan review, editable panel) |
 | [docs/vscode-extension-plan.md](docs/vscode-extension-plan.md) | VS Code extension roadmap (phases, CLI hooks, diagnostics) |
 | [docs/efvibe-daemon-and-vscode.md](docs/efvibe-daemon-and-vscode.md) | `efvibe serve` daemon — fast Run Selection in VS Code |
 | [docs/visual-studio-extension-plan.md](docs/visual-studio-extension-plan.md) | Visual Studio 2022+ extension roadmap (VSIX, Error List, tool windows) |

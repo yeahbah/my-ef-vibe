@@ -35,3 +35,27 @@ export function getDbContextSessionDirectory(
   const contextFolder = getDbContextSessionFolderName(dbContextName);
   return path.join(workspaceRoot, projectFolder, contextFolder);
 }
+
+export function getProjectScanDirectory(workspaceRoot: string, projectCsprojPath: string): string {
+  const projectFolder = getProjectSessionFolderName(projectCsprojPath);
+  return path.join(workspaceRoot, projectFolder, 'scan');
+}
+
+export const LITE_SCAN_FILE_NAME = 'myefvibe-scan-lite.json';
+export const DEEP_SCAN_FILE_NAME = 'myefvibe-scan-deep.json';
+export const SCAN_DISMISSALS_FILE_NAME = 'myefvibe-scan-dismissals.json';
+
+export function getLiteScanFilePath(workspaceRoot: string, projectCsprojPath: string): string {
+  return path.join(getProjectScanDirectory(workspaceRoot, projectCsprojPath), LITE_SCAN_FILE_NAME);
+}
+
+export function getDeepScanFilePath(
+  workspaceRoot: string,
+  projectCsprojPath: string,
+  dbContextName: string,
+): string {
+  return path.join(
+    getDbContextSessionDirectory(workspaceRoot, projectCsprojPath, dbContextName),
+    DEEP_SCAN_FILE_NAME,
+  );
+}

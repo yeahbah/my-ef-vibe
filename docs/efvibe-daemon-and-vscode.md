@@ -1,8 +1,12 @@
 # efvibe daemon vs one-shot (VS Code performance)
 
-## Why Run Selection feels slow
+## Why one-shot Run Selection was slow
 
-**Run Selection today is fully one-shot.** Each run starts a new `efvibe` process, which **builds the EF project, loads the workspace host, creates the `DbContext`, evaluates once, and exits**. That is slower than an interactive REPL where build and connection stay warm.
+**Before `efvibe serve`, each Run Selection started a new process**, which **built the EF project, loaded the workspace host, created the `DbContext`, evaluated once, and exited**. That was much slower than an interactive REPL where build and connection stay warm.
+
+**VS Code v0.3.1+** uses `efvibe serve` by default (`efvibe.useDaemon`: true). Set `efvibe.useDaemon`: false to restore per-run `efvibe -e` one-shot behavior.
+
+**Scan Review** (v0.3.1) runs `efvibe scan` headless and opens a carousel tab for findings — separate from the result panel used for Run Selection.
 
 | One-shot (`efvibe -e "…"`) | Interactive REPL (`efvibe`) |
 |----------------------------|-----------------------------|

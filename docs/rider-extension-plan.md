@@ -94,7 +94,7 @@ Aligned with [vscode-extension-plan.md](./vscode-extension-plan.md). VS Code Pha
 
 | Feature | Behavior |
 |---------|----------|
-| **Run selection / line / statement** | `AnAction` on `PsiFile` (C#); extract text via PSI or raw selection (statement expansion can mirror TS or defer to CLI-only selection) |
+| **Run selection / line / statement** | `AnAction` on `PsiFile` (C#); prefer `efvibe serve` daemon (same JSON protocol as VS Code), fallback to one-shot `-e` |
 | **Repository snippets** | CLI `RepositorySnippetAdapter` |
 | **Result tool window** | `SimpleToolWindowPanel` or JCEF for HTML table; expression `JTextArea`, **Run**, **Run :plan** |
 | **Read-only guard** | Kotlin port of `expressionGuard.ts` before `GeneralCommandLine` |

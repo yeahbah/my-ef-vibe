@@ -1,12 +1,15 @@
 import * as vscode from 'vscode';
 import { buildExpressionCommand, buildReplCommand, runExpressionJson } from './cliRunner';
 import { getSearchDirectory, getWorkspaceFolder, readSettings } from './config';
+import { exportEvaluationPayload } from './resultExport';
+import { getDbContextSessionDirectory } from './sessionPaths';
 import { getExpressionFromEditor, type ExpressionSelectionKind } from './expressionSelection';
 import { checkPrerequisites, formatPrerequisiteMessage } from './prerequisites';
 import { invalidateEfvibeDaemon } from './daemonClient';
 import { validateReadOnlyExpression } from './expressionGuard';
 import { EfvibeResultPanel, formatEvaluationForOutput, type PanelRunRequest } from './resultPanel';
 import { generateReplTask } from './replTask';
+import { registerScanService } from './scanService';
 import { EfvibeStatusBar } from './statusBar';
 
 const OUTPUT_CHANNEL_NAME = 'efvibe';
@@ -25,6 +28,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   statusBar = new EfvibeStatusBar(context);
   statusBar.showConfigured();
 
+  registerScanService(context);
+
   context.subscriptions.push(
     vscode.commands.registerCommand('efvibe.startRepl', () => startRepl()),
     vscode.commands.registerCommand('efvibe.runExpression', () => runExpression()),
@@ -35,6 +40,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('efvibe.generateReplTask', () => generateReplTaskCommand()),
     vscode.commands.registerCommand('efvibe.checkPrerequisites', () => checkPrerequisitesCommand()),
     vscode.commands.registerCommand('efvibe.refreshStatus', () => statusBar?.refresh()),
+    vscode.commands.registerCommand('efvibe.exportResult', () => exportLastResultCommand()),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('efvibe')) {
         if (event.affectsConfiguration('efvibe.project')
@@ -284,6 +290,7 @@ async function evaluateExpression(
           result.payload,
           expression,
           (request) => runFromResultPanel(request, context),
+          resolveExportDirectory(context.settings, context.folder),
         );
 
         if (!result.payload.success) {
@@ -358,6 +365,7 @@ async function runFromResultPanel(
         result.payload,
         expression,
         (next) => runFromResultPanel(next, context),
+        resolveExportDirectory(context.settings, context.folder),
       );
 
       if (!result.payload.success) {
@@ -367,6 +375,49 @@ async function runFromResultPanel(
       }
     },
   );
+}
+
+function resolveExportDirectory(
+  settings: ReturnType<typeof readSettings>,
+  folder: vscode.WorkspaceFolder,
+): string {
+  if (settings.project && settings.context) {
+    return getDbContextSessionDirectory(
+      settings.workspaceRoot,
+      settings.project,
+      settings.context,
+    );
+  }
+
+  return folder.uri.fsPath;
+}
+
+async function exportLastResultCommand(): Promise<void> {
+  const payload = EfvibeResultPanel.getLastPayload();
+  if (!payload) {
+    vscode.window.showInformationMessage('Run an expression in the result panel first.');
+    return;
+  }
+
+  const format = await vscode.window.showQuickPick(
+    [
+      { label: 'CSV', description: 'Comma-separated values', value: 'csv' as const },
+      { label: 'JSON', description: 'JSON array of row objects', value: 'json' as const },
+    ],
+    { title: 'efvibe :export' },
+  );
+
+  if (!format) {
+    return;
+  }
+
+  const folder = getWorkspaceFolder();
+  const settings = readSettings(folder);
+  const exportDirectory = folder
+    ? resolveExportDirectory(settings, folder)
+    : settings.workspaceRoot;
+
+  await exportEvaluationPayload(payload, format.value, exportDirectory);
 }
 
 async function showLastSql(): Promise<void> {

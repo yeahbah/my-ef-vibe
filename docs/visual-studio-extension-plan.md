@@ -90,7 +90,7 @@ Phases mirror [vscode-extension-plan.md](./vscode-extension-plan.md). VS Code Ph
 
 | Feature | Behavior |
 |---------|----------|
-| **Run selection / line / statement** | Editor context menu + `OleMenuCommand`; spawn `efvibe -e --format json --no-banner` |
+| **Run selection / line / statement** | Editor commands; prefer `efvibe serve` daemon (same protocol as VS Code), fallback to `efvibe -e --format json` |
 | **Repository snippets** | Rely on CLI `RepositorySnippetAdapter` (no VS-specific rewrite) |
 | **Result tool window** | WPF: editable expression, **Run**, **Run :plan** (`--with-plan`), results grid, SQL blocks |
 | **Read-only guard** | Block `SaveChanges`, `Add`/`Update`/`Remove`, `ExecuteSql`, destructive SQL before spawn (mirror `expressionGuard.ts`) |

@@ -18,6 +18,7 @@ internal static class ScanCommandRunner
             options.MinSeverity,
             options.RespectDismissals,
             options.Json,
+            options.NoBanner,
             options.ConnectionString,
             options.Provider,
             cancellationToken);
@@ -33,11 +34,14 @@ internal static class ScanCommandRunner
         string? minSeverityRaw,
         bool respectDismissals,
         bool jsonOutput,
+        bool noBanner,
         string? connectionString,
         string? providerRaw,
         CancellationToken cancellationToken = default)
     {
         CliUi.Configure();
+
+        var quietOutput = noBanner || jsonOutput;
 
         if (!TryParseMode(modeRaw, out var mode))
         {
@@ -104,7 +108,7 @@ internal static class ScanCommandRunner
 
         if (mode == LinqScanMode.Lite)
         {
-            if (!jsonOutput)
+            if (!quietOutput)
             {
                 AnsiConsole.MarkupLine("[dim]Scanning project sources (lite)…[/]");
             }
@@ -121,13 +125,19 @@ internal static class ScanCommandRunner
 
             try
             {
-                workspaceBuild = CliUi.RunWithStatus(
-                    "Building EF project for deep scan…",
-                    () => WorkspaceBuilder.BuildResolvedProject(
+                workspaceBuild = quietOutput
+                    ? WorkspaceBuilder.BuildResolvedProject(
                         pendingSessionDirectory,
                         resolvedProject,
                         resolvedStartup,
-                        frameworkOrNull));
+                        frameworkOrNull)
+                    : CliUi.RunWithStatus(
+                        "Building EF project for deep scan…",
+                        () => WorkspaceBuilder.BuildResolvedProject(
+                            pendingSessionDirectory,
+                            resolvedProject,
+                            resolvedStartup,
+                            frameworkOrNull));
             }
             catch (WorkspaceException workspaceFailure)
             {
@@ -184,7 +194,7 @@ internal static class ScanCommandRunner
                 workspaceBuild.ReferenceAssemblyPaths,
                 host.AssemblyLoader);
 
-            if (!jsonOutput)
+            if (!quietOutput)
                 AnsiConsole.MarkupLine("[dim]Scanning project sources and translating SQL (deep)…[/]");
 
             (scanResult, deepStats) = await LinqDeepScanner.ScanAsync(

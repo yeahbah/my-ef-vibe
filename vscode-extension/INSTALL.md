@@ -16,19 +16,19 @@ Then in VS Code or Cursor:
 
 1. Open the **Extensions** view (`Cmd+Shift+X` / `Ctrl+Shift+X`)
 2. Click the **`...`** menu → **Install from VSIX…**
-3. Choose the generated `vscode-efvibe-*.vsix` (for example `vscode-efvibe-0.2.1.vsix`)
+3. Choose the generated `vscode-efvibe-*.vsix` (for example `vscode-efvibe-0.3.1.vsix`)
 4. **Reload** the window when prompted
 
 Or from a terminal (one line — do not break the path onto a new line):
 
 ```bash
-code --install-extension "/path/to/my-ef-vibe/vscode-extension/vscode-efvibe-0.2.1.vsix"
+code --install-extension "/path/to/my-ef-vibe/vscode-extension/vscode-efvibe-0.3.1.vsix"
 ```
 
 Cursor:
 
 ```bash
-cursor --install-extension "/path/to/my-ef-vibe/vscode-extension/vscode-efvibe-0.2.1.vsix"
+cursor --install-extension "/path/to/my-ef-vibe/vscode-extension/vscode-efvibe-0.3.1.vsix"
 ```
 
 ### Updating an existing VSIX install
@@ -58,6 +58,12 @@ Command Palette → type `efvibe`. You should see:
 - efvibe: Generate REPL Task
 - efvibe: Check Prerequisites
 - efvibe: Refresh Status
+- efvibe: Scan Workspace
+- efvibe: Scan Workspace (Deep)
+- efvibe: Open Scan Review
+- efvibe: Refresh Scan Diagnostics
+- efvibe: Dismiss Scan Finding
+- efvibe: Export Last Result
 
 If you see **no matching commands**, the extension is not installed in that window — use Option A or B above.
 
@@ -72,10 +78,13 @@ If you see **no matching commands**, the extension is not installed in that wind
   "efvibe.context": "YourDbContext",
   "efvibe.dotnetFramework": "net8.0",
   "efvibe.dbLog": true,
-  "efvibe.resultDestination": "panel"
+  "efvibe.resultDestination": "panel",
+  "efvibe.useDaemon": true,
+  "efvibe.scan.openReviewOnScan": true,
+  "efvibe.scan.problemsPanel": false
 }
 ```
 
-Use the exact `DbContext` type name (spelling matters). Point `efvibe.toolPath` at a local `myefvibe` build when using features from the latest CLI in this repo.
+Use the exact `DbContext` type name (spelling matters). Point `efvibe.toolPath` at a local `myefvibe` build when using **serve**, **scan**, and repository-snippet evaluation from the latest CLI in this repo.
 
 See [README.md](README.md) for editor workflows and [features.md](../features.md) for CLI flags (`--dblog`, `--format json`, repository snippet adaptation).

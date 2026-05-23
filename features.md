@@ -11,7 +11,7 @@ Licensed under [Apache 2.0](LICENSE).
 3. It runs `dotnet build` on the EF project and loads assemblies from the output folder and `.deps.json` (including NuGet package paths and RID-specific runtimes such as `runtimes/unix/...` on macOS).
 4. It locates a concrete `DbContext` type and constructs an instance when possible.
 5. It attaches workspace assemblies to a Roslyn scripting session so entity types, extension methods, and project types are available in scripts.
-6. You run LINQ in the REPL (or a one-shot expression); results, SQL, and metrics are shown in the terminal.
+6. You run LINQ in the REPL, a one-shot expression (`-e`), or **`efvibe serve`** (long-running daemon for editors); results, SQL, and metrics are shown in the terminal or JSON for tools.
 
 ### EF project selection (`-p`)
 
@@ -68,9 +68,25 @@ db.JsonBlobDocuments
 | `expression` (positional) | Same as `-e` when passed as trailing arguments |
 | `--format` | One-shot output format: `text` (default) or `json` (for editors and scripts) |
 | `--no-banner` | Suppress workspace/build banners (recommended with `--format json`) |
+| `--with-plan` | With `-e --format json`, include EXPLAIN / SHOWPLAN for the evaluated SQL |
 | `--dblog` | Show executed SQL via EF database logging (default: **on**; use `--no-dblog` to disable; toggle in REPL with `:dblog`) |
 | `--no-dblog` | Disable database command logging for this run |
 | `--about-json` | Write session metadata as JSON to stdout and exit (no REPL) |
+
+### `efvibe serve` (editor daemon)
+
+Long-running mode for fast repeated evaluation (VS Code **Run Selection** uses this by default):
+
+```bash
+efvibe serve -p ./MyApp.Persistence.csproj -s ./MyApp.Api.csproj -c AppDbContext
+# stdout: {"type":"ready","dbContext":"AppDbContext",...}
+# stdin (one JSON object per line):
+{"type":"eval","expression":"db.Products.Count()"}
+{"type":"eval","expression":"db.Orders.Take(5).ToList()","withPlan":true}
+{"type":"shutdown"}
+```
+
+Each `eval` response is the same JSON shape as `-e --format json`. Build and `DbContext` stay loaded until the process exits.
 
 Install as a .NET tool: `dotnet tool install --global efvibe`, then run `efvibe`.
 Requires .NET 8+ (package includes net8.0, net9.0, and net10.0 tool assets).
@@ -116,11 +132,25 @@ You can paste or run selections copied from repositories and handlers — not on
 
 **Limits:** stubbed parameters mean you see **SQL shape and sample execution**, not the same rows as production unless you declare variables in the REPL first (e.g. `var entraObjectId = Guid.Parse("...");`). Heavy `Include` / `SelectMany` chains may still fail at runtime depending on provider and data.
 
-One-shot JSON for tools and the VS Code extension:
+JSON for tools and the VS Code extension (one-shot or via `serve`):
 
 ```bash
 efvibe -p ... -c MyDbContext -e "db.Products.Count()" --format json --no-banner
+efvibe -p ... -c MyDbContext -e "db.Products.Take(5).ToList()" --format json --no-banner --with-plan
 ```
+
+See [docs/efvibe-daemon-and-vscode.md](docs/efvibe-daemon-and-vscode.md) and [vscode-extension/README.md](vscode-extension/README.md).
+
+### VS Code extension (v0.3.1)
+
+| Area | Behavior |
+|------|----------|
+| Run Selection | `efvibe serve` daemon (default) or one-shot `-e --format json` |
+| Result panel | Editable expression, Run / Run Plan, export CSV/JSON, **📋 copy** on SQL and query plan blocks |
+| Scan Review | Carousel tab after **Scan Workspace** — Previous/Next, Dismiss, Note, clickable location, copy on code/SQL/plan |
+| Headless scan | `efvibe scan lite\|deep --json --no-banner` (same engine as REPL `:scan`) |
+
+Settings: `efvibe.scan.openReviewOnScan`, `efvibe.scan.problemsPanel` (optional squiggles, default off).
 
 ## SQL output
 

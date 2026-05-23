@@ -34,6 +34,9 @@ internal sealed class ScanCliOptions
     [Option("json", Default = false, HelpText = "Write scan summary and findings as JSON to stdout.")]
     public bool Json { get; set; }
 
+    [Option("no-banner", HelpText = "Suppress build/status banners (recommended with --json).")]
+    public bool NoBanner { get; set; }
+
     [Option("connection-string|cs", HelpText = "Connection string for deep scan (requires --provider).")]
     public string? ConnectionString { get; set; }
 

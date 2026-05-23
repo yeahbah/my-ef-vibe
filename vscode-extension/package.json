@@ -2,7 +2,7 @@
   "name": "vscode-efvibe",
   "displayName": "My EF Vibe",
   "description": "Run EF Core LINQ from VS Code: REPL terminal, editor evaluation with SQL panel, and workspace-aware project settings.",
-  "version": "0.2.2",
+  "version": "0.3.1",
   "icon": "images/icon.png",
   "publisher": "efvibe",
   "license": "Apache-2.0",
@@ -74,6 +74,36 @@
       {
         "command": "efvibe.refreshStatus",
         "title": "Refresh Status",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.exportResult",
+        "title": "Export Last Result",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.scanWorkspace",
+        "title": "Scan Workspace",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.scanDeep",
+        "title": "Scan Workspace (Deep)",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.refreshScanDiagnostics",
+        "title": "Refresh Scan Diagnostics",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.dismissScanFinding",
+        "title": "Dismiss Scan Finding",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.openScanReview",
+        "title": "Open Scan Review",
         "category": "efvibe"
       }
     ],
@@ -203,6 +233,47 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Use long-running `efvibe serve` for Run Selection (fast, warm DbContext). Requires a local CLI build with `serve` support. Falls back to one-shot `efvibe -e` if the daemon cannot start. Disable for `resultDestination: terminal` workflows or debugging."
+        },
+        "efvibe.scan.mode": {
+          "type": "string",
+          "default": "lite",
+          "enum": [
+            "lite",
+            "deep"
+          ],
+          "markdownDescription": "Default scan mode for **Scan Workspace** (`efvibe scan lite` or `deep`). Deep scan requires `efvibe.context` and builds the EF project."
+        },
+        "efvibe.scan.respectDismissals": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Pass `--respect-dismissals` to scan and hide findings dismissed via **Dismiss Scan Finding** or the REPL."
+        },
+        "efvibe.scan.refreshOnSave": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Watch `myefvibe-scan-lite.json` / `myefvibe-scan-deep.json` and refresh the Problems panel when they change (including after a REPL `:scan`)."
+        },
+        "efvibe.scan.minSeverity": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "info",
+            "warning",
+            "error",
+            "critical"
+          ],
+          "markdownDescription": "Optional `--min-severity` filter for scan commands (empty = report all severities)."
+        },
+        "efvibe.scan.openReviewOnScan": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Open the **Scan Review** carousel tab after **Scan Workspace** completes."
+        },
+        "efvibe.scan.problemsPanel": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Also show findings in the VS Code **Problems** panel (can interfere with C# lightbulb actions on squiggled lines)."
         }
       }
     }
