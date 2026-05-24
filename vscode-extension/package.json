@@ -1,9 +1,13 @@
 {
   "name": "vscode-efvibe",
   "displayName": "My EF Vibe",
-  "description": "Run EF Core LINQ from VS Code: REPL terminal, editor evaluation with SQL panel, and workspace-aware project settings.",
+  "description": "Evaluate EF Core LINQ in VS Code: Run Selection with SQL, deep scan + Scan Review, REPL terminal, and efvibe Session sidebar.",
   "version": "0.5.4",
   "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1a1b26",
+    "theme": "dark"
+  },
   "publisher": "yeahbah",
   "license": "Apache-2.0",
   "homepage": "https://myefvibe.com",
@@ -27,8 +31,13 @@
     "entity-framework",
     "linq",
     "repl",
-    "dotnet"
+    "dotnet",
+    "sql",
+    "dbcontext"
   ],
+  "vsce": {
+    "baseImagesUrl": "https://github.com/yeahbah/my-ef-vibe/raw/HEAD/vscode-extension/images"
+  },
   "activationEvents": [
     "onStartupFinished",
     "workspaceContains:**/*.csproj"

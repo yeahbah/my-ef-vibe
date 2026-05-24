@@ -133,4 +133,5 @@ jobs:
             exit 0
           fi
           cd vscode-extension
-          npx --yes @vscode/vsce publish "vscode-efvibe-${VERSION}.vsix" -p "$VSCE_PAT"
+          npx --yes @vscode/vsce publish "vscode-efvibe-${VERSION}.vsix" -p "$VSCE_PAT" \
+            --baseImagesUrl "https://github.com/yeahbah/my-ef-vibe/raw/HEAD/vscode-extension/images"
