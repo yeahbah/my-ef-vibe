@@ -2,9 +2,33 @@
 
 Install guide on the site: [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html). Quick start: [myefvibe.com/docs/getting-started.html](https://myefvibe.com/docs/getting-started.html).
 
-The extension is **not on the Marketplace yet** (optional CI publish when `VSCE_PAT` / `OVSX_PAT` are configured). Install from a [GitHub Release](https://github.com/yeahbah/my-ef-vibe/releases) `.vsix` or build locally from this folder.
+## Option A — Visual Studio Marketplace (recommended)
 
-## Option A — Install from VSIX (recommended)
+The extension is published as **[yeahbah.vscode-efvibe](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe)** on the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe).
+
+In VS Code or Cursor:
+
+1. Open **Extensions** (`Cmd+Shift+X` / `Ctrl+Shift+X`)
+2. Search **`efvibe`** (display name: **My EF Vibe**, publisher **yeahbah**)
+3. Click **Install** and reload the window when prompted
+
+From a terminal:
+
+```bash
+code --install-extension yeahbah.vscode-efvibe
+```
+
+Cursor:
+
+```bash
+cursor --install-extension yeahbah.vscode-efvibe
+```
+
+Updates arrive automatically when the Marketplace listing is updated (CI publishes on each release when `VSCE_PAT` is configured).
+
+## Option B — Install from VSIX
+
+Use a `.vsix` for pre-release builds, air-gapped machines, or contributors testing a local package.
 
 **From a release:** download `vscode-efvibe-<version>.vsix` from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe/releases).
 
@@ -18,36 +42,30 @@ npm run package
 
 Then in VS Code or Cursor:
 
-1. Open the **Extensions** view (`Cmd+Shift+X` / `Ctrl+Shift+X`)
+1. Open **Extensions**
 2. Click the **`...`** menu → **Install from VSIX…**
-3. Choose the `.vsix` file (for example `vscode-efvibe-0.5.0.vsix`)
+3. Choose the `.vsix` file (for example `vscode-efvibe-0.5.1.vsix`)
 4. **Reload** the window when prompted
 
-Or from a terminal (one line — do not break the path onto a new line):
+Or from a terminal:
 
 ```bash
-code --install-extension "/path/to/my-ef-vibe/vscode-extension/vscode-efvibe-0.5.0.vsix"
+code --install-extension "/path/to/vscode-efvibe-0.5.1.vsix"
 ```
 
-Cursor:
+### Updating a VSIX install
 
-```bash
-cursor --install-extension "/path/to/my-ef-vibe/vscode-extension/vscode-efvibe-0.3.1.vsix"
-```
-
-### Updating an existing VSIX install
-
-Repeat **Option A**: `npm run package`, then **Install from VSIX…** again with the new file, and **Reload Window**. You do not need to uninstall first.
+Repeat **Option B**: install the newer `.vsix` and **Reload Window**. You do not need to uninstall first.
 
 After install, open the **Command Palette** (`Cmd+Shift+P`) and run **efvibe: Start REPL**.
 
-## Option B — Extension Development Host (contributors)
+## Option C — Extension Development Host (contributors)
 
 1. Open the **my-ef-vibe** repo root in VS Code
 2. Run **Run Extension** from Run and Debug (F5)
 3. In the **new** `[Extension Development Host]` window, open your .NET solution and use the commands
 
-Commands only exist in the window where the extension is loaded (main VS Code after VSIX install, or the dev host after F5).
+Commands only exist in the window where the extension is loaded (main VS Code after Marketplace/VSIX install, or the dev host after F5).
 
 ## Verify installation
 
@@ -69,7 +87,7 @@ Command Palette → type `efvibe`. You should see:
 - efvibe: Dismiss Scan Finding
 - efvibe: Export Last Result
 
-If you see **no matching commands**, the extension is not installed in that window — use Option A or B above.
+If you see **no matching commands**, the extension is not installed in that window — use Option A, B, or C above.
 
 ## Configure before Start REPL
 

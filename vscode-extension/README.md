@@ -1,6 +1,8 @@
 # My EF Vibe — VS Code extension (v0.5.0)
 
-Run **[efvibe](https://myefvibe.com/)** from VS Code — the EF Core LINQ REPL with workspace settings for `-p`, `-s`, and `-c`. User guide: [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html). Source: [github.com/yeahbah/my-ef-vibe](https://github.com/yeahbah/my-ef-vibe).
+Run **[efvibe](https://myefvibe.com/)** from VS Code — the EF Core LINQ REPL with workspace settings for `-p`, `-s`, and `-c`.
+
+**Install:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) — Extensions → search **`efvibe`** (`yeahbah.vscode-efvibe`). User guide: [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html). Source: [github.com/yeahbah/my-ef-vibe](https://github.com/yeahbah/my-ef-vibe).
 
 ![efvibe VS Code: Run Selection with result and SQL beside your C# code](../screenshots/vscode1.png)
 
@@ -104,15 +106,15 @@ Scan artifacts: lite → `{workspaceRoot}/{Project}/scan/myefvibe-scan-lite.json
 
 Select a full handler query (including `await`, `DbContext`, and `cancellationToken`) and use **Run Selection**. The CLI adapts it the same way as deep-scan probes: `DbContext` → `db`, parameters stubbed, async terminals converted to sync. See [features.md](../features.md#repository-snippets-from-your-codebase) for details and limits.
 
-## Install (required)
+## Install
 
-This extension is **not published** to the Marketplace yet. See **[INSTALL.md](INSTALL.md)** to install from a VSIX or run via F5.
+**Recommended:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) — open Extensions, search **`efvibe`**, install **My EF Vibe** (publisher **yeahbah**).
 
 ```bash
-cd vscode-extension && npm install && npm run package
+code --install-extension yeahbah.vscode-efvibe
 ```
 
-Then **Extensions → … → Install from VSIX** and reload the window.
+**Alternatives:** VSIX from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe/releases) or local `npm run package` — see **[INSTALL.md](INSTALL.md)**. Contributors: F5 **Run Extension** from this folder.
 
 ## Development
 

@@ -138,7 +138,9 @@ efvibe writes under the session folder:
 
 **CLI:** `--tables-json`, `--describe-json`, `--dbinfo-json`, `--completions-json`, `efvibe language-server`, `efvibe scan note|dismiss`.
 
-**Deferred (Phase 3A notebook / marketplace):** Multi-cell LINQ notebook editor; Open VSX publish.
+**Deferred (Phase 3A notebook):** Multi-cell LINQ notebook editor.
+
+**Published:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) (`yeahbah.vscode-efvibe`) — search **`efvibe`**. Open VSX when `OVSX_PAT` is configured in CI.
 
 ## VS Code feature map (full target)
 
@@ -191,7 +193,7 @@ my-ef-vibe/
     vscode-extension-plan.md   # this document
 ```
 
-Publish as **`efvibe.vscode-efvibe`** on Open VSX and the Visual Studio Marketplace.
+Published as **`yeahbah.vscode-efvibe`** on the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) (search **`efvibe`**). Open VSX publish is optional via `OVSX_PAT` in CI.
 
 ## Required CLI evolution (summary)
 

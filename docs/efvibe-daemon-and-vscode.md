@@ -1,6 +1,6 @@
 # efvibe daemon vs one-shot (VS Code performance)
 
-**Website:** [myefvibe.com](https://myefvibe.com/) · **VS Code guide:** [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html)
+**Website:** [myefvibe.com](https://myefvibe.com/) · **VS Code extension:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) (search **`efvibe`**) · **Guide:** [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html)
 
 ## Why one-shot Run Selection was slow
 

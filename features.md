@@ -143,7 +143,9 @@ efvibe -p ... -c MyDbContext -e "db.Products.Take(5).ToList()" --format json --n
 
 See [docs/efvibe-daemon-and-vscode.md](docs/efvibe-daemon-and-vscode.md) and [vscode-extension/README.md](vscode-extension/README.md).
 
-### VS Code extension (v0.3.1)
+### VS Code extension (v0.5+)
+
+Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe): Extensions → search **`efvibe`** (`yeahbah.vscode-efvibe`). See [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md).
 
 | Area | Behavior |
 |------|----------|
