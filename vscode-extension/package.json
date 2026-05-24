@@ -2,7 +2,7 @@
   "name": "vscode-efvibe",
   "displayName": "My EF Vibe",
   "description": "Run EF Core LINQ from VS Code: REPL terminal, editor evaluation with SQL panel, and workspace-aware project settings.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "icon": "images/icon.png",
   "publisher": "yeahbah",
   "license": "Apache-2.0",
