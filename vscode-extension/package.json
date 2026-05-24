@@ -418,7 +418,7 @@
         "efvibe.scan.onSave": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "After saving a C# file (2s debounce), run `efvibe scan` using `efvibe.scan.mode`. Does not open Scan Review; shows a brief status bar message."
+          "markdownDescription": "After saving a C# file (2s debounce), run `efvibe scan` using `efvibe.scan.mode`. Does not open Scan Review; shows a brief status bar message on success and a warning + **efvibe** output channel entry on failure. Enable `efvibe.scan.problemsPanel` to see squiggles in the Problems panel."
         },
         "efvibe.scan.minSeverity": {
           "type": "string",

@@ -168,8 +168,32 @@ internal static class AppSettingsConnectionResolver
 
     internal static MyEfVibeProvider? InferProvider(string outputDirectory, string connectionString)
     {
+        if (Directory.Exists(outputDirectory))
+        {
+            var fromArtifacts = TryInferProviderFromDepsJson(outputDirectory, connectionString)
+                                ?? TryInferProviderFromOutputDlls(outputDirectory, connectionString);
+
+            if (fromArtifacts.HasValue)
+                return fromArtifacts;
+        }
+
+        return InferProviderFromConnectionString(connectionString);
+    }
+
+    private static MyEfVibeProvider? TryInferProviderFromOutputDlls(
+        string outputDirectory,
+        string connectionString)
+    {
         if (Directory.EnumerateFiles(outputDirectory, "Npgsql*.dll").Any())
             return MyEfVibeProvider.Npgsql;
+
+        if (Directory.EnumerateFiles(outputDirectory, "Pomelo.EntityFrameworkCore.MySql*.dll").Any()
+            || Directory.EnumerateFiles(outputDirectory, "MySql.EntityFrameworkCore*.dll").Any())
+        {
+            return LooksLikeMariaDbConnection(connectionString)
+                ? MyEfVibeProvider.MariaDb
+                : MyEfVibeProvider.MySql;
+        }
 
         if (Directory.EnumerateFiles(outputDirectory, "Microsoft.Data.SqlClient*.dll").Any()
             || Directory.EnumerateFiles(outputDirectory, "Microsoft.EntityFrameworkCore.SqlServer*.dll").Any())
@@ -182,14 +206,55 @@ internal static class AppSettingsConnectionResolver
             || Directory.EnumerateFiles(outputDirectory, "Oracle.ManagedDataAccess*.dll").Any())
             return MyEfVibeProvider.Oracle;
 
-        if (Directory.EnumerateFiles(outputDirectory, "Pomelo.EntityFrameworkCore.MySql*.dll").Any()
-            || Directory.EnumerateFiles(outputDirectory, "MySql.EntityFrameworkCore*.dll").Any())
+        return null;
+    }
+
+    private static MyEfVibeProvider? TryInferProviderFromDepsJson(
+        string outputDirectory,
+        string connectionString)
+    {
+        foreach (var depsPath in Directory.EnumerateFiles(outputDirectory, "*.deps.json"))
         {
-            return LooksLikeMariaDbConnection(connectionString)
-                ? MyEfVibeProvider.MariaDb
-                : MyEfVibeProvider.MySql;
+            string text;
+
+            try
+            {
+                text = File.ReadAllText(depsPath);
+            }
+            catch (IOException)
+            {
+                continue;
+            }
+
+            if (DepsReferencesPackage(text, "Pomelo.EntityFrameworkCore.MySql")
+                || DepsReferencesPackage(text, "MySql.EntityFrameworkCore"))
+            {
+                return LooksLikeMariaDbConnection(connectionString)
+                    ? MyEfVibeProvider.MariaDb
+                    : MyEfVibeProvider.MySql;
+            }
+
+            if (DepsReferencesPackage(text, "Microsoft.EntityFrameworkCore.SqlServer"))
+                return MyEfVibeProvider.SqlServer;
+
+            if (DepsReferencesPackage(text, "Npgsql.EntityFrameworkCore.PostgreSQL"))
+                return MyEfVibeProvider.Npgsql;
+
+            if (DepsReferencesPackage(text, "Microsoft.EntityFrameworkCore.Sqlite"))
+                return MyEfVibeProvider.Sqlite;
+
+            if (DepsReferencesPackage(text, "Oracle.EntityFrameworkCore"))
+                return MyEfVibeProvider.Oracle;
         }
 
+        return null;
+    }
+
+    private static bool DepsReferencesPackage(string depsJson, string packageName) =>
+        depsJson.Contains($"\"{packageName}/", StringComparison.Ordinal);
+
+    private static MyEfVibeProvider? InferProviderFromConnectionString(string connectionString)
+    {
         if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase)
             || connectionString.Contains("Username=", StringComparison.OrdinalIgnoreCase))
             return MyEfVibeProvider.Npgsql;
@@ -198,24 +263,32 @@ internal static class AppSettingsConnectionResolver
             && connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase))
             return MyEfVibeProvider.Sqlite;
 
-        if (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
-            || connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase))
-            return MyEfVibeProvider.SqlServer;
-
-        if (connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
-            && connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase))
-            return MyEfVibeProvider.Oracle;
-
-        if (connectionString.Contains("Uid=", StringComparison.OrdinalIgnoreCase)
-            || connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase))
+        if (LooksLikeMySqlConnection(connectionString))
         {
             return LooksLikeMariaDbConnection(connectionString)
                 ? MyEfVibeProvider.MariaDb
                 : MyEfVibeProvider.MySql;
         }
 
+        if (connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase)
+            || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
+                && connectionString.Contains("Database=", StringComparison.OrdinalIgnoreCase)
+                && !connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase)))
+            return MyEfVibeProvider.SqlServer;
+
+        if (connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
+            && connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.Oracle;
+
         return null;
     }
+
+    internal static bool LooksLikeMySqlConnection(string connectionString) =>
+        connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("Uid=", StringComparison.OrdinalIgnoreCase)
+        || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
+            && connectionString.Contains("User=", StringComparison.OrdinalIgnoreCase)
+            && !connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase));
 
     private static bool LooksLikeMariaDbConnection(string connectionString) =>
         connectionString.Contains("mariadb", StringComparison.OrdinalIgnoreCase);

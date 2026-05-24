@@ -14,6 +14,7 @@ import {
 } from './sessionPaths';
 import { loadScanReviewItems, saveFindingNote } from './scanFindingsLoader';
 import { EfvibeScanReviewPanel } from './scanReviewPanel';
+import { appendToEfvibeOutput, summarizeCliOutput } from './efvibeOutput';
 import { runScan } from './scanRunner';
 import type { ScanReviewItem } from './scanReviewTypes';
 import type { ScanMode } from './scanTypes';
@@ -59,6 +60,8 @@ export class EfvibeScanService implements vscode.Disposable {
   private onSaveScanRunning = false;
 
   private onSaveScanPending = false;
+
+  private onSaveScanFolder: vscode.WorkspaceFolder | undefined;
 
   constructor(private readonly extensionContext: vscode.ExtensionContext) {
     this.disposables.push(this.collection);
@@ -110,8 +113,10 @@ export class EfvibeScanService implements vscode.Disposable {
     return vscode.workspace.workspaceFolders ?? [];
   }
 
-  private getProjectSettings(): { settings: ReturnType<typeof readSettings>; folder: vscode.WorkspaceFolder } | undefined {
-    const folder = getWorkspaceFolder();
+  private getProjectSettings(
+    workspaceFolder?: vscode.WorkspaceFolder,
+  ): { settings: ReturnType<typeof readSettings>; folder: vscode.WorkspaceFolder } | undefined {
+    const folder = workspaceFolder ?? getWorkspaceFolder();
 
     if (!folder) {
       return undefined;
@@ -231,7 +236,13 @@ export class EfvibeScanService implements vscode.Disposable {
   }
 
   private onDocumentSaved(document: vscode.TextDocument): void {
-    const scanSettings = readScanSettings();
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+
+    if (!folder) {
+      return;
+    }
+
+    const scanSettings = readScanSettings(folder);
 
     if (!scanSettings.onSave) {
       return;
@@ -241,11 +252,7 @@ export class EfvibeScanService implements vscode.Disposable {
       return;
     }
 
-    if (!vscode.workspace.getWorkspaceFolder(document.uri)) {
-      return;
-    }
-
-    if (!this.getProjectSettings()) {
+    if (!this.getProjectSettings(folder)) {
       return;
     }
 
@@ -255,11 +262,13 @@ export class EfvibeScanService implements vscode.Disposable {
 
     this.onSaveScanTimer = setTimeout(() => {
       this.onSaveScanTimer = undefined;
-      void this.runOnSaveScan();
+      void this.runOnSaveScan(folder);
     }, 2000);
   }
 
-  private async runOnSaveScan(): Promise<void> {
+  private async runOnSaveScan(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
+    this.onSaveScanFolder = workspaceFolder;
+
     if (this.onSaveScanRunning) {
       this.onSaveScanPending = true;
       return;
@@ -271,13 +280,14 @@ export class EfvibeScanService implements vscode.Disposable {
       await this.scanWorkspaceInternal({
         silent: true,
         openReview: false,
+        workspaceFolder,
       });
     } finally {
       this.onSaveScanRunning = false;
 
-      if (this.onSaveScanPending) {
+      if (this.onSaveScanPending && this.onSaveScanFolder) {
         this.onSaveScanPending = false;
-        void this.runOnSaveScan();
+        void this.runOnSaveScan(this.onSaveScanFolder);
       }
     }
   }
@@ -290,8 +300,9 @@ export class EfvibeScanService implements vscode.Disposable {
     modeOverride?: ScanMode;
     silent?: boolean;
     openReview?: boolean;
+    workspaceFolder?: vscode.WorkspaceFolder;
   }): Promise<void> {
-    const folder = getWorkspaceFolder();
+    const folder = options?.workspaceFolder ?? getWorkspaceFolder();
 
     if (!folder) {
       if (!options?.silent) {
@@ -339,15 +350,19 @@ export class EfvibeScanService implements vscode.Disposable {
       }
 
       if (result.exitCode !== 0 && !result.output) {
+        const detail = summarizeCliOutput(result.stderr, result.stdout);
+        appendToEfvibeOutput(
+          `scan ${mode} failed (exit ${result.exitCode}): ${detail}`,
+          silent,
+        );
+
         if (silent) {
-          void vscode.window.setStatusBarMessage(
-            `efvibe scan ${mode} failed (exit ${result.exitCode})`,
-            4000,
+          void vscode.window.showWarningMessage(
+            `efvibe scan ${mode} failed: ${detail}`,
           );
         } else {
-          const detail = (result.stderr || result.stdout).trim().slice(0, 500);
           void vscode.window.showErrorMessage(
-            `efvibe scan ${mode} failed (exit ${result.exitCode}).${detail ? ` ${detail}` : ''}`,
+            `efvibe scan ${mode} failed (exit ${result.exitCode}). ${detail}`,
           );
         }
 

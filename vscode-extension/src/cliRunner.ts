@@ -166,7 +166,7 @@ export function buildEfvibeArgs(settings: EfvibeSettings): string[] {
     args.push('-p', settings.project);
   }
 
-  if (settings.startupProject) {
+  if (settings.startupProject && fs.existsSync(settings.startupProject)) {
     args.push('-s', settings.startupProject);
   }
 
