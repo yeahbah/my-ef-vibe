@@ -73,7 +73,7 @@ db.JsonBlobDocuments
 | `--with-plan` | With `-e --format json`, include EXPLAIN / SHOWPLAN for the evaluated SQL |
 | `--dblog` | Show executed SQL via EF database logging (default: **on**; use `--no-dblog` to disable; toggle in REPL with `:dblog`) |
 | `--no-dblog` | Disable database command logging for this run |
-| `--about-json` | Write session metadata as JSON to stdout and exit (no REPL) |
+| `--about-json` | Write tool metadata as JSON to stdout and exit (no workspace or DbContext required) |
 
 ### `efvibe serve` (editor daemon)
 

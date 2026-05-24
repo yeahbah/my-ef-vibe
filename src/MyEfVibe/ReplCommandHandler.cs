@@ -55,7 +55,7 @@ internal sealed class ReplCommandHandler
                 return true;
 
             case "about":
-                AboutReporter.Write(_dbContext, _host);
+                AboutReporter.Write();
                 return true;
 
             case "describe":

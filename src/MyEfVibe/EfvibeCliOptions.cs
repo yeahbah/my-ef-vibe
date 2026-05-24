@@ -37,7 +37,7 @@ internal sealed class EfvibeCliOptions
     [Option("dblog-verbose", HelpText = "Show full EF diagnostic logs (default: sql-only executed commands).")]
     public bool DbLogVerbose { get; set; }
 
-    [Option("about-json", HelpText = "Write session metadata as JSON to stdout and exit (no REPL).")]
+    [Option("about-json", HelpText = "Write tool metadata as JSON to stdout and exit (no workspace or DbContext required).")]
     public bool AboutJson { get; set; }
 
     [Option("tables-json", HelpText = "Write DbSet names and entity types as JSON to stdout and exit (no REPL).")]

@@ -1,5 +1,3 @@
-using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -14,100 +12,46 @@ internal static class AboutJsonReporter
         WriteIndented = false,
     };
 
-    internal static void Write(
-        object dbContext,
-        WorkspaceHost host,
-        string workspaceRoot,
-        MyEfVibeProvider? provider)
+    internal static void Write()
     {
-        var payload = Build(dbContext, host, workspaceRoot, provider);
-        Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
+        Console.WriteLine(JsonSerializer.Serialize(Build(), SerializerOptions));
     }
 
-    internal static AboutJsonPayload Build(
-        object dbContext,
-        WorkspaceHost host,
-        string workspaceRoot,
-        MyEfVibeProvider? provider)
-    {
-        var contextType = dbContext.GetType();
-        var database = contextType.GetProperty("Database")?.GetValue(dbContext);
-
-        string? providerName = null;
-        string? connectionState = null;
-
-        if (database is not null)
-        {
-            providerName = database.GetType().GetProperty("ProviderName")?.GetValue(database) as string;
-
-            if (RelationalDatabaseFacadeInvoker.TryGetDbConnection(
-                    database,
-                    host.EnumerateLoadedAssemblies(),
-                    out var connection)
-                && connection is not null)
-            {
-                connectionState = connection.State.ToString();
-            }
-        }
-
-        return new AboutJsonPayload
+    internal static AboutJsonPayload Build() =>
+        new()
         {
             ToolVersion = ToolInfo.GetVersion(),
-            WorkspaceRoot = workspaceRoot,
-            SessionDirectory = host.SessionDirectory,
-            ProjectPath = host.ProjectPath,
-            StartupProjectPath = host.StartupProjectPath,
-            DbContext = contextType.Name,
-            DbContextFullName = contextType.FullName,
-            EfCoreVersion = TryGetEfCoreVersion(),
-            Provider = provider?.ToString(),
-            ProviderName = providerName,
-            ConnectionState = connectionState,
-            Runtime = GetRuntimeDescription(),
+            Command = AppMetadata.CommandName,
+            ProductName = AppMetadata.ProductName,
+            Description = AppMetadata.GetDescription(),
+            Author = AppMetadata.GetAuthor(),
+            License = AppMetadata.License,
+            Website = AppMetadata.WebsiteUrl,
+            Repository = AppMetadata.RepositoryUrl,
+            NuGet = AppMetadata.NuGetUrl,
+            Runtime = AppMetadata.GetRuntimeDescription(),
         };
-    }
-
-    private static string GetRuntimeDescription()
-    {
-        var framework = RuntimeInformation.FrameworkDescription;
-        var rid = RuntimeInformation.RuntimeIdentifier;
-
-        return string.IsNullOrWhiteSpace(rid) ? framework : $"{framework} ({rid})";
-    }
-
-    private static string? TryGetEfCoreVersion()
-    {
-        var efAssembly = AppDomain.CurrentDomain.GetAssemblies()
-            .FirstOrDefault(assembly =>
-                string.Equals(assembly.GetName().Name, "Microsoft.EntityFrameworkCore", StringComparison.Ordinal));
-
-        return efAssembly?.GetName().Version?.ToString(3);
-    }
 
     internal sealed class AboutJsonPayload
     {
         public string ToolVersion { get; init; } = string.Empty;
 
-        public string WorkspaceRoot { get; init; } = string.Empty;
+        public string Command { get; init; } = string.Empty;
 
-        public string SessionDirectory { get; init; } = string.Empty;
+        public string ProductName { get; init; } = string.Empty;
 
-        public string ProjectPath { get; init; } = string.Empty;
+        public string Description { get; init; } = string.Empty;
 
-        public string StartupProjectPath { get; init; } = string.Empty;
+        public string Author { get; init; } = string.Empty;
 
-        public string DbContext { get; init; } = string.Empty;
+        public string License { get; init; } = string.Empty;
 
-        public string? DbContextFullName { get; init; }
+        public string Website { get; init; } = string.Empty;
 
-        public string? EfCoreVersion { get; init; }
+        public string Repository { get; init; } = string.Empty;
 
-        public string? Provider { get; init; }
+        public string NuGet { get; init; } = string.Empty;
 
-        public string? ProviderName { get; init; }
-
-        public string? ConnectionState { get; init; }
-
-        public string? Runtime { get; init; }
+        public string Runtime { get; init; } = string.Empty;
     }
 }

@@ -26,7 +26,7 @@ Build `MyEfVibe` locally for **`--tables-json`**, **`--describe-json`**, **`--db
 | **efvibe: Export Last Result** | Save last panel result as CSV or JSON (like REPL `:export`) |
 | **efvibe: Generate REPL Task** | Writes/updates `efvibe: Start REPL` in `.vscode/tasks.json` |
 | **efvibe: Check Prerequisites** | Verifies `dotnet` and `efvibe` on PATH |
-| **efvibe: Refresh Status** | Updates the status bar via `efvibe --about-json` |
+| **efvibe: Refresh Status** | Refreshes the status bar (DbContext from settings; tool version via `efvibe --about-json`) |
 | **efvibe: Scan Workspace** | Runs `efvibe scan` and opens **Scan Review** (carousel) |
 | **efvibe: Scan Workspace (Deep)** | Deep scan with SQL translation (requires `efvibe.context`) |
 | **efvibe: Open Scan Review** | Browse findings (Previous / Next, Go to code, Save note, Dismiss) |

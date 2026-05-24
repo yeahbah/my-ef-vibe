@@ -104,13 +104,19 @@ internal static class Program
         string? frameworkOrNull,
         IEnumerable<string>? expressionParts)
     {
+        if (aboutJson)
+        {
+            AboutJsonReporter.Write();
+            return 0;
+        }
+
         if (!TryParseOutputFormat(formatRaw, out var outputFormat, out var formatError))
         {
             CliUi.WriteError(formatError!);
             return 1;
         }
 
-        var quietOutput = noBanner || outputFormat == CliOutputFormat.Json || aboutJson;
+        var quietOutput = noBanner || outputFormat == CliOutputFormat.Json;
 
         var dbLogSettings = new DbLogSettings
         {
@@ -211,6 +217,13 @@ internal static class Program
 
         using var host = WorkspaceHost.Load(workspaceBuild);
 
+        var headlessJsonOutput = tablesJson
+            || dbInfoJson
+            || completionsPrefix is not null
+            || !string.IsNullOrWhiteSpace(describeJsonEntity);
+
+        var allowInteractiveSelection = string.IsNullOrWhiteSpace(oneShotExpression) && !headlessJsonOutput;
+
         Type dbContextType;
 
         try
@@ -218,7 +231,7 @@ internal static class Program
             dbContextType = DbContextActivator.ResolveContextType(
                 host,
                 contextFullName,
-                allowInteractiveSelection: string.IsNullOrWhiteSpace(oneShotExpression));
+                allowInteractiveSelection);
         }
         catch (InvalidOperationException resolutionFailure)
         {
@@ -247,7 +260,7 @@ internal static class Program
                 contextFullName,
                 connectionString,
                 parsedProvider,
-                allowInteractiveSelection: string.IsNullOrWhiteSpace(oneShotExpression));
+                allowInteractiveSelection);
         }
         catch (InvalidOperationException resolutionFailure)
         {
@@ -260,12 +273,6 @@ internal static class Program
             dbContextInstance,
             workspaceBuild.ReferenceAssemblyPaths,
             host.AssemblyLoader);
-
-        if (aboutJson)
-        {
-            AboutJsonReporter.Write(dbContextInstance, host, workspaceRoot, parsedProvider);
-            return 0;
-        }
 
         if (tablesJson)
         {

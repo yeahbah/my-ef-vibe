@@ -36,17 +36,15 @@ export interface ToolInvocation {
 
 export interface AboutJsonPayload {
   toolVersion: string;
-  workspaceRoot: string;
-  sessionDirectory: string;
-  projectPath: string;
-  startupProjectPath: string;
-  dbContext: string;
-  dbContextFullName?: string;
-  efCoreVersion?: string;
-  provider?: string;
-  providerName?: string;
-  connectionState?: string;
-  runtime?: string;
+  command: string;
+  productName: string;
+  description: string;
+  author: string;
+  license: string;
+  website: string;
+  repository: string;
+  nuGet: string;
+  runtime: string;
 }
 
 export interface TablesJsonEntry {
@@ -322,13 +320,13 @@ export async function runExpressionJson(
   }
 }
 
-export function buildAboutJsonCommand(settings: EfvibeSettings, searchDirectory: string): string {
-  const invocation = resolveToolInvocation(
-    searchDirectory,
-    settings.toolPath,
-    settings.dotnetFramework,
-  );
-  return buildCommandLine(invocation, [...buildEfvibeArgs(settings), '--about-json']);
+export function buildAboutJsonCommand(
+  searchDirectory: string,
+  toolPath?: string,
+  dotnetFramework?: string,
+): string {
+  const invocation = resolveToolInvocation(searchDirectory, toolPath ?? '', dotnetFramework);
+  return buildCommandLine(invocation, ['--about-json', '--no-banner']);
 }
 
 async function runJsonStdout<T>(
@@ -336,6 +334,7 @@ async function runJsonStdout<T>(
   searchDirectory: string,
   cwd: string,
   flag: string,
+  options?: { timeoutMs?: number },
 ): Promise<T | undefined> {
   const invocation = resolveToolInvocation(
     searchDirectory,
@@ -347,7 +346,7 @@ async function runJsonStdout<T>(
   try {
     const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
       cwd,
-      timeout: 10 * 60_000,
+      timeout: options?.timeoutMs ?? 10 * 60_000,
       maxBuffer: 4 * 1024 * 1024,
       windowsHide: true,
     });
@@ -368,11 +367,38 @@ async function runJsonStdout<T>(
 }
 
 export async function runAboutJson(
-  settings: EfvibeSettings,
   searchDirectory: string,
   cwd: string,
+  options?: { toolPath?: string; dotnetFramework?: string },
 ): Promise<AboutJsonPayload | undefined> {
-  return runJsonStdout<AboutJsonPayload>(settings, searchDirectory, cwd, '--about-json');
+  const invocation = resolveToolInvocation(
+    searchDirectory,
+    options?.toolPath ?? '',
+    options?.dotnetFramework,
+  );
+  const args = ['--about-json', '--no-banner'];
+
+  try {
+    const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
+      cwd,
+      timeout: 15_000,
+      maxBuffer: 1024 * 1024,
+      windowsHide: true,
+    });
+
+    const line = stdout
+      .split(/\r?\n/u)
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith('{'));
+
+    if (!line) {
+      return undefined;
+    }
+
+    return JSON.parse(line) as AboutJsonPayload;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function runTablesJson(
