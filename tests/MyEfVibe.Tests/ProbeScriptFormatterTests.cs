@@ -14,7 +14,7 @@ public sealed class ProbeScriptFormatterTests
         var script = ProbeScriptFormatter.ToScriptExpression(probe);
 
         Assert.Equal(
-            "db.Employees .Include(e => e.Department) .Where(e => e.BusinessEntityId == businessEntityId)",
+            "db.Employees.Include(e => e.Department).Where(e => e.BusinessEntityId == businessEntityId)",
             script);
         Assert.Contains("e => e.BusinessEntityId", script, StringComparison.Ordinal);
     }

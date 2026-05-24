@@ -25,26 +25,49 @@ public static class ReplQueryableRuntime
     public static object? SingleOrDefault(object source) =>
         InvokeQueryable("SingleOrDefault", source);
 
-    public static object First(object source, object predicate) =>
-        InvokeQueryable("First", source, predicate);
+    public static object First<T>(object source, Expression<Func<T, bool>> predicate) =>
+        Queryable.First((IQueryable<T>)source, predicate);
 
-    public static object? FirstOrDefault(object source, object predicate) =>
-        InvokeQueryable("FirstOrDefault", source, predicate);
+    public static object? FirstOrDefault<T>(object source, Expression<Func<T, bool>> predicate) =>
+        Queryable.FirstOrDefault((IQueryable<T>)source, predicate);
 
-    public static object Single(object source, object predicate) =>
-        InvokeQueryable("Single", source, predicate);
+    public static object Single<T>(object source, Expression<Func<T, bool>> predicate) =>
+        Queryable.Single((IQueryable<T>)source, predicate);
 
-    public static object? SingleOrDefault(object source, object predicate) =>
-        InvokeQueryable("SingleOrDefault", source, predicate);
+    public static object? SingleOrDefault<T>(object source, Expression<Func<T, bool>> predicate) =>
+        Queryable.SingleOrDefault((IQueryable<T>)source, predicate);
 
     public static object Where(object source, object predicate) =>
         InvokeQueryable("Where", source, predicate);
 
-    public static object Select(object source, object selector) =>
-        InvokeQueryable("Select", source, selector);
+    /// <summary>
+    /// Typed predicate for script compilation; <paramref name="source"/> stays <see cref="object"/>
+    /// so <c>DbSet&lt;T&gt;</c> from the REPL host does not need to match metadata <c>T</c> at compile time.
+    /// </summary>
+    public static object Where<T>(object source, Expression<Func<T, bool>> predicate) =>
+        InvokeQueryable("Where", source, predicate);
+
+    public static object Select<TSource, TResult>(object source, Expression<Func<TSource, TResult>> selector)
+    {
+        var method = typeof(Queryable)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .First(method =>
+                string.Equals(method.Name, "Select", StringComparison.Ordinal)
+                && method.IsGenericMethodDefinition
+                && method.GetGenericArguments().Length == 2
+                && method.GetParameters().Length == 2);
+
+        return method.MakeGenericMethod(typeof(TSource), typeof(TResult)).Invoke(null, [source, selector])!;
+    }
 
     public static object Take(object source, object count) =>
         InvokeQueryable("Take", source, count);
+
+    public static object ToArray(object source) =>
+        InvokeEnumerable("ToArray", source);
+
+    public static object ToList(object source) =>
+        InvokeEnumerable("ToList", source);
 
     public static Task<object?> FirstAsync(object source, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("FirstAsync", source, cancellationToken);
@@ -58,16 +81,16 @@ public static class ReplQueryableRuntime
     public static Task<object?> SingleOrDefaultAsync(object source, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("SingleOrDefaultAsync", source, cancellationToken);
 
-    public static Task<object?> FirstAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
+    public static Task<object?> FirstAsync<T>(object source, Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("FirstAsync", source, cancellationToken, predicate);
 
-    public static Task<object?> FirstOrDefaultAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
+    public static Task<object?> FirstOrDefaultAsync<T>(object source, Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("FirstOrDefaultAsync", source, cancellationToken, predicate);
 
-    public static Task<object?> SingleAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
+    public static Task<object?> SingleAsync<T>(object source, Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("SingleAsync", source, cancellationToken, predicate);
 
-    public static Task<object?> SingleOrDefaultAsync(object source, object predicate, CancellationToken cancellationToken = default) =>
+    public static Task<object?> SingleOrDefaultAsync<T>(object source, Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("SingleOrDefaultAsync", source, cancellationToken, predicate);
 
     private static object InvokeQueryable(string methodName, object source, object? secondArgument = null)
@@ -120,6 +143,15 @@ public static class ReplQueryableRuntime
         return new object?[] { source, predicate, cancellationToken };
     }
 
+    private static object InvokeEnumerable(string methodName, object source)
+    {
+        var elementType = GetQueryableElementType(source);
+        var method = FindEnumerableMethod(methodName)
+            ?? throw new InvalidOperationException($"Enumerable.{methodName} was not found.");
+
+        return method.MakeGenericMethod(elementType).Invoke(null, [source])!;
+    }
+
     private static MethodInfo? FindQueryableMethod(string methodName, int parameterCount) =>
         typeof(Queryable)
             .GetMethods(BindingFlags.Public | BindingFlags.Static)
@@ -127,6 +159,14 @@ public static class ReplQueryableRuntime
                 string.Equals(method.Name, methodName, StringComparison.Ordinal)
                 && method.GetParameters().Length == parameterCount
                 && method.IsGenericMethodDefinition);
+
+    private static MethodInfo? FindEnumerableMethod(string methodName) =>
+        typeof(Enumerable)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .FirstOrDefault(method =>
+                string.Equals(method.Name, methodName, StringComparison.Ordinal)
+                && method.IsGenericMethodDefinition
+                && method.GetParameters().Length == 1);
 
     private static MethodInfo? FindEfAsyncMethod(string methodName, bool hasPredicate)
     {

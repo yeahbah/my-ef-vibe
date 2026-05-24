@@ -72,7 +72,7 @@ internal static class QueryEvaluator
 
             var message = failure is TypeInitializationException or ReflectionTypeLoadException
                 ? DescribeExceptionChain(failure)
-                : failure.Message;
+                : DescribeExceptionChain(UnwrapEvaluationException(failure));
 
             throw new EvaluationFailedException(
                 EvaluationMetrics.Failed(snippet, stopwatch.ElapsedMilliseconds, message),
@@ -116,14 +116,38 @@ internal static class QueryEvaluator
             ? "Query not executed; showing translated SQL from ToQueryString()."
             : "Executed SQL was not captured from the database log; showing translated SQL from ToQueryString() (provider LIMIT/TOP may differ at runtime).";
 
+    private static Exception UnwrapEvaluationException(Exception failure)
+    {
+        while (true)
+        {
+            switch (failure)
+            {
+                case TargetInvocationException { InnerException: { } inner }:
+                    failure = inner;
+                    continue;
+                case AggregateException { InnerExceptions.Count: 1 } aggregate:
+                    failure = aggregate.InnerExceptions[0];
+                    continue;
+                default:
+                    return failure;
+            }
+        }
+    }
+
     private static string DescribeExceptionChain(Exception failure)
     {
-        var lines = new List<string> { failure.Message };
+        var lines = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        for (var inner = failure.InnerException; inner is not null; inner = inner.InnerException)
-            lines.Add(inner.Message);
+        for (var current = failure; current is not null; current = current.InnerException)
+        {
+            if (!seen.Add(current.Message))
+                continue;
 
-        return string.Join(Environment.NewLine, lines);
+            lines.Add(current.Message);
+        }
+
+        return lines.Count == 0 ? failure.Message : string.Join(Environment.NewLine, lines);
     }
 }
 

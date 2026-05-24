@@ -5,6 +5,7 @@ internal static class ConnectionStringKeys
     internal static readonly string[] PreferredNames =
     [
         "DefaultConnection",
+        "ApplicationDatabase",
         "Postgres",
         "Sqlite",
         "MySql",

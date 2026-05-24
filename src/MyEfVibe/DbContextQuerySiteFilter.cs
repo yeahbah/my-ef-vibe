@@ -2,18 +2,6 @@ namespace MyEfVibe;
 
 internal static class DbContextQuerySiteFilter
 {
-    private static readonly string[] ContextMemberAliases =
-    [
-        "DbContext",
-        "_dbContext",
-        "dbContext",
-        "_context",
-        "applicationDbContext",
-        "_applicationDbContext",
-        "appDbContext",
-        "_appDbContext",
-    ];
-
     internal static bool BelongsToSelectedContext(
         string statement,
         DbContextScanScope? scope,
@@ -29,20 +17,38 @@ internal static class DbContextQuerySiteFilter
         if (ReferencesSelectedContextType(statement, scope))
             return true;
 
-        if (!string.IsNullOrWhiteSpace(containingTypeName)
-            && containingTypeIndex is not null
-            && containingTypeIndex.TryGetBoundContextType(containingTypeName, out var boundType))
+        if (UsesContextMemberAlias(statement))
         {
-            if (string.Equals(boundType, scope.SelectedContextTypeName, StringComparison.Ordinal))
-                return UsesContextMemberAlias(statement);
+            if (TryGetBoundContextType(containingTypeName, containingTypeIndex, out var boundType)
+                && !string.Equals(boundType, scope.SelectedContextTypeName, StringComparison.Ordinal))
+                return false;
 
-            return false;
+            return true;
         }
 
         if (statement.Contains("db.", StringComparison.Ordinal))
+        {
+            if (TryGetBoundContextType(containingTypeName, containingTypeIndex, out var boundType)
+                && !string.Equals(boundType, scope.SelectedContextTypeName, StringComparison.Ordinal))
+                return false;
+
             return true;
+        }
 
         return false;
+    }
+
+    private static bool TryGetBoundContextType(
+        string? containingTypeName,
+        DbContextContainingTypeIndex? containingTypeIndex,
+        out string boundType)
+    {
+        boundType = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(containingTypeName) || containingTypeIndex is null)
+            return false;
+
+        return containingTypeIndex.TryGetBoundContextType(containingTypeName, out boundType!);
     }
 
     private static bool ReferencesSelectedContextType(string statement, DbContextScanScope scope) =>
@@ -63,8 +69,13 @@ internal static class DbContextQuerySiteFilter
 
     private static bool UsesContextMemberAlias(string statement)
     {
-        foreach (var alias in ContextMemberAliases)
+        foreach (var prefix in DbContextQueryMarkers.MemberPrefixes)
         {
+            if (prefix.Equals("db.", StringComparison.Ordinal))
+                continue;
+
+            var alias = prefix[..^1];
+
             if (statement.Contains($"{alias}.", StringComparison.Ordinal))
                 return true;
         }

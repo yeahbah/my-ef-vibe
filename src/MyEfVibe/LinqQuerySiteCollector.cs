@@ -6,40 +6,18 @@ namespace MyEfVibe;
 
 internal static class LinqQuerySiteCollector
 {
-    private static readonly HashSet<string> QueryMethodNames = new(StringComparer.Ordinal)
-    {
-        "AsEnumerable",
-        "ToList",
-        "ToListAsync",
-        "ToArray",
-        "ToArrayAsync",
-        "Include",
-        "ThenInclude",
-        "FromSql",
-        "FromSqlRaw",
-        "ExecuteSqlRaw",
-        "Single",
-        "SingleAsync",
-        "SingleOrDefault",
-        "SingleOrDefaultAsync",
-        "First",
-        "FirstAsync",
-        "FirstOrDefault",
-        "FirstOrDefaultAsync",
-        "Count",
-        "CountAsync",
-        "Any",
-        "AnyAsync",
-        "All",
-        "AllAsync",
-    };
+    internal static IReadOnlyList<LinqQuerySite> Collect(
+        string efProjectPath,
+        string startupProjectPath,
+        Type selectedDbContextType) =>
+        Collect(efProjectPath, startupProjectPath, selectedDbContextType.Name);
 
     internal static IReadOnlyList<LinqQuerySite> Collect(
         string efProjectPath,
         string startupProjectPath,
-        Type selectedDbContextType)
+        string selectedContextTypeName)
     {
-        var scope = DbContextScanScope.Create(efProjectPath, startupProjectPath, selectedDbContextType);
+        var scope = DbContextScanScope.Create(efProjectPath, startupProjectPath, selectedContextTypeName);
         var sites = new List<LinqQuerySite>();
         var projectPaths = LinqProjectSourceWalker.CollectScanProjectPaths(efProjectPath, startupProjectPath);
 
@@ -83,7 +61,7 @@ internal static class LinqQuerySiteCollector
         {
             var methodName = GetSimpleMethodName(invocation.Expression);
 
-            if (methodName is null || !QueryMethodNames.Contains(methodName))
+            if (methodName is null || !LinqQueryInvocationNames.ScanTargets.Contains(methodName))
                 continue;
 
             var statement = GetStatementText(invocation);
@@ -118,8 +96,25 @@ internal static class LinqQuerySiteCollector
     private static string GetStatementText(SyntaxNode node)
     {
         var statement = node.FirstAncestorOrSelf<StatementSyntax>();
+        var text = statement?.ToString() ?? node.ToString();
 
-        return statement?.ToString() ?? node.ToString();
+        if (LinqEfQueryHeuristics.LooksLikeEfQuery(text))
+            return text;
+
+        var block = node.FirstAncestorOrSelf<BlockSyntax>();
+
+        if (block is not null)
+        {
+            foreach (var sibling in block.Statements)
+            {
+                var siblingText = sibling.ToString();
+
+                if (LinqEfQueryHeuristics.LooksLikeEfQuery(siblingText))
+                    return siblingText;
+            }
+        }
+
+        return text;
     }
 
     private static string? GetContainingTypeName(SyntaxNode node)

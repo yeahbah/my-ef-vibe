@@ -65,6 +65,7 @@ db.JsonBlobDocuments
 | `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--dblog` or `:dblog`. |
 | `-c`, `--context` | `DbContext` type name (e.g. `MyDbContext`) or fully qualified name |
 | `--connection-string`, `-cs` | Connection string for manual `DbContextOptions` construction |
+| *(automatic)* | When building `DbContextOptions` from config, efvibe uses `UseSqlServer(conn, o => …)` / `UseNpgsql(conn, o => …)` and applies optional extensions referenced by the EF project (e.g. `UseNetTopologySuite`, `UseHierarchyId`) |
 | `--provider` | Provider with `-cs`: `sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb` |
 | `-e`, `--expression` | Run one expression and exit |
 | `expression` (positional) | Same as `-e` when passed as trailing arguments |

@@ -68,6 +68,18 @@ public sealed class DbContextQuerySiteFilterTests
     }
 
     [Fact]
+    public void BelongsToSelectedContext_IncludesInjectedContextField()
+    {
+        var scope = CreateScope("WideWorldImportersContext");
+
+        Assert.True(DbContextQuerySiteFilter.BelongsToSelectedContext(
+            "var entity = _context.Cities.Where(x => x.CityId == key);",
+            scope,
+            containingTypeName: "EntitiesController",
+            containingTypeIndex: null));
+    }
+
+    [Fact]
     public void BelongsToSelectedContext_RepositoryBoundToSelected_IncludesDbContextAlias()
     {
         const string source = """

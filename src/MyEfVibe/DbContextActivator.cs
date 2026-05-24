@@ -82,7 +82,7 @@ internal static class DbContextActivator
             + $"{Environment.NewLine}"
             + " - Add a public parameterless constructor on the DbContext."
             + $"{Environment.NewLine}"
-            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb) to build `DbContextOptions<TContext>`."
+            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb) to build `DbContextOptions<TContext>` (optional packages such as NetTopologySuite are applied when referenced)."
             + $"{Environment.NewLine}"
             + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.";
 
@@ -829,6 +829,15 @@ internal static class DbContextActivator
 
             if (providerAssembly is null)
                 continue;
+
+            if (ProviderOptionsConfigurator.TryInvokeUseProviderWithOptions(
+                    host,
+                    providerAssembly,
+                    closedBuilderInstance,
+                    connectionString,
+                    spec.MethodName,
+                    providerKey))
+                return true;
 
             if (TryInvokeUseProviderExtensionMethod(
                     providerAssembly,

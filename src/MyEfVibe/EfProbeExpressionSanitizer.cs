@@ -35,6 +35,8 @@ internal static class EfProbeExpressionSanitizer
         while (result.Contains("..", StringComparison.Ordinal))
             result = result.Replace("..", ".", StringComparison.Ordinal);
 
-        return result;
+        result = Regex.Replace(result, @"\s+\.", ".", RegexOptions.CultureInvariant);
+
+        return result.Trim();
     }
 }

@@ -3,6 +3,42 @@ namespace MyEfVibe.Tests;
 public sealed class LinqDeepExpressionAdapterTests
 {
     [Fact]
+    public void TryCreateProbeExpression_EmployeeIncludeGraph_PreparesTranslatableScript()
+    {
+        const string statement = """
+            return await DbContext.Employees
+                .AsNoTracking()
+                .Include(e => e.PersonBusinessEntity)
+                .Include(e => e.EmployeeDepartmentHistory)
+                    .ThenInclude(dh => dh.Department)
+                .Include(e => e.EmployeeDepartmentHistory)
+                    .ThenInclude(dh => dh.Shift)
+                .Include(e => e.EmployeePayHistory)
+                .Where(e => e.BusinessEntityId == businessEntityId)
+                .FirstOrDefaultAsync(cancellationToken);
+            """;
+
+        var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
+            statement,
+            representativeEntityTypeName: nameof(FakeEmployee),
+            dbContextType: typeof(FakeAdventureWorksDbContext),
+            queryEntityTypeName: nameof(FakeEmployee));
+
+        Assert.NotNull(probe);
+        Assert.DoesNotContain("AsNoTracking", probe, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(1)", probe, StringComparison.Ordinal);
+        Assert.Contains(".Include(e => e.PersonBusinessEntity)", probe, StringComparison.Ordinal);
+        Assert.Contains("BusinessEntityId == 0", ProbeTestHelper.CollapseWhitespace(probe), StringComparison.Ordinal);
+
+        var script = SnippetNormalizer.ForEvaluation(
+            ProbeScriptFormatter.ToScriptExpression(probe),
+            typeof(FakeAdventureWorksDbContext));
+
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime", script, StringComparison.Ordinal);
+        Assert.Contains(".Include(", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TryCreateProbeExpression_MultilineIncludeWithLambdas_DoesNotCorruptProbe()
     {
         const string statement = """

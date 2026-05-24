@@ -19,7 +19,8 @@ internal static class RepositorySnippetAdapter
         normalized = EfReplQueryableRewriter.TryCastDbSetRoots(normalized, dbContextType)
             ?? normalized;
 
-        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(normalized)
+        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(normalized, dbContextType)
+            ?? EfReplQueryableRewriter.TryRewriteBareWhere(normalized, dbContextType)
             ?? normalized;
     }
 }

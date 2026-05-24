@@ -6,34 +6,6 @@ namespace MyEfVibe;
 
 internal static class LinqLiteScanner
 {
-    private static readonly HashSet<string> QueryMethodNames = new(StringComparer.Ordinal)
-    {
-        "AsEnumerable",
-        "ToList",
-        "ToListAsync",
-        "ToArray",
-        "ToArrayAsync",
-        "Include",
-        "ThenInclude",
-        "FromSql",
-        "FromSqlRaw",
-        "ExecuteSqlRaw",
-        "Single",
-        "SingleAsync",
-        "SingleOrDefault",
-        "SingleOrDefaultAsync",
-        "First",
-        "FirstAsync",
-        "FirstOrDefault",
-        "FirstOrDefaultAsync",
-        "Count",
-        "CountAsync",
-        "Any",
-        "AnyAsync",
-        "All",
-        "AllAsync",
-    };
-
     internal static LinqLiteScanResult Scan(
         string efProjectPath,
         string startupProjectPath,
@@ -104,7 +76,7 @@ internal static class LinqLiteScanner
         {
             var methodName = GetSimpleMethodName(invocation.Expression);
 
-            if (methodName is null || !QueryMethodNames.Contains(methodName))
+            if (methodName is null || !LinqQueryInvocationNames.ScanTargets.Contains(methodName))
                 continue;
 
             var statement = GetStatementText(invocation);
@@ -225,8 +197,25 @@ internal static class LinqLiteScanner
     private static string GetStatementText(SyntaxNode node)
     {
         var statement = node.FirstAncestorOrSelf<StatementSyntax>();
+        var text = statement?.ToString() ?? node.ToString();
 
-        return statement?.ToString() ?? node.ToString();
+        if (LinqEfQueryHeuristics.LooksLikeEfQuery(text))
+            return text;
+
+        var block = node.FirstAncestorOrSelf<BlockSyntax>();
+
+        if (block is not null)
+        {
+            foreach (var sibling in block.Statements)
+            {
+                var siblingText = sibling.ToString();
+
+                if (LinqEfQueryHeuristics.LooksLikeEfQuery(siblingText))
+                    return siblingText;
+            }
+        }
+
+        return text;
     }
 
     private static string ToPreviewLine(string text)

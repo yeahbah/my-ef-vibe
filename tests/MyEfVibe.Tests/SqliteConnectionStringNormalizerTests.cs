@@ -55,6 +55,75 @@ public sealed class SqliteConnectionStringNormalizerTests
     }
 
     [Fact]
+    public void LooksLikeSqliteConnection_is_false_for_sql_server_host_comma_port()
+    {
+        const string connectionString =
+            "Data Source=localhost,1533;User ID=wwi;Password=secret;Initial Catalog=WideWorldImporters;TrustServerCertificate=Yes";
+
+        Assert.False(SqliteConnectionStringNormalizer.LooksLikeSqliteConnection(connectionString));
+    }
+
+    [Fact]
+    public void Normalize_does_not_rewrite_sql_server_connection_string()
+    {
+        const string connectionString =
+            "Data Source=localhost,1533;User ID=wwi;Initial Catalog=WideWorldImporters;TrustServerCertificate=Yes";
+        var startupProject = Path.Combine(Path.GetTempPath(), "WideWorldImporters.Server.Api.csproj");
+
+        var normalized = SqliteConnectionStringNormalizer.Normalize(connectionString, startupProject);
+
+        Assert.Equal(connectionString, normalized);
+    }
+
+    [Fact]
+    public void AppSettings_resolver_reads_application_database_from_development_settings()
+    {
+        using var temp = new TempDirectory();
+        var startupProject = Path.Combine(temp.Path, "WideWorldImporters.Server.Api.csproj");
+        File.WriteAllText(
+            startupProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        File.WriteAllText(
+            Path.Combine(temp.Path, "appsettings.json"),
+            """
+            {
+              "ConnectionStrings": {
+                "ApplicationDatabase": "Data Source=prod;Initial Catalog=WideWorldImporters"
+              }
+            }
+            """);
+
+        const string developmentConnection =
+            "Data Source=localhost,1533;Initial Catalog=WideWorldImporters;TrustServerCertificate=Yes";
+
+        File.WriteAllText(
+            Path.Combine(temp.Path, "appsettings.Development.json"),
+            $$"""
+            {
+              "ConnectionStrings": {
+                "ApplicationDatabase": "{{developmentConnection}}"
+              }
+            }
+            """);
+
+        Assert.True(
+            AppSettingsConnectionResolver.TryResolve(
+                startupProject,
+                efOutputDirectory: temp.Path,
+                out var connectionString,
+                out _));
+
+        Assert.Equal(developmentConnection, connectionString);
+    }
+
+    [Fact]
     public void AppSettings_resolver_layers_development_over_base()
     {
         using var temp = new TempDirectory();

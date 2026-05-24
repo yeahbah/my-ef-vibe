@@ -154,6 +154,10 @@ internal static class SqlTranslationProbe
             _ => suffix,
         };
 
+    internal static bool ContainsEagerLoad(string expression) =>
+        expression.Contains(".Include(", StringComparison.Ordinal)
+        || expression.Contains(".ThenInclude(", StringComparison.Ordinal);
+
     internal static string? TryCreateProbeExpression(string snippet)
     {
         var trimmed = snippet.Trim().TrimEnd(';').Trim();
@@ -246,7 +250,7 @@ internal static class SqlTranslationProbe
         if (string.IsNullOrWhiteSpace(queryable))
             return null;
 
-        if (takeLimit is null)
+        if (takeLimit is null || ContainsEagerLoad(queryable))
             return queryable;
 
         var predicate = TryExtractPredicateArgument(terminalArguments);
@@ -257,7 +261,7 @@ internal static class SqlTranslationProbe
         return $"{queryable}.Take({takeLimit.Value})";
     }
 
-    private static string? TryExtractPredicateArgument(string? arguments)
+    internal static string? TryExtractPredicateArgument(string? arguments)
     {
         if (string.IsNullOrWhiteSpace(arguments))
             return null;

@@ -5,23 +5,6 @@ namespace MyEfVibe;
 /// </summary>
 internal static class LinqEfQueryHeuristics
 {
-    private static readonly string[] EfMarkers =
-    [
-        "db.",
-        "_dbContext.",
-        "dbContext.",
-        "applicationDbContext.",
-        "_applicationDbContext.",
-        "appDbContext.",
-        "_appDbContext.",
-        "DbContext",
-        ".Set<",
-        "FromSqlRaw(",
-        "FromSql(",
-        "ExecuteSqlRaw(",
-        "ExecuteSql(",
-    ];
-
     private static readonly string[] NonEfMarkers =
     [
         "AppDomain.",
@@ -33,6 +16,7 @@ internal static class LinqEfQueryHeuristics
         "Directory.",
         "File.",
         "Path.",
+        "HttpContext.",
     ];
 
     internal static bool LooksLikeEfQuery(string statement)
@@ -48,9 +32,15 @@ internal static class LinqEfQueryHeuristics
                 return false;
         }
 
-        foreach (var marker in EfMarkers)
+        foreach (var prefix in DbContextQueryMarkers.MemberPrefixes)
         {
-            if (normalized.Contains(marker, StringComparison.Ordinal))
+            if (normalized.Contains(prefix, StringComparison.Ordinal))
+                return true;
+        }
+
+        foreach (var typeName in DbContextQueryMarkers.TypeNameFragments)
+        {
+            if (normalized.Contains(typeName, StringComparison.Ordinal))
                 return true;
         }
 

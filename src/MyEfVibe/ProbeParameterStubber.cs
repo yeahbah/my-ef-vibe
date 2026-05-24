@@ -447,7 +447,8 @@ internal static class ProbeParameterStubber
             if (IsLikelyGuidParameterName(name))
                 return GuidStubLiteral();
 
-            if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase)
+            if (string.Equals(name, "key", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "id", StringComparison.OrdinalIgnoreCase)
                 || (name.EndsWith("Id", StringComparison.OrdinalIgnoreCase)
                     && name.Length > 2
                     && !name.EndsWith("ObjectId", StringComparison.OrdinalIgnoreCase))

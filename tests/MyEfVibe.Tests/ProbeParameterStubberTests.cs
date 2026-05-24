@@ -3,6 +3,17 @@ namespace MyEfVibe.Tests;
 public sealed class ProbeParameterStubberTests
 {
     [Fact]
+    public void Stub_ODataKeyParameter_UsesNumericZero()
+    {
+        const string probe = "db.Cities.Where(x => x.CityId == key)";
+
+        var stubbed = ProbeParameterStubber.Stub(probe);
+
+        Assert.Contains("CityId == 0", stubbed, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(stubbed);
+    }
+
+    [Fact]
     public void Stub_IdComparedToDepartmentId_UsesNumericZero()
     {
         const string probe = "db.Departments.Where(s => s.DepartmentId == id).Take(1)";
@@ -140,6 +151,15 @@ public sealed class ProbeParameterStubberTests
 
 public sealed class FakeGuidNoteDbContext : Microsoft.EntityFrameworkCore.DbContext
 {
+    public FakeGuidNoteDbContext()
+    {
+    }
+
+    public FakeGuidNoteDbContext(Microsoft.EntityFrameworkCore.DbContextOptions<FakeGuidNoteDbContext> options)
+        : base(options)
+    {
+    }
+
     public Microsoft.EntityFrameworkCore.DbSet<FakeGuidUser> Users => Set<FakeGuidUser>();
 
     public Microsoft.EntityFrameworkCore.DbSet<FakeGuidNote> Notes => Set<FakeGuidNote>();
@@ -148,6 +168,8 @@ public sealed class FakeGuidNoteDbContext : Microsoft.EntityFrameworkCore.DbCont
 public sealed class FakeGuidUser
 {
     public Guid Id { get; set; }
+
+    public string Username { get; set; } = string.Empty;
 }
 
 public sealed class FakeGuidNote

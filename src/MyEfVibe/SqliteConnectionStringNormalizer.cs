@@ -9,7 +9,8 @@ internal static class SqliteConnectionStringNormalizer
         string startupProjectPath,
         string? efOutputDirectory = null)
     {
-        if (string.IsNullOrWhiteSpace(connectionString))
+        if (string.IsNullOrWhiteSpace(connectionString)
+            || !LooksLikeSqliteConnection(connectionString))
             return connectionString;
 
         if (!TryParseDataSource(connectionString, out var dataSource, out var usesPrefix))
@@ -35,11 +36,38 @@ internal static class SqliteConnectionStringNormalizer
         return FormatDataSource(fallbackPath, usesPrefix);
     }
 
-    internal static bool LooksLikeSqliteConnection(string connectionString) =>
-        connectionString.Contains(DataSourcePrefix, StringComparison.OrdinalIgnoreCase)
-        || (connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase)
-            && !connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
-            && !connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase));
+    internal static bool LooksLikeSqliteConnection(string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return false;
+
+        // SQL Server and other server-based providers also use "Data Source=" — do not treat as SQLite.
+        if (LooksLikeServerBasedConnection(connectionString))
+            return false;
+
+        if (connectionString.Contains(DataSourcePrefix, StringComparison.OrdinalIgnoreCase)
+            && TryParseDataSource(connectionString, out var dataSource, out _))
+        {
+            if (dataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase)
+                || dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
+                || dataSource.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase)
+            && !connectionString.Contains(';', StringComparison.Ordinal);
+    }
+
+    private static bool LooksLikeServerBasedConnection(string connectionString) =>
+        connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("Integrated Security=", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase)
+        || (connectionString.Contains(DataSourcePrefix, StringComparison.OrdinalIgnoreCase)
+            && TryParseDataSource(connectionString, out var dataSource, out _)
+            && dataSource.Contains(',', StringComparison.Ordinal));
 
     private static bool TryParseDataSource(
         string connectionString,

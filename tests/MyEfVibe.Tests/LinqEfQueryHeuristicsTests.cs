@@ -3,17 +3,20 @@ namespace MyEfVibe.Tests;
 public sealed class LinqEfQueryHeuristicsTests
 {
     [Theory]
-    [InlineData("return await DbContext.Products.ToListAsync();")]
-    [InlineData("db.Employees.Where(e => e.Active)")]
-    public void LooksLikeEfQuery_DbContextMarkers_ReturnsTrue(string statement)
+    [InlineData("return Ok(_context.Cities);")]
+    [InlineData("var entity = _context.BuyingGroups.Where(x => x.BuyingGroupId == key);")]
+    [InlineData("await _dbContext.Orders.ToListAsync();")]
+    [InlineData("db.Products.Count();")]
+    public void LooksLikeEfQuery_IncludesCommonDbContextFieldNames(string statement)
     {
         Assert.True(LinqEfQueryHeuristics.LooksLikeEfQuery(statement));
     }
 
     [Theory]
-    [InlineData("return items.Where(x => x.Amount > 0).ToList();")]
-    [InlineData("Request.Headers.FirstOrDefault()")]
-    public void LooksLikeEfQuery_InMemoryOrHttpMarkers_ReturnsFalse(string statement)
+    [InlineData("context.Features.Get<IExceptionHandlerFeature>();")]
+    [InlineData("Request.Headers.Accept")]
+    [InlineData("filters.Values.ToList();")]
+    public void LooksLikeEfQuery_ExcludesNonEfCode(string statement)
     {
         Assert.False(LinqEfQueryHeuristics.LooksLikeEfQuery(statement));
     }

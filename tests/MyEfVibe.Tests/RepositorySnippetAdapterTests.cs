@@ -31,6 +31,19 @@ public sealed class RepositorySnippetAdapterTests
     }
 
     [Fact]
+    public void TryRewriteBareWhere_IncludeChain_UsesTypedWhere()
+    {
+        const string probe =
+            "db.Employees.Include(e => e.PersonBusinessEntity).Where(e => e.BusinessEntityId == 0)";
+
+        var rewritten = EfReplQueryableRewriter.TryRewriteBareWhere(probe, typeof(FakeAdventureWorksDbContext));
+
+        Assert.NotNull(rewritten);
+        Assert.Contains("ReplQueryableRuntime.Where<", rewritten, StringComparison.Ordinal);
+        Assert.Contains("FakeEmployee>", rewritten, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PrepareForEvaluation_EmployeeIncludeQuery_RewritesToPublicRuntime()
     {
         const string snippet = """
@@ -70,7 +83,24 @@ public sealed class FakeEmployee
     public int BusinessEntityId { get; set; }
 
     public FakePersonBusinessEntity? PersonBusinessEntity { get; set; }
+
+    public ICollection<FakeEmployeeDepartmentHistory> EmployeeDepartmentHistory { get; set; } = [];
+
+    public ICollection<FakeEmployeePayHistory> EmployeePayHistory { get; set; } = [];
 }
+
+public sealed class FakeEmployeeDepartmentHistory
+{
+    public FakeDepartment? Department { get; set; }
+
+    public FakeShift? Shift { get; set; }
+}
+
+public sealed class FakeDepartment;
+
+public sealed class FakeShift;
+
+public sealed class FakeEmployeePayHistory;
 
 public sealed class FakePersonBusinessEntity
 {

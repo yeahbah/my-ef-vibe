@@ -73,7 +73,8 @@ internal static class SnippetNormalizer
         rewritten = EfReplQueryableRewriter.TryCastDbSetRoots(rewritten, dbContextType)
             ?? rewritten;
 
-        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten)
+        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten, dbContextType)
+            ?? EfReplQueryableRewriter.TryRewriteBareWhere(rewritten, dbContextType)
             ?? rewritten;
     }
 
@@ -167,6 +168,7 @@ internal static class SnippetNormalizer
         || snippet.Contains("dbContext", StringComparison.Ordinal)
         || snippet.Contains("Async(", StringComparison.Ordinal)
         || snippet.Contains("cancellationToken", StringComparison.OrdinalIgnoreCase)
+        || SqlTranslationProbe.ContainsEagerLoad(snippet)
         || InputLineUtilities.SplitLines(snippet).Length > 1;
 
     private static bool LooksLikeTypeDeclaration(string text)
