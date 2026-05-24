@@ -448,6 +448,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
+    "copy-screenshots": "cp ../screenshots/vscode1.png ../screenshots/vscode-scan-review.png images/",
+    "prepackage": "npm run copy-screenshots",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "tsc -p ./ --noEmit",

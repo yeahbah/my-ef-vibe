@@ -29,7 +29,9 @@ Startup banner, session panel, and a LINQ query with translated SQL, results, an
 
 VS Code extension (v0.5.0) — install from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) (search **`efvibe`**). **Run Selection** via `efvibe serve`, result panel, **efvibe Session** sidebar, **Scan Review** carousel ([vscode-extension/README.md](vscode-extension/README.md) · [docs on myefvibe.com](https://myefvibe.com/docs/vscode.html)):
 
-![efvibe VS Code extension: editor, result panel, and SQL](screenshots/vscode1.png)
+![efvibe VS Code extension: Run Selection with result and SQL](screenshots/vscode1.png)
+
+![efvibe VS Code extension: Scan Review carousel](screenshots/vscode-scan-review.png)
 
 ## Install
 

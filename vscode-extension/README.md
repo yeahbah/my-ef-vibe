@@ -4,7 +4,15 @@ Run **[efvibe](https://myefvibe.com/)** from VS Code — the EF Core LINQ REPL w
 
 **Install:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) — Extensions → search **`efvibe`** (`yeahbah.vscode-efvibe`). User guide: [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html). Source: [github.com/yeahbah/my-ef-vibe](https://github.com/yeahbah/my-ef-vibe).
 
-![efvibe VS Code: Run Selection with result and SQL beside your C# code](../screenshots/vscode1.png)
+## Screenshots
+
+**Run Selection** — evaluate LINQ in place; result panel with rows and captured SQL (`Shift+Alt+E`):
+
+![efvibe VS Code: Run Selection with result and SQL beside your C# code](images/vscode1.png)
+
+**Scan Review** — deep-scan findings carousel with SQL, query plan, note, and dismiss:
+
+![efvibe VS Code: Scan Review carousel for deep scan findings](images/vscode-scan-review.png)
 
 ## Prerequisites
 
