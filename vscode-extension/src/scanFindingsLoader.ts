@@ -6,7 +6,7 @@ import { loadNoteMap, saveFindingNote } from './scanNotes';
 import type { ScanReviewItem } from './scanReviewTypes';
 import type { ScanFindingDto, ScanMode, ScanSessionDocument } from './scanTypes';
 import {
-  getDbContextSessionDirectory,
+  discoverDeepScanFilePaths,
   getDeepScanFilePath,
   getLiteScanFilePath,
   getProjectScanDirectory,
@@ -83,20 +83,31 @@ export function loadScanReviewItems(
     );
   }
 
+  const deepPaths = new Set<string>();
+
   if (dbContextName.trim()) {
-    const deepPath = getDeepScanFilePath(workspaceRoot, projectCsprojPath, dbContextName.trim());
+    deepPaths.add(getDeepScanFilePath(workspaceRoot, projectCsprojPath, dbContextName.trim()));
+  }
+
+  for (const discovered of discoverDeepScanFilePaths(workspaceRoot, projectCsprojPath)) {
+    deepPaths.add(discovered);
+  }
+
+  for (const deepPath of deepPaths) {
     const deepDoc = loadScanSessionDocument(deepPath);
 
-    if (deepDoc) {
-      appendDocumentFindings(
-        items,
-        deepDoc,
-        getDbContextSessionDirectory(workspaceRoot, projectCsprojPath, dbContextName.trim()),
-        'deep',
-        workspaceFolders,
-        hideDismissed,
-      );
+    if (!deepDoc) {
+      continue;
     }
+
+    appendDocumentFindings(
+      items,
+      deepDoc,
+      path.dirname(deepPath),
+      'deep',
+      workspaceFolders,
+      hideDismissed,
+    );
   }
 
   items.sort((left, right) => {

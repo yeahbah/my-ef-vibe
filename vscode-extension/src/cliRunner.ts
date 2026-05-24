@@ -49,6 +49,56 @@ export interface AboutJsonPayload {
   runtime?: string;
 }
 
+export interface TablesJsonEntry {
+  dbSet: string;
+  entityType: string;
+  entityTypeFullName?: string;
+}
+
+export interface DescribeJsonMember {
+  name: string;
+  type: string;
+  nullable: string;
+  notes?: string;
+}
+
+export interface DescribeJsonPayload {
+  success: boolean;
+  dbSet?: string;
+  entityType?: string;
+  entityTypeFullName?: string;
+  members?: DescribeJsonMember[];
+  error?: string;
+  knownEntities?: string[];
+}
+
+export interface DbInfoJsonEntry {
+  key: string;
+  value?: string;
+}
+
+export interface DbInfoJsonPayload {
+  dbContext: string;
+  entries: DbInfoJsonEntry[];
+}
+
+export interface CompletionJsonItem {
+  label: string;
+  insertText: string;
+  kind: string;
+  detail?: string;
+}
+
+export interface CompletionsJsonPayload {
+  prefix: string;
+  items: CompletionJsonItem[];
+}
+
+export interface TablesJsonPayload {
+  dbContext: string;
+  tables: TablesJsonEntry[];
+}
+
 function quoteArg(value: string): string {
   if (value.length === 0) {
     return '""';
@@ -281,17 +331,18 @@ export function buildAboutJsonCommand(settings: EfvibeSettings, searchDirectory:
   return buildCommandLine(invocation, [...buildEfvibeArgs(settings), '--about-json']);
 }
 
-export async function runAboutJson(
+async function runJsonStdout<T>(
   settings: EfvibeSettings,
   searchDirectory: string,
   cwd: string,
-): Promise<AboutJsonPayload | undefined> {
+  flag: string,
+): Promise<T | undefined> {
   const invocation = resolveToolInvocation(
     searchDirectory,
     settings.toolPath,
     settings.dotnetFramework,
   );
-  const args = [...buildEfvibeArgs(settings), '--about-json'];
+  const args = [...buildEfvibeArgs(settings), flag, '--no-banner'];
 
   try {
     const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
@@ -310,7 +361,102 @@ export async function runAboutJson(
       return undefined;
     }
 
-    return JSON.parse(line) as AboutJsonPayload;
+    return JSON.parse(line) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function runAboutJson(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+): Promise<AboutJsonPayload | undefined> {
+  return runJsonStdout<AboutJsonPayload>(settings, searchDirectory, cwd, '--about-json');
+}
+
+export async function runTablesJson(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+): Promise<TablesJsonPayload | undefined> {
+  return runJsonStdout<TablesJsonPayload>(settings, searchDirectory, cwd, '--tables-json');
+}
+
+export async function runDescribeJson(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+  entityName: string,
+): Promise<DescribeJsonPayload | undefined> {
+  const invocation = resolveToolInvocation(
+    searchDirectory,
+    settings.toolPath,
+    settings.dotnetFramework,
+  );
+  const args = [...buildEfvibeArgs(settings), '--describe-json', entityName, '--no-banner'];
+
+  try {
+    const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
+      cwd,
+      timeout: 10 * 60_000,
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+    });
+
+    return parseJsonLine<DescribeJsonPayload>(stdout);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function runDbInfoJson(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+): Promise<DbInfoJsonPayload | undefined> {
+  return runJsonStdout<DbInfoJsonPayload>(settings, searchDirectory, cwd, '--dbinfo-json');
+}
+
+export async function runCompletionsJson(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+  prefix: string,
+): Promise<CompletionsJsonPayload | undefined> {
+  const invocation = resolveToolInvocation(
+    searchDirectory,
+    settings.toolPath,
+    settings.dotnetFramework,
+  );
+  const args = [...buildEfvibeArgs(settings), '--completions-json', prefix, '--no-banner'];
+
+  try {
+    const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
+      cwd,
+      timeout: 10 * 60_000,
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+    });
+
+    return parseJsonLine<CompletionsJsonPayload>(stdout);
+  } catch {
+    return undefined;
+  }
+}
+
+function parseJsonLine<T>(stdout: string): T | undefined {
+  const line = stdout
+    .split(/\r?\n/u)
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith('{'));
+
+  if (!line) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(line) as T;
   } catch {
     return undefined;
   }

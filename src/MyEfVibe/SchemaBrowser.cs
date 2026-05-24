@@ -5,27 +5,36 @@ namespace MyEfVibe;
 
 internal static class SchemaBrowser
 {
-    internal static async Task WriteTablesAsync(object dbContext, CancellationToken cancellationToken = default)
+    internal static Task WriteTablesAsync(object dbContext, CancellationToken cancellationToken = default)
     {
-        var counts = await GetDbSetCountsAsync(dbContext, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (counts.Count == 0)
+        var sets = GetDbSets(dbContext);
+
+        if (sets.Count == 0)
         {
             CliUi.WriteWarning("No DbSet properties found on this context.");
-            return;
+            return Task.CompletedTask;
         }
 
         var table = new Table().RoundedBorder().BorderColor(Color.Grey);
         table.AddColumn("DbSet");
         table.AddColumn("entity");
-        table.AddColumn("rows");
 
-        foreach (var entry in counts)
-            table.AddRow(entry.DbSet, entry.EntityType, entry.Count?.ToString() ?? "?");
+        foreach (var entry in sets)
+            table.AddRow(entry.DbSet, entry.EntityType);
 
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
+
+        return Task.CompletedTask;
     }
+
+    internal static IReadOnlyList<(string DbSet, string EntityType, string? EntityTypeFullName)> GetDbSets(
+        object dbContext) =>
+        DiscoverDbSets(dbContext)
+            .Select(set => (set.PropertyName, set.EntityTypeName, set.ElementType.FullName))
+            .ToArray();
 
     internal static async Task<IReadOnlyList<(string DbSet, string EntityType, int? Count)>> GetDbSetCountsAsync(
         object dbContext,

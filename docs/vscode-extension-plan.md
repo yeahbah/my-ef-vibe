@@ -116,25 +116,29 @@ efvibe writes under the session folder:
 - Headless `efvibe scan lite|deep` with `--json`, `--no-banner`, `--respect-dismissals`
 - Public `ReplQueryableRuntime` for repository-snippet evaluation in Roslyn scripts
 
-### Phase 3 — Rich REPL experience (6+ weeks)
+### Phase 3 — Rich REPL experience ✅ implemented in `vscode-extension/` v0.5.0
 
 **Goal:** Optional upgrade beyond terminal-only.
 
-| Option | Tradeoff |
-|--------|----------|
-| **A. Custom editor (Notebook / Webview)** | Multi-cell LINQ, `;` submit, Shift+Enter newline — duplicates REPL UX; high effort |
-| **B. Language Server (LSP)** | Completion on `db.`, entity types — needs long-running `efvibe language-server` |
-| **C. Terminal enhancements only** | Keybindings for submit — low effort; keeps one REPL |
-
-**Recommendation:** Ship **C** in v1; prototype **B** only if terminal completion is insufficient.
-
-| Feature | Phase |
+| Feature | Status |
 |---------|--------|
-| Completion via LSP | 3B |
-| Entity picker (`:describe` data) in Quick Pick | 3A-lite |
-| Schema explorer tree (`:tables`, `:dbinfo`) | Webview sidebar |
-| Query plan viewer (`:plan`) | Webview |
-| Compare / benchmark from last run | Webview charts (CLI already has `:chart`) |
+| `efvibe.scan.onSave` | ✅ Debounced scan on C# save |
+| **EF Model** tree | ✅ Describe, Go To Definition, Run Query, Run Count |
+| **Send to REPL** | ✅ |
+| **`db.*` completion** | ✅ C# completion provider + `--completions-json` |
+| **`efvibe language-server`** | ✅ Minimal LSP (initialize + completion) for other editors |
+| **Entity picker** | ✅ **Pick Entity** command |
+| **Query plan viewer** | ✅ **Show Query Plan** command + result panel **Run Plan** |
+| **Compare / charts** | ✅ **Show Session Charts**, **Set Compare Baseline** |
+| **CodeLens** | ✅ **Run with efvibe** on LINQ-like lines |
+| **Scan rule docs** | ✅ Learn-more links in Scan Review + Problems related info |
+| **`:dbinfo`** | ✅ **Show DbInfo** panel (`--dbinfo-json`) |
+| **Session explorer** | ✅ **efvibe Session** sidebar (scan JSON, notes, exports) |
+| **`efvibe scan note` / `dismiss`** | ✅ Headless CLI subcommands |
+
+**CLI:** `--tables-json`, `--describe-json`, `--dbinfo-json`, `--completions-json`, `efvibe language-server`, `efvibe scan note|dismiss`.
+
+**Deferred (Phase 3A notebook / marketplace):** Multi-cell LINQ notebook editor; Open VSX publish.
 
 ## VS Code feature map (full target)
 
@@ -199,6 +203,7 @@ Publish as **`efvibe.vscode-efvibe`** on Open VSX and the Visual Studio Marketpl
 | P1 | `scan --no-repl` / headless scan | CI; editor diagnostics |
 | P2 | `scan dismiss` / `scan note` CLI | Editor actions without REPL |
 | P2 | `--about-json` (context, paths, provider) | Status bar; tree labels |
+| P2 | `--tables-json` (DbSets, entity types) ✅ | EF Model sidebar |
 | P3 | `efvibe language-server` (optional) | `db.` IntelliSense in editor |
 
 Keep **JSON schemas versioned** (scan documents already expose a `version` field).
@@ -263,6 +268,7 @@ The extension can consume today’s scan files without waiting for new formats. 
 
 ## Related docs
 
+- [myefvibe.com](https://myefvibe.com/) — product site, getting started, CLI/REPL/scan/VS Code guides
 - [visual-studio-extension-plan.md](./visual-studio-extension-plan.md) — Visual Studio 2022+ VSIX roadmap
 - [rider-extension-plan.md](./rider-extension-plan.md) — JetBrains Rider plugin roadmap
 - [features.md](../features.md) — REPL commands, scan behavior, session layout

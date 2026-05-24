@@ -1,5 +1,7 @@
 # MyEfVibe features
 
+**Website:** [myefvibe.com](https://myefvibe.com/) · **Documentation:** [myefvibe.com/docs](https://myefvibe.com/docs/)
+
 MyEfVibe is an interactive CLI for running LINQ against an **external** EF Core `DbContext`. It builds the EF project, loads assemblies into a Roslyn scripting session, and exposes the context as `db` in a REPL.
 
 Licensed under [Apache 2.0](LICENSE).
@@ -192,7 +194,7 @@ Re-show with `:warnings`.
 | `:dblog` | Toggle database command logging (sql-only by default) |
 | `:stats` | Session evaluation table and aggregates |
 | `:tracked` | Change tracker summary by state |
-| `:tables` | DbSets with row counts |
+| `:tables` | DbSets and entity types (no row counts) |
 | `:dbinfo` | DbContext type, provider, connection string, server version, and related metadata |
 | `:describe <entity>`, `:desc` | Entity property sheet (see below) |
 | `:scan lite` | Static Roslyn scan of EF project sources for slow-query patterns (see below) |
@@ -265,7 +267,7 @@ Rules include: client-side `AsEnumerable()`, unbounded materialization, multiple
 
 ### Schema and connection (`:tables`, `:describe`, `:dbinfo`)
 
-**`:tables`** — table of each DbSet name, CLR entity type, and row count (`Count()` per set).
+**`:tables`** — table of each DbSet name and CLR entity type (no database `Count()`).
 
 **`:describe <entity>`** (alias `:desc`) — resolves an entity from DbSet names or type names on the current context:
 

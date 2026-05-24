@@ -1,5 +1,8 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
-import { buildExpressionCommand, buildReplCommand, runExpressionJson } from './cliRunner';
+import { buildExpressionCommand, runDescribeJson, runExpressionJson } from './cliRunner';
+import { EfvibeDescribePanel } from './describePanel';
+import { goToEntityDefinition } from './entityNavigation';
 import { getSearchDirectory, getWorkspaceFolder, readSettings } from './config';
 import { exportEvaluationPayload } from './resultExport';
 import { getDbContextSessionDirectory } from './sessionPaths';
@@ -9,8 +12,14 @@ import { invalidateEfvibeDaemon } from './daemonClient';
 import { validateReadOnlyExpression } from './expressionGuard';
 import { EfvibeResultPanel, formatEvaluationForOutput, type PanelRunRequest } from './resultPanel';
 import { generateReplTask } from './replTask';
+import { EfvibeModelTreeItem, type EfvibeModelTreeProvider } from './modelTree';
+import { registerSessionExplorer } from './sessionExplorer';
+import { registerReplTerminal, sendSnippetToRepl, startEfvibeRepl } from './replTerminal';
 import { registerScanService } from './scanService';
 import { EfvibeStatusBar } from './statusBar';
+import { EvaluationHistoryStore } from './evaluationHistory';
+import { pickEntityCommand } from './entityPicker';
+import { registerPhase3Features, recordEvaluationHistory } from './registerPhase3';
 
 const OUTPUT_CHANNEL_NAME = 'efvibe';
 
@@ -19,9 +28,11 @@ let outputChannel: vscode.OutputChannel | undefined;
 let lastSql: string[] = [];
 
 let extensionContext: vscode.ExtensionContext | undefined;
+let evaluationHistory: EvaluationHistoryStore | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   extensionContext = context;
+  evaluationHistory = new EvaluationHistoryStore(context.globalState);
   outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
   context.subscriptions.push(outputChannel);
 
@@ -29,6 +40,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   statusBar.showConfigured();
 
   registerScanService(context);
+  registerReplTerminal(context);
+  const { model: modelTree } = registerSessionExplorer(context);
+
+  registerPhase3Features(context, {
+    evaluationHistory: evaluationHistory!,
+    extensionContext: context,
+    requireWorkspace: requireWorkspaceAndSettings,
+    runFromResultPanel,
+    resolveExportDirectory,
+  });
 
   context.subscriptions.push(
     vscode.commands.registerCommand('efvibe.startRepl', () => startRepl()),
@@ -41,6 +62,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('efvibe.checkPrerequisites', () => checkPrerequisitesCommand()),
     vscode.commands.registerCommand('efvibe.refreshStatus', () => statusBar?.refresh()),
     vscode.commands.registerCommand('efvibe.exportResult', () => exportLastResultCommand()),
+    vscode.commands.registerCommand('efvibe.sendToRepl', () => sendToReplCommand()),
+    vscode.commands.registerCommand('efvibe.runDbSetCount', (item) => runDbSetCountCommand(item, modelTree)),
+    vscode.commands.registerCommand('efvibe.describeEntity', (item) => describeEntityCommand(item)),
+    vscode.commands.registerCommand('efvibe.goToEntityDefinition', (item) => goToEntityDefinitionCommand(item)),
+    vscode.commands.registerCommand('efvibe.runDbSetQuery', (item) => runDbSetQueryCommand(item)),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('efvibe')) {
         if (event.affectsConfiguration('efvibe.project')
@@ -158,14 +184,7 @@ async function startRepl(): Promise<void> {
     return;
   }
 
-  const commandLine = buildReplCommand(context.settings, context.searchDirectory);
-  const terminal = vscode.window.createTerminal({
-    name: 'efvibe',
-    cwd: context.folder.uri.fsPath,
-  });
-
-  terminal.show();
-  terminal.sendText(commandLine, true);
+  await startEfvibeRepl(context.settings, context.folder, context.searchDirectory);
 }
 
 async function runExpression(): Promise<void> {
@@ -293,6 +312,10 @@ async function evaluateExpression(
           resolveExportDirectory(context.settings, context.folder),
         );
 
+        if (evaluationHistory) {
+          recordEvaluationHistory(evaluationHistory, expression, result.payload);
+        }
+
         if (!result.payload.success) {
           vscode.window.showErrorMessage(result.payload.error ?? 'efvibe evaluation failed.');
         }
@@ -368,6 +391,10 @@ async function runFromResultPanel(
         resolveExportDirectory(context.settings, context.folder),
       );
 
+      if (evaluationHistory) {
+        recordEvaluationHistory(evaluationHistory, expression, result.payload);
+      }
+
       if (!result.payload.success) {
         vscode.window.showErrorMessage(result.payload.error ?? 'efvibe evaluation failed.');
       } else if (request.withPlan && result.payload.queryPlanNote && !result.payload.queryPlan) {
@@ -438,6 +465,152 @@ async function showLastSql(): Promise<void> {
 
     outputChannel.show(true);
   }
+}
+
+async function sendToReplCommand(): Promise<void> {
+  const context = await requireWorkspaceAndSettings();
+
+  if (!context) {
+    return;
+  }
+
+  const editor = vscode.window.activeTextEditor;
+
+  if (!editor) {
+    vscode.window.showWarningMessage('Open a C# file to send text to the efvibe REPL.');
+    return;
+  }
+
+  const text = editor.document.getText(editor.selection).trim()
+    || getExpressionFromEditor(editor, 'statement')
+    || editor.document.lineAt(editor.selection.active.line).text.trim();
+
+  if (!text) {
+    vscode.window.showWarningMessage('Select a LINQ expression or place the cursor on a query to send.');
+    return;
+  }
+
+  await sendSnippetToRepl(context.settings, context.folder, context.searchDirectory, text);
+}
+
+async function describeEntityCommand(item: EfvibeModelTreeItem | undefined): Promise<void> {
+  const context = await requireWorkspaceAndSettings();
+
+  const ctx = extensionContext;
+
+  if (!context || !ctx) {
+    return;
+  }
+
+  const entityName = item?.dbSetName ?? item?.entityTypeName;
+
+  if (!entityName) {
+    vscode.window.showWarningMessage('Select a DbSet in the efvibe Session tree.');
+    return;
+  }
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `efvibe: describe ${entityName}`,
+      cancellable: false,
+    },
+    async () => {
+      const payload = await runDescribeJson(
+        context.settings,
+        context.searchDirectory,
+        context.folder.uri.fsPath,
+        entityName,
+      );
+
+      if (!payload) {
+        vscode.window.showErrorMessage(
+          'efvibe: Could not load entity description (build CLI with --describe-json support).',
+        );
+        return;
+      }
+
+      EfvibeDescribePanel.show(ctx, payload);
+
+      if (!payload.success) {
+        vscode.window.showWarningMessage(payload.error ?? 'efvibe: Describe failed.');
+      }
+    },
+  );
+}
+
+async function goToEntityDefinitionCommand(item: EfvibeModelTreeItem | undefined): Promise<void> {
+  const context = await requireWorkspaceAndSettings();
+
+  if (!context) {
+    return;
+  }
+
+  const entityTypeName = item?.entityTypeName;
+
+  if (!entityTypeName) {
+    vscode.window.showWarningMessage('Select a DbSet in the efvibe Session tree.');
+    return;
+  }
+
+  const projectDir = context.settings.project
+    ? path.dirname(context.settings.project)
+    : context.folder.uri.fsPath;
+
+  await goToEntityDefinition(
+    entityTypeName,
+    item?.entityTypeFullName,
+    [projectDir, context.folder.uri.fsPath, context.searchDirectory],
+  );
+}
+
+async function runDbSetQueryCommand(item: EfvibeModelTreeItem | undefined): Promise<void> {
+  const context = await requireWorkspaceAndSettings();
+
+  if (!context || !extensionContext) {
+    return;
+  }
+
+  let dbSetName = item?.dbSetName;
+
+  if (!dbSetName) {
+    const picked = await pickEntityCommand();
+    if (!picked) {
+      return;
+    }
+
+    dbSetName = picked.dbSet;
+  }
+
+  const expression = `db.${dbSetName}.AsNoTracking()`;
+
+  EfvibeResultPanel.openExpressionEditor(
+    extensionContext,
+    expression,
+    (request) => runFromResultPanel(request, context),
+    resolveExportDirectory(context.settings, context.folder),
+  );
+}
+
+async function runDbSetCountCommand(
+  item: EfvibeModelTreeItem | undefined,
+  modelTree: EfvibeModelTreeProvider,
+): Promise<void> {
+  const context = await requireWorkspaceAndSettings();
+
+  if (!context) {
+    return;
+  }
+
+  const dbSetName = item?.dbSetName;
+
+  if (!dbSetName) {
+    vscode.window.showWarningMessage('Select a DbSet in the efvibe Session tree.');
+    return;
+  }
+
+  await evaluateExpression(`db.${dbSetName}.Count()`, context);
+  void modelTree.refresh();
 }
 
 async function generateReplTaskCommand(): Promise<void> {

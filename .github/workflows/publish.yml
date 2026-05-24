@@ -1,4 +1,4 @@
-name: Publish to NuGet
+name: Publish
 
 on:
   push:
@@ -72,12 +72,65 @@ jobs:
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Sync VS Code extension version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '.version = $v' vscode-extension/package.json > vscode-extension/package.json.tmp
+          mv vscode-extension/package.json.tmp vscode-extension/package.json
+
+      - name: Package VS Code extension
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p artifacts
+          cd vscode-extension
+          npm ci
+          npm run package
+          test -f "vscode-efvibe-${VERSION}.vsix"
+          cp "vscode-efvibe-${VERSION}.vsix" "../artifacts/vscode-efvibe-${VERSION}.vsix"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           generate_release_notes: true
-          files: ./artifacts/efvibe.${{ steps.version.outputs.version }}.nupkg
+          files: |
+            ./artifacts/efvibe.${{ steps.version.outputs.version }}.nupkg
+            ./artifacts/vscode-efvibe-${{ steps.version.outputs.version }}.vsix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to Open VSX
+        continue-on-error: true
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [[ -z "$OVSX_PAT" ]]; then
+            echo "OVSX_PAT secret is not set; skipping Open VSX."
+            exit 0
+          fi
+          cd vscode-extension
+          npx --yes ovsx publish "vscode-efvibe-${VERSION}.vsix" -p "$OVSX_PAT"
+
+      - name: Publish to Visual Studio Marketplace
+        continue-on-error: true
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [[ -z "$VSCE_PAT" ]]; then
+            echo "VSCE_PAT secret is not set; skipping Marketplace."
+            exit 0
+          fi
+          cd vscode-extension
+          npx --yes @vscode/vsce publish "vscode-efvibe-${VERSION}.vsix" -p "$VSCE_PAT"

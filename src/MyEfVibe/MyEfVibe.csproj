@@ -19,7 +19,7 @@
     <Authors>Arnold Diaz</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/yeahbah/my-ef-vibe</PackageProjectUrl>
+    <PackageProjectUrl>https://myefvibe.com</PackageProjectUrl>
     <RepositoryUrl>https://github.com/yeahbah/my-ef-vibe.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReleaseNotes>Workspace deps/RID loading for macOS SqlClient; smart project selection; SQL Server :plan batch fix; ConfigurationManager preload; keyword tab completion.</PackageReleaseNotes>

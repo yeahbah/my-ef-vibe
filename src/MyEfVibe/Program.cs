@@ -9,6 +9,22 @@ internal static class Program
     {
         if (args.Length > 0 && string.Equals(args[0], "scan", StringComparison.OrdinalIgnoreCase))
         {
+            if (args.Length > 1 && string.Equals(args[1], "note", StringComparison.OrdinalIgnoreCase))
+            {
+                return Parser.Default.ParseArguments<ScanNoteCliOptions>(args[2..])
+                    .MapResult(
+                        (ScanNoteCliOptions options) => ScanNoteCommandRunner.RunFromOptionsAsync(options),
+                        (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+            }
+
+            if (args.Length > 1 && string.Equals(args[1], "dismiss", StringComparison.OrdinalIgnoreCase))
+            {
+                return Parser.Default.ParseArguments<ScanDismissCliOptions>(args[2..])
+                    .MapResult(
+                        (ScanDismissCliOptions options) => ScanDismissCommandRunner.RunFromOptionsAsync(options),
+                        (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+            }
+
             return Parser.Default.ParseArguments<ScanCliOptions>(args[1..])
                 .MapResult(
                     (ScanCliOptions options) => ScanCommandRunner.RunFromOptionsAsync(options),
@@ -20,6 +36,14 @@ internal static class Program
             return Parser.Default.ParseArguments<ServeCliOptions>(args[1..])
                 .MapResult(
                     (ServeCliOptions options) => ServeCommandRunner.RunFromOptionsAsync(options),
+                    (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+        }
+
+        if (args.Length > 0 && string.Equals(args[0], "language-server", StringComparison.OrdinalIgnoreCase))
+        {
+            return Parser.Default.ParseArguments<LanguageServerCliOptions>(args[1..])
+                .MapResult(
+                    (LanguageServerCliOptions options) => LanguageServerCommandRunner.RunFromOptionsAsync(options),
                     (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
         }
 
@@ -46,6 +70,10 @@ internal static class Program
             options.DbLogLevel,
             options.DbLogVerbose,
             options.AboutJson,
+            options.TablesJson,
+            options.DescribeJson,
+            options.DbInfoJson,
+            options.CompletionsJson,
             options.Format,
             options.NoBanner,
             options.WithPlan,
@@ -66,6 +94,10 @@ internal static class Program
         string? dbLogLevelRaw,
         bool dbLogVerbose,
         bool aboutJson,
+        bool tablesJson,
+        string? describeJsonEntity,
+        bool dbInfoJson,
+        string? completionsPrefix,
         string? formatRaw,
         bool noBanner,
         bool withPlan,
@@ -232,6 +264,30 @@ internal static class Program
         if (aboutJson)
         {
             AboutJsonReporter.Write(dbContextInstance, host, workspaceRoot, parsedProvider);
+            return 0;
+        }
+
+        if (tablesJson)
+        {
+            TablesJsonReporter.Write(dbContextInstance);
+            return 0;
+        }
+
+        if (!string.IsNullOrWhiteSpace(describeJsonEntity))
+        {
+            DescribeJsonReporter.Write(dbContextInstance, describeJsonEntity);
+            return 0;
+        }
+
+        if (dbInfoJson)
+        {
+            await DbInfoJsonReporter.WriteAsync(dbContextInstance, host);
+            return 0;
+        }
+
+        if (completionsPrefix is not null)
+        {
+            CompletionsJsonReporter.Write(dbContextInstance, completionsPrefix);
             return 0;
         }
 

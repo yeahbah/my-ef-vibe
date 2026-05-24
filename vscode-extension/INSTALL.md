@@ -1,10 +1,14 @@
 # Installing the efvibe VS Code extension
 
-The extension is **not on the Marketplace yet**. Until it is published, install it locally from this folder.
+Install guide on the site: [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html). Quick start: [myefvibe.com/docs/getting-started.html](https://myefvibe.com/docs/getting-started.html).
+
+The extension is **not on the Marketplace yet** (optional CI publish when `VSCE_PAT` / `OVSX_PAT` are configured). Install from a [GitHub Release](https://github.com/yeahbah/my-ef-vibe/releases) `.vsix` or build locally from this folder.
 
 ## Option A — Install from VSIX (recommended)
 
-From the repository root:
+**From a release:** download `vscode-efvibe-<version>.vsix` from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe/releases).
+
+**From source** (repository root):
 
 ```bash
 cd vscode-extension
@@ -16,13 +20,13 @@ Then in VS Code or Cursor:
 
 1. Open the **Extensions** view (`Cmd+Shift+X` / `Ctrl+Shift+X`)
 2. Click the **`...`** menu → **Install from VSIX…**
-3. Choose the generated `vscode-efvibe-*.vsix` (for example `vscode-efvibe-0.3.1.vsix`)
+3. Choose the `.vsix` file (for example `vscode-efvibe-0.5.0.vsix`)
 4. **Reload** the window when prompted
 
 Or from a terminal (one line — do not break the path onto a new line):
 
 ```bash
-code --install-extension "/path/to/my-ef-vibe/vscode-extension/vscode-efvibe-0.3.1.vsix"
+code --install-extension "/path/to/my-ef-vibe/vscode-extension/vscode-efvibe-0.5.0.vsix"
 ```
 
 Cursor:

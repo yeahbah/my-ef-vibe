@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -58,4 +59,34 @@ export function getDeepScanFilePath(
     getDbContextSessionDirectory(workspaceRoot, projectCsprojPath, dbContextName),
     DEEP_SCAN_FILE_NAME,
   );
+}
+
+const SESSION_ARTIFACT_SKIP_DIRS = new Set(['scan', '.pending']);
+
+/** DbContext session folders that contain a deep-scan artifact (CLI uses type.Name, not -c). */
+export function discoverDeepScanFilePaths(
+  workspaceRoot: string,
+  projectCsprojPath: string,
+): string[] {
+  const projectFolder = path.join(workspaceRoot, getProjectSessionFolderName(projectCsprojPath));
+
+  if (!fs.existsSync(projectFolder)) {
+    return [];
+  }
+
+  const paths: string[] = [];
+
+  for (const entry of fs.readdirSync(projectFolder, { withFileTypes: true })) {
+    if (!entry.isDirectory() || SESSION_ARTIFACT_SKIP_DIRS.has(entry.name)) {
+      continue;
+    }
+
+    const deepPath = path.join(projectFolder, entry.name, DEEP_SCAN_FILE_NAME);
+
+    if (fs.existsSync(deepPath)) {
+      paths.push(deepPath);
+    }
+  }
+
+  return paths.sort((left, right) => left.localeCompare(right));
 }

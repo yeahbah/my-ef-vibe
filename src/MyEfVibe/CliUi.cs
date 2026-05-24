@@ -116,7 +116,7 @@ internal static class CliUi
             "Database logging (sql-only by default) — :dblog on|off [[level]] [[verbose]]");
         table.AddRow("[cyan]:stats[/]", "Session evaluation statistics");
         table.AddRow("[cyan]:tracked[/]", "Change tracker summary");
-        table.AddRow("[cyan]:tables[/]", "List DbSets and row counts");
+        table.AddRow("[cyan]:tables[/]", "List DbSets and entity types");
         table.AddRow("[cyan]:dbinfo[/]", "Database, provider, and connection details");
         table.AddRow("[cyan]:describe <entity>[/]", "Entity properties (DbSet name or type)");
         table.AddRow("[cyan]:scan lite[/]", "Static LINQ performance scan of EF project sources");

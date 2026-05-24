@@ -8,6 +8,7 @@ import {
   rangeForLine,
 } from './scanDiagnostics';
 import {
+  discoverDeepScanFilePaths,
   getDeepScanFilePath,
   getLiteScanFilePath,
 } from './sessionPaths';
@@ -23,6 +24,7 @@ export interface EfvibeScanSettings {
   mode: EfvibeScanModeSetting;
   respectDismissals: boolean;
   refreshOnSave: boolean;
+  onSave: boolean;
   minSeverity: string;
   problemsPanel: boolean;
   openReviewOnScan: boolean;
@@ -36,6 +38,7 @@ export function readScanSettings(workspaceFolder?: vscode.WorkspaceFolder): Efvi
     mode: modeRaw === 'deep' ? 'deep' : 'lite',
     respectDismissals: config.get<boolean>('scan.respectDismissals', true),
     refreshOnSave: config.get<boolean>('scan.refreshOnSave', true),
+    onSave: config.get<boolean>('scan.onSave', false),
     minSeverity: config.get<string>('scan.minSeverity', '').trim(),
     problemsPanel: config.get<boolean>('scan.problemsPanel', false),
     openReviewOnScan: config.get<boolean>('scan.openReviewOnScan', true),
@@ -50,6 +53,12 @@ export class EfvibeScanService implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
 
   private watchers: vscode.FileSystemWatcher[] = [];
+
+  private onSaveScanTimer: ReturnType<typeof setTimeout> | undefined;
+
+  private onSaveScanRunning = false;
+
+  private onSaveScanPending = false;
 
   constructor(private readonly extensionContext: vscode.ExtensionContext) {
     this.disposables.push(this.collection);
@@ -74,10 +83,16 @@ export class EfvibeScanService implements vscode.Disposable {
           void this.refreshFromArtifacts();
         }
       }),
+      vscode.workspace.onDidSaveTextDocument((document) => this.onDocumentSaved(document)),
     );
   }
 
   dispose(): void {
+    if (this.onSaveScanTimer) {
+      clearTimeout(this.onSaveScanTimer);
+      this.onSaveScanTimer = undefined;
+    }
+
     for (const watcher of this.watchers) {
       watcher.dispose();
     }
@@ -111,22 +126,24 @@ export class EfvibeScanService implements vscode.Disposable {
     return { settings, folder };
   }
 
-  private resolveArtifactPaths(): { lite?: string; deep?: string } {
+  private resolveArtifactPaths(): { lite?: string; deepPaths: string[] } {
     const project = this.getProjectSettings();
 
     if (!project) {
-      return {};
+      return { deepPaths: [] };
     }
 
     const { settings } = project;
     const lite = getLiteScanFilePath(settings.workspaceRoot, settings.project);
-    let deep: string | undefined;
+    const deepPaths = new Set(discoverDeepScanFilePaths(settings.workspaceRoot, settings.project));
 
     if (settings.context.trim()) {
-      deep = getDeepScanFilePath(settings.workspaceRoot, settings.project, settings.context.trim());
+      deepPaths.add(
+        getDeepScanFilePath(settings.workspaceRoot, settings.project, settings.context.trim()),
+      );
     }
 
-    return { lite, deep };
+    return { lite, deepPaths: [...deepPaths].sort((left, right) => left.localeCompare(right)) };
   }
 
   private loadReviewItems(): ScanReviewItem[] {
@@ -160,8 +177,8 @@ export class EfvibeScanService implements vscode.Disposable {
       return;
     }
 
-    const { lite, deep } = this.resolveArtifactPaths();
-    const patterns = [lite, deep].filter((entry): entry is string => Boolean(entry));
+    const { lite, deepPaths } = this.resolveArtifactPaths();
+    const patterns = [lite, ...deepPaths].filter((entry): entry is string => Boolean(entry));
 
     for (const pattern of patterns) {
       const watcher = vscode.workspace.createFileSystemWatcher(pattern);
@@ -213,28 +230,142 @@ export class EfvibeScanService implements vscode.Disposable {
     this.showReviewPanel(0);
   }
 
+  private onDocumentSaved(document: vscode.TextDocument): void {
+    const scanSettings = readScanSettings();
+
+    if (!scanSettings.onSave) {
+      return;
+    }
+
+    if (document.languageId !== 'csharp' || document.uri.scheme !== 'file') {
+      return;
+    }
+
+    if (!vscode.workspace.getWorkspaceFolder(document.uri)) {
+      return;
+    }
+
+    if (!this.getProjectSettings()) {
+      return;
+    }
+
+    if (this.onSaveScanTimer) {
+      clearTimeout(this.onSaveScanTimer);
+    }
+
+    this.onSaveScanTimer = setTimeout(() => {
+      this.onSaveScanTimer = undefined;
+      void this.runOnSaveScan();
+    }, 2000);
+  }
+
+  private async runOnSaveScan(): Promise<void> {
+    if (this.onSaveScanRunning) {
+      this.onSaveScanPending = true;
+      return;
+    }
+
+    this.onSaveScanRunning = true;
+
+    try {
+      await this.scanWorkspaceInternal({
+        silent: true,
+        openReview: false,
+      });
+    } finally {
+      this.onSaveScanRunning = false;
+
+      if (this.onSaveScanPending) {
+        this.onSaveScanPending = false;
+        void this.runOnSaveScan();
+      }
+    }
+  }
+
   async scanWorkspaceCommand(modeOverride?: ScanMode): Promise<void> {
+    await this.scanWorkspaceInternal({ modeOverride, silent: false });
+  }
+
+  private async scanWorkspaceInternal(options?: {
+    modeOverride?: ScanMode;
+    silent?: boolean;
+    openReview?: boolean;
+  }): Promise<void> {
     const folder = getWorkspaceFolder();
 
     if (!folder) {
-      void vscode.window.showWarningMessage('efvibe: Open a workspace folder before scanning.');
+      if (!options?.silent) {
+        void vscode.window.showWarningMessage('efvibe: Open a workspace folder before scanning.');
+      }
+
       return;
     }
 
     const settings = readSettings(folder);
 
     if (!settings.project) {
-      void vscode.window.showWarningMessage('efvibe: Set efvibe.project to your EF Core .csproj path.');
+      if (!options?.silent) {
+        void vscode.window.showWarningMessage('efvibe: Set efvibe.project to your EF Core .csproj path.');
+      }
+
       return;
     }
 
     const scanSettings = readScanSettings(folder);
-    const mode = modeOverride ?? scanSettings.mode;
+    const mode = options?.modeOverride ?? scanSettings.mode;
 
-    if (mode === 'deep' && !settings.context.trim()) {
-      void vscode.window.showWarningMessage(
-        'efvibe: Deep scan requires efvibe.context when multiple DbContexts exist.',
-      );
+    const openReview = options?.openReview ?? scanSettings.openReviewOnScan;
+    const silent = options?.silent ?? false;
+
+    const runScanJob = async (): Promise<void> => {
+      const searchDirectory = getSearchDirectory(settings, folder);
+      const result = await runScan(settings, searchDirectory, folder.uri.fsPath, {
+        mode,
+        respectDismissals: scanSettings.respectDismissals,
+        minSeverity: scanSettings.minSeverity || undefined,
+      });
+
+      const items = await this.refreshFromArtifacts();
+      const count = result.output?.totalFindings ?? items.length;
+      const reportedMode = result.output?.scanMode?.trim().toLowerCase();
+
+      if (reportedMode && reportedMode !== mode) {
+        const detail = `CLI reported scan mode "${reportedMode}" but "${mode}" was requested.`;
+        if (silent) {
+          void vscode.window.setStatusBarMessage(`efvibe: ${detail}`, 5000);
+        } else {
+          void vscode.window.showWarningMessage(`efvibe: ${detail}`);
+        }
+      }
+
+      if (result.exitCode !== 0 && !result.output) {
+        if (silent) {
+          void vscode.window.setStatusBarMessage(
+            `efvibe scan ${mode} failed (exit ${result.exitCode})`,
+            4000,
+          );
+        } else {
+          const detail = (result.stderr || result.stdout).trim().slice(0, 500);
+          void vscode.window.showErrorMessage(
+            `efvibe scan ${mode} failed (exit ${result.exitCode}).${detail ? ` ${detail}` : ''}`,
+          );
+        }
+
+        return;
+      }
+
+      if (openReview) {
+        const startIndex = Math.max(0, items.findIndex((item) => item.scanMode === mode));
+        this.showReviewPanel(startIndex);
+      } else if (silent) {
+        void vscode.window.setStatusBarMessage(`efvibe scan ${mode}: ${count} finding(s)`, 3000);
+      } else {
+        void vscode.window.showInformationMessage(`efvibe scan ${mode}: ${count} finding(s).`);
+      }
+    };
+
+    if (silent) {
+      await runScanJob();
       return;
     }
 
@@ -244,31 +375,7 @@ export class EfvibeScanService implements vscode.Disposable {
         title: `efvibe scan ${mode}`,
         cancellable: false,
       },
-      async () => {
-        const searchDirectory = getSearchDirectory(settings, folder);
-        const result = await runScan(settings, searchDirectory, folder.uri.fsPath, {
-          mode,
-          respectDismissals: scanSettings.respectDismissals,
-          minSeverity: scanSettings.minSeverity || undefined,
-        });
-
-        const items = await this.refreshFromArtifacts();
-        const count = result.output?.totalFindings ?? items.length;
-
-        if (result.exitCode !== 0 && !result.output) {
-          const detail = (result.stderr || result.stdout).trim().slice(0, 500);
-          void vscode.window.showErrorMessage(
-            `efvibe scan ${mode} failed (exit ${result.exitCode}).${detail ? ` ${detail}` : ''}`,
-          );
-          return;
-        }
-
-        if (scanSettings.openReviewOnScan) {
-          this.showReviewPanel(0);
-        } else {
-          void vscode.window.showInformationMessage(`efvibe scan ${mode}: ${count} finding(s).`);
-        }
-      },
+      runScanJob,
     );
   }
 

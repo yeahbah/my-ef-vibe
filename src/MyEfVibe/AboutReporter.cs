@@ -6,6 +6,7 @@ namespace MyEfVibe;
 
 internal static class AboutReporter
 {
+    private const string WebsiteUrl = "https://myefvibe.com";
     private const string RepositoryUrl = "https://github.com/yeahbah/my-ef-vibe";
     private const string NuGetUrl = "https://www.nuget.org/packages/efvibe";
 
@@ -22,6 +23,7 @@ internal static class AboutReporter
         tool.AddRow("[grey]Description[/]", Markup.Escape(GetDescription(assembly)));
         tool.AddRow("[grey]Author[/]", Markup.Escape(GetAuthors(assembly)));
         tool.AddRow("[grey]License[/]", "Apache-2.0");
+        tool.AddRow("[grey]Website[/]", Markup.Escape(WebsiteUrl));
         tool.AddRow("[grey]Repository[/]", Markup.Escape(RepositoryUrl));
         tool.AddRow("[grey]NuGet[/]", Markup.Escape(NuGetUrl));
         tool.AddRow("[grey]Runtime[/]", Markup.Escape(GetRuntimeDescription()));

@@ -1,5 +1,7 @@
 # LINQ scan rules reference
 
+**Website:** [myefvibe.com/docs/scan.html](https://myefvibe.com/docs/scan.html)
+
 efvibe’s **`:scan lite`** and **`:scan deep`** (and headless `efvibe scan`) report findings using stable **rule ids**. Each finding includes a **message**, **Fix** guidance, and a **severity** level.
 
 ## Severity

@@ -1,6 +1,6 @@
-# My EF Vibe — VS Code extension (v0.3.1)
+# My EF Vibe — VS Code extension (v0.5.0)
 
-Run the [efvibe](https://github.com/yeahbah/my-ef-vibe) EF Core LINQ REPL from VS Code with workspace settings for `-p`, `-s`, and `-c`. Phase 1 adds **editor-integrated queries** with JSON results and a **split-tab** result + SQL panel. Phase 2 adds a **Scan Review** carousel (one finding per view, Previous/Next, Dismiss, Note) plus optional Problems-panel diagnostics.
+Run **[efvibe](https://myefvibe.com/)** from VS Code — the EF Core LINQ REPL with workspace settings for `-p`, `-s`, and `-c`. User guide: [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html). Source: [github.com/yeahbah/my-ef-vibe](https://github.com/yeahbah/my-ef-vibe).
 
 ![efvibe VS Code: Run Selection with result and SQL beside your C# code](../screenshots/vscode1.png)
 
@@ -9,7 +9,7 @@ Run the [efvibe](https://github.com/yeahbah/my-ef-vibe) EF Core LINQ REPL from V
 - [.NET SDK](https://dotnet.net/download)
 - `efvibe` built from this repo or installed as a [global/local tool](https://www.nuget.org/packages/efvibe)
 
-Build `MyEfVibe` from this repository for **`efvibe -e --format json --no-banner`**, **`efvibe serve`**, and **`efvibe scan lite|deep --json --no-banner`**.
+Build `MyEfVibe` locally for **`--tables-json`**, **`--describe-json`**, **`--dbinfo-json`**, **`--completions-json`**, **`efvibe language-server`**, and **`efvibe scan note|dismiss`**.
 
 **Run Selection** uses `efvibe serve` by default (`efvibe.useDaemon`: true) so build + DbContext stay warm. Set `efvibe.useDaemon`: false to force one-shot `efvibe -e` per run.
 
@@ -32,8 +32,35 @@ Build `MyEfVibe` from this repository for **`efvibe -e --format json --no-banner
 | **efvibe: Open Scan Review** | Browse findings (Previous / Next, Go to code, Save note, Dismiss) |
 | **efvibe: Refresh Scan Diagnostics** | Reload findings from scan JSON (REPL `:scan` or file watcher) |
 | **efvibe: Dismiss Scan Finding** | Opens Scan Review at the finding under the cursor |
+| **efvibe: Send to REPL** | Starts the REPL if needed, collapses selection to one line, submits with `;` (`Ctrl/Cmd+Shift+Enter`) |
+| **efvibe: Refresh efvibe Session** | Reloads the **efvibe Session** sidebar (EF model + session files) |
+| **efvibe: Run Count** | From Session tree DbSet: runs `db.{DbSet}.Count()` in the result panel |
 
-Right-click in a `.cs` file for **Run Selection** / **Run Line at Cursor**.
+Right-click in a `.cs` file for **Run Selection** / **Run Line at Cursor** / **Send to REPL**.
+
+**Send to REPL** opens the `efvibe` terminal and runs `efvibe` with your settings (waits for the first build on cold start). Multi-line repository queries are sent as a **single line** ending with `;` so the shell does not run `await` as a zsh command. The REPL normalizes `DbContext` → `db`, `await`, and `Async` terminals the same way as **Run Selection**.
+
+**efvibe Session** (Explorer sidebar): toolbar **Scan Deep**, **Run Query**, **Start REPL**, and **Refresh**; DbContext with DbSets at the top, then scan/session folders. Right-click a DbSet:
+
+| Action | Behavior |
+|--------|----------|
+| **Run Query** | Opens the result panel (prefills `db.{DbSet}.AsNoTracking()` when started from the tree; empty from the command palette) |
+| **Describe** | Entity members (like REPL `:describe`) in a side panel |
+| **Go To Definition** | Opens the entity `.cs` file (C# workspace symbols or search) |
+| **efvibe: Run Count** | Evaluates `db.{DbSet}.Count()` |
+
+Phase 3 commands:
+
+| Command | Description |
+|---------|-------------|
+| **Pick Entity** | Quick Pick over DbSets (`:tables` data) |
+| **Show DbInfo** | `:dbinfo` panel (`--dbinfo-json`) |
+| **Show Query Plan** | Full-screen plan from last **Run Plan** result |
+| **Show Session Charts** | Timing history + compare baseline (`:chart stats/compare`) |
+| **Set / Clear Compare Baseline** | Mirror REPL `:compare` baseline |
+| **efvibe Session** sidebar | EF model (DbSets), scan JSON, notes, dismissals, exports |
+| **CodeLens** | **Run with efvibe** on LINQ-like C# lines (`efvibe.codeLens.enabled`) |
+| **Completion** | `db.*` DbSet and LINQ member suggestions (`efvibe.completion.enabled`) |
 
 **Scan Review** shows one finding at a time: rule, location (click to open code), message, code, SQL/plan (deep), **📋 copy** on those blocks, editable **Note**, **Dismiss**, and **← / →** navigation (arrow keys when the panel is focused).
 
@@ -66,6 +93,7 @@ Configure in `.vscode/settings.json`:
 | `efvibe.scan.openReviewOnScan` | Open Scan Review tab after scan (default `true`) |
 | `efvibe.scan.problemsPanel` | Also show squiggles in Problems (default `false`; avoids C# LSP conflicts) |
 | `efvibe.scan.refreshOnSave` | Reload review when scan JSON changes (default `true`; includes REPL `:scan`) |
+| `efvibe.scan.onSave` | Run scan after saving C# files, 2s debounce (default `false`; uses `efvibe.scan.mode`) |
 | `efvibe.scan.minSeverity` | Optional minimum severity filter |
 
 Deprecated: `efvibe.showSql` (renamed to `efvibe.dbLog`; the CLI flag is `--dblog`, not `--sql`).

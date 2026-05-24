@@ -1,5 +1,7 @@
 # Scanning project LINQ for slow queries
 
+**Website:** [myefvibe.com/docs/scan.html](https://myefvibe.com/docs/scan.html)
+
 **Short answer:** Yes — efvibe supports **`:scan lite`** (static heuristics) and **`:scan deep`** (heuristics + `ToQueryString()` per call site) in the REPL, plus runtime analysis on snippets you execute.
 
 ## What efvibe does now

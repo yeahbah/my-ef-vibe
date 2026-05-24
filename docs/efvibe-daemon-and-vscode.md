@@ -1,12 +1,14 @@
 # efvibe daemon vs one-shot (VS Code performance)
 
+**Website:** [myefvibe.com](https://myefvibe.com/) · **VS Code guide:** [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html)
+
 ## Why one-shot Run Selection was slow
 
 **Before `efvibe serve`, each Run Selection started a new process**, which **built the EF project, loaded the workspace host, created the `DbContext`, evaluated once, and exited**. That was much slower than an interactive REPL where build and connection stay warm.
 
-**VS Code v0.3.1+** uses `efvibe serve` by default (`efvibe.useDaemon`: true). Set `efvibe.useDaemon`: false to restore per-run `efvibe -e` one-shot behavior.
+**VS Code v0.5.0+** uses `efvibe serve` by default (`efvibe.useDaemon`: true). Set `efvibe.useDaemon`: false to restore per-run `efvibe -e` one-shot behavior.
 
-**Scan Review** (v0.3.1) runs `efvibe scan` headless and opens a carousel tab for findings — separate from the result panel used for Run Selection.
+**Scan Review** runs `efvibe scan` headless and opens a carousel tab for findings — separate from the result panel used for Run Selection.
 
 | One-shot (`efvibe -e "…"`) | Interactive REPL (`efvibe`) |
 |----------------------------|-----------------------------|
@@ -108,5 +110,6 @@ efvibe serve -p ./MyApp.Data.csproj -s ./MyApp.Api.csproj -c AppDbContext
 
 ## Related
 
+- [myefvibe.com](https://myefvibe.com/) — product site and guides
 - [vscode-extension-plan.md](./vscode-extension-plan.md) — Phase 3B language-server / long-running process
 - [vscode-extension/README.md](../vscode-extension/README.md) — `efvibe.useDaemon` setting

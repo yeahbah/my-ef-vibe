@@ -2,10 +2,14 @@
   "name": "vscode-efvibe",
   "displayName": "My EF Vibe",
   "description": "Run EF Core LINQ from VS Code: REPL terminal, editor evaluation with SQL panel, and workspace-aware project settings.",
-  "version": "0.3.1",
+  "version": "0.5.0",
   "icon": "images/icon.png",
-  "publisher": "efvibe",
+  "publisher": "yeahbah",
   "license": "Apache-2.0",
+  "homepage": "https://myefvibe.com",
+  "bugs": {
+    "url": "https://github.com/yeahbah/my-ef-vibe/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/yeahbah/my-ef-vibe"
@@ -34,7 +38,8 @@
       {
         "command": "efvibe.startRepl",
         "title": "Start REPL",
-        "category": "efvibe"
+        "category": "efvibe",
+        "icon": "$(terminal)"
       },
       {
         "command": "efvibe.runExpression",
@@ -88,8 +93,9 @@
       },
       {
         "command": "efvibe.scanDeep",
-        "title": "Scan Workspace (Deep)",
-        "category": "efvibe"
+        "title": "Scan Deep",
+        "category": "efvibe",
+        "icon": "$(search-fuzzy)"
       },
       {
         "command": "efvibe.refreshScanDiagnostics",
@@ -105,9 +111,129 @@
         "command": "efvibe.openScanReview",
         "title": "Open Scan Review",
         "category": "efvibe"
+      },
+      {
+        "command": "efvibe.refreshModelTree",
+        "title": "Refresh efvibe Session",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.runDbSetCount",
+        "title": "Run Count",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.describeEntity",
+        "title": "Describe",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.goToEntityDefinition",
+        "title": "Go To Definition",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.runDbSetQuery",
+        "title": "Run Query",
+        "category": "efvibe",
+        "icon": "$(play)"
+      },
+      {
+        "command": "efvibe.sendToRepl",
+        "title": "Send to REPL",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.pickEntity",
+        "title": "Pick Entity",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.showDbInfo",
+        "title": "Show DbInfo",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.showQueryPlan",
+        "title": "Show Query Plan",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.showCharts",
+        "title": "Show Session Charts",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.setCompareBaseline",
+        "title": "Set Compare Baseline",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.clearCompareBaseline",
+        "title": "Clear Compare Baseline",
+        "category": "efvibe"
+      },
+      {
+        "command": "efvibe.refreshSessionExplorer",
+        "title": "Refresh efvibe Session",
+        "category": "efvibe",
+        "icon": "$(refresh)"
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "id": "efvibeSession",
+          "name": "efvibe Session",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
     "menus": {
+      "view/title": [
+        {
+          "command": "efvibe.scanDeep",
+          "when": "view == efvibeSession",
+          "group": "navigation@1"
+        },
+        {
+          "command": "efvibe.runDbSetQuery",
+          "when": "view == efvibeSession",
+          "group": "navigation@2"
+        },
+        {
+          "command": "efvibe.startRepl",
+          "when": "view == efvibeSession",
+          "group": "navigation@3"
+        },
+        {
+          "command": "efvibe.refreshSessionExplorer",
+          "when": "view == efvibeSession",
+          "group": "navigation@4"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "efvibe.runDbSetQuery",
+          "when": "view == efvibeSession && viewItem == dbSet",
+          "group": "efvibe@1"
+        },
+        {
+          "command": "efvibe.describeEntity",
+          "when": "view == efvibeSession && viewItem == dbSet",
+          "group": "efvibe@2"
+        },
+        {
+          "command": "efvibe.goToEntityDefinition",
+          "when": "view == efvibeSession && viewItem == dbSet",
+          "group": "efvibe@3"
+        },
+        {
+          "command": "efvibe.runDbSetCount",
+          "when": "view == efvibeSession && viewItem == dbSet",
+          "group": "efvibe@4"
+        }
+      ],
       "editor/context": [
         {
           "command": "efvibe.runSelection",
@@ -123,9 +249,17 @@
           "command": "efvibe.runStatementAtCursor",
           "when": "editorLangId == csharp",
           "group": "efvibe@3"
+        },
+        {
+          "command": "efvibe.sendToRepl",
+          "when": "editorLangId == csharp",
+          "group": "efvibe@4"
         }
       ],
       "commandPalette": [
+        {
+          "command": "efvibe.runDbSetQuery"
+        },
         {
           "command": "efvibe.runSelection",
           "when": "editorLangId == csharp"
@@ -141,6 +275,18 @@
         {
           "command": "efvibe.showLastSql",
           "when": "efvibe.hasLastSql"
+        },
+        {
+          "command": "efvibe.pickEntity"
+        },
+        {
+          "command": "efvibe.showDbInfo"
+        },
+        {
+          "command": "efvibe.showQueryPlan"
+        },
+        {
+          "command": "efvibe.showCharts"
         }
       ]
     },
@@ -148,6 +294,12 @@
       {
         "command": "efvibe.runSelection",
         "key": "shift+alt+e",
+        "when": "editorLangId == csharp && editorTextFocus"
+      },
+      {
+        "command": "efvibe.sendToRepl",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
         "when": "editorLangId == csharp && editorTextFocus"
       }
     ],
@@ -251,7 +403,12 @@
         "efvibe.scan.refreshOnSave": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Watch `myefvibe-scan-lite.json` / `myefvibe-scan-deep.json` and refresh the Problems panel when they change (including after a REPL `:scan`)."
+          "markdownDescription": "Watch `myefvibe-scan-lite.json` / `myefvibe-scan-deep.json` and refresh Scan Review when they change (including after a REPL `:scan`)."
+        },
+        "efvibe.scan.onSave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "After saving a C# file (2s debounce), run `efvibe scan` using `efvibe.scan.mode`. Does not open Scan Review; shows a brief status bar message."
         },
         "efvibe.scan.minSeverity": {
           "type": "string",
@@ -274,6 +431,16 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Also show findings in the VS Code **Problems** panel (can interfere with C# lightbulb actions on squiggled lines)."
+        },
+        "efvibe.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Suggest `db.*` DbSet and LINQ members in C# files (uses `efvibe --completions-json`)."
+        },
+        "efvibe.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show **Run with efvibe** CodeLens on LINQ-like lines in C# files."
         }
       }
     }

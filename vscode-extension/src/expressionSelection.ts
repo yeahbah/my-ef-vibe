@@ -44,7 +44,7 @@ function expandStatementAtLine(document: vscode.TextDocument, line: number): str
   return combined.length > 0 ? combined : undefined;
 }
 
-function findStatementStart(document: vscode.TextDocument, line: number): number {
+export function findStatementStart(document: vscode.TextDocument, line: number): number {
   for (let index = line; index >= 0; index--) {
     const text = document.lineAt(index).text.trim();
 

@@ -42,10 +42,9 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
     {
         var session = await _sessions.GetAsync(scenarioId);
 
-        var tables = await SchemaBrowser.GetDbSetCountsAsync(session.DbContext);
+        var tables = SchemaBrowser.GetDbSets(session.DbContext);
 
         Assert.Contains(tables, entry => string.Equals(entry.DbSet, "Products", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(tables, entry => entry.Count is > 0);
     }
 
     [SkippableTheory]

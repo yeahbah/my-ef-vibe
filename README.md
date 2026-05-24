@@ -1,5 +1,7 @@
 # MyEfVibe
 
+**Website:** [myefvibe.com](https://myefvibe.com/) · **Docs:** [myefvibe.com/docs](https://myefvibe.com/docs/) · **GitHub:** [yeahbah/my-ef-vibe](https://github.com/yeahbah/my-ef-vibe) · **NuGet:** [efvibe](https://www.nuget.org/packages/efvibe)
+
 Interactive CLI to run LINQ against an external .NET project's EF Core `DbContext`.
 
 Point `efvibe` at your solution, get a REPL with **`db`** (your `DbContext`) in scope, see translated SQL,
@@ -13,7 +15,7 @@ Startup banner, session panel, and a LINQ query with translated SQL, results, an
 
 ![efvibe REPL with query, SQL, results, and query plan](screenshots/screen1.png)
 
-`:tables` — DbSets, entity types, and row counts:
+`:tables` — DbSets and entity types:
 
 ![efvibe :tables](screenshots/screen2.png)
 
@@ -25,7 +27,7 @@ Startup banner, session panel, and a LINQ query with translated SQL, results, an
 
 ![efvibe :scan deep with translated SQL and query plan](screenshots/scan-deep.png)
 
-VS Code extension (v0.3.1) — **Run Selection** via `efvibe serve`, editable result panel with **📋 copy** on SQL/plan blocks, **Scan Review** carousel ([vscode-extension/README.md](vscode-extension/README.md)):
+VS Code extension (v0.5.0) — **Run Selection** via `efvibe serve`, result panel, **EF Model** sidebar, **Scan Review** carousel ([vscode-extension/README.md](vscode-extension/README.md) · [docs on myefvibe.com](https://myefvibe.com/docs/vscode.html)):
 
 ![efvibe VS Code extension: editor, result panel, and SQL](screenshots/vscode1.png)
 
@@ -84,7 +86,7 @@ In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). End 
 
 | Command | Purpose |
 |---------|---------|
-| `:tables` | List DbSets and row counts |
+| `:tables` | List DbSets and entity types |
 | `:describe Product` | Entity properties (types, PK/FK, columns) |
 | `:dbinfo` | Provider, connection string, server version |
 | `:tracked` | Change tracker summary |
@@ -182,7 +184,15 @@ Highlights:
 
 ## Documentation
 
-| Doc | Description |
+| Resource | Link |
+|----------|------|
+| **Product site** | [myefvibe.com](https://myefvibe.com/) |
+| **Getting started** | [myefvibe.com/docs/getting-started.html](https://myefvibe.com/docs/getting-started.html) |
+| **REPL commands** | [myefvibe.com/docs/repl.html](https://myefvibe.com/docs/repl.html) |
+| **LINQ scan** | [myefvibe.com/docs/scan.html](https://myefvibe.com/docs/scan.html) |
+| **VS Code extension** | [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html) |
+
+| Doc (repository) | Description |
 |-----|-------------|
 | [features.md](features.md) | Full REPL and CLI reference |
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md) | Install the VS Code extension locally (not on Marketplace yet) |
@@ -201,15 +211,24 @@ The open source CLI is free to use under Apache 2.0. See [features.md](features.
 
 ## Publishing
 
-Every push to `main` runs CI, then automatically:
+Every push to `main` runs CI (including a VS Code extension compile check), then automatically:
 
-1. Computes the next patch version (max of latest `v*` git tag, NuGet, and `.csproj`)
+1. Computes the next patch version (max of latest `v*` git tag, NuGet, `.csproj`, and `vscode-extension/package.json`)
 2. Creates and pushes a `v*` tag (e.g. `v0.1.4`)
-3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe) and opens a GitHub Release
+3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe), packages the **VS Code extension** as a `.vsix`, and opens a GitHub Release with both assets
 
 Set the repository secret **`NUGET_API_KEY`** ([nuget.org API key](https://www.nuget.org/account/apikeys)) for publish to work.
 
-Manual publish: **Actions → Publish to NuGet → Run workflow** (optional version input), or push a tag:
+Optional secrets for extension marketplaces (skipped when unset):
+
+| Secret | Purpose |
+|--------|---------|
+| `OVSX_PAT` | [Open VSX](https://open-vsx.org/) — token from your publisher account |
+| `VSCE_PAT` | [Visual Studio Marketplace](https://marketplace.visualstudio.com/) — Azure DevOps PAT with **Marketplace (Publish)** scope |
+
+Install the extension from a release: download `vscode-efvibe-<version>.vsix` from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe/releases) and use **Extensions: Install from VSIX…** (see [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md)).
+
+Manual publish: **Actions → Publish → Run workflow** (optional version input), or push a tag:
 
 ```bash
 git tag v0.1.5 && git push origin v0.1.5

@@ -29,11 +29,16 @@ latest_from_csproj() {
   grep -oP '(?<=<Version>)[^<]+' src/MyEfVibe/MyEfVibe.csproj 2>/dev/null | head -n1 || echo "0.1.0"
 }
 
+latest_from_vscode_extension() {
+  jq -r '.version // empty' vscode-extension/package.json 2>/dev/null || true
+}
+
 G="$(latest_from_git)"
 N="$(latest_from_nuget)"
 C="$(latest_from_csproj)"
+V="$(latest_from_vscode_extension)"
 
-BASE="$(printf '%s\n%s\n%s\n' "$G" "$N" "$C" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)"
+BASE="$(printf '%s\n%s\n%s\n%s\n' "$G" "$N" "$C" "$V" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)"
 if [[ -z "$BASE" ]]; then
   BASE="0.1.0"
 fi

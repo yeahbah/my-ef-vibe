@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ScanReviewItem } from './scanReviewTypes';
+import { getScanRuleDocsUrl } from './scanRuleDocs';
 
 const VIEW_TYPE = 'efvibe.scanReview';
 
@@ -181,6 +182,11 @@ function buildHtml(items: ScanReviewItem[], index: number): string {
   const recommendation = finding.recommendation?.trim()
     ? `<section><h3>Recommendation</h3><p>${escapeHtml(finding.recommendation.trim())}</p></section>`
     : '';
+
+  const learnMoreUrl = getScanRuleDocsUrl(finding.ruleId);
+  const learnMore = learnMoreUrl
+    ? `<p><a href="${escapeHtml(learnMoreUrl)}">Learn more about ${escapeHtml(finding.ruleId)}</a></p>`
+    : '';
   const sql = finding.translatedSql?.trim()
     ? copyableSection('Translated SQL', finding.translatedSql.trim())
     : '';
@@ -214,6 +220,7 @@ function buildHtml(items: ScanReviewItem[], index: number): string {
       <p>${escapeHtml(finding.message)}</p>
     </section>
     ${recommendation}
+    ${learnMore}
     ${codeBlock}
     ${sql}
     ${sqlNote}

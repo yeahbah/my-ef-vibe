@@ -50,6 +50,19 @@ jobs:
           test -f artifacts/efvibe.*.nupkg
           unzip -l artifacts/efvibe.*.nupkg | grep -E 'tools/net(8|9|10)\.0/any/myefvibe\.dll'
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Build VS Code extension
+        run: |
+          cd vscode-extension
+          npm ci
+          npm run lint
+
   release:
     needs: build
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
@@ -115,10 +128,12 @@ jobs:
           sed -i "s/<Version>.*<\/Version>/<Version>${VERSION}<\/Version>/" src/MyEfVibe/MyEfVibe.csproj
           jq --arg v "$VERSION" '.tools.efvibe.version = $v' .config/dotnet-tools.json > .config/dotnet-tools.json.tmp
           mv .config/dotnet-tools.json.tmp .config/dotnet-tools.json
+          jq --arg v "$VERSION" '.version = $v' vscode-extension/package.json > vscode-extension/package.json.tmp
+          mv vscode-extension/package.json.tmp vscode-extension/package.json
           if git diff --quiet; then
             echo "No file changes to commit."
             exit 0
           fi
-          git add src/MyEfVibe/MyEfVibe.csproj .config/dotnet-tools.json
+          git add src/MyEfVibe/MyEfVibe.csproj .config/dotnet-tools.json vscode-extension/package.json
           git commit -m "chore: bump version to ${VERSION} [skip ci]"
           git push origin HEAD:${{ github.ref_name }}

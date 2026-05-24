@@ -40,6 +40,18 @@ internal sealed class EfvibeCliOptions
     [Option("about-json", HelpText = "Write session metadata as JSON to stdout and exit (no REPL).")]
     public bool AboutJson { get; set; }
 
+    [Option("tables-json", HelpText = "Write DbSet names and entity types as JSON to stdout and exit (no REPL).")]
+    public bool TablesJson { get; set; }
+
+    [Option("describe-json", HelpText = "Write entity member schema as JSON for the given DbSet or entity type name and exit (no REPL).")]
+    public string? DescribeJson { get; set; }
+
+    [Option("dbinfo-json", HelpText = "Write database and connection metadata as JSON to stdout and exit (no REPL).")]
+    public bool DbInfoJson { get; set; }
+
+    [Option("completions-json", HelpText = "Write db.* completion items for the given prefix (e.g. db.Pro) and exit (no REPL).")]
+    public string? CompletionsJson { get; set; }
+
     [Option("format", HelpText = "Output format for one-shot -e runs: text (default) or json.")]
     public string? Format { get; set; }
 

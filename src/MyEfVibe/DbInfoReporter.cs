@@ -120,7 +120,7 @@ internal static class DbInfoReporter
     private static string FormatProjectPath(string absolutePath)
         => Path.GetFileName(absolutePath);
 
-    private static string FormatProviderDisplay(string providerName)
+    internal static string FormatProviderDisplay(string providerName)
     {
         if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
             return "SQL Server";
@@ -179,7 +179,7 @@ internal static class DbInfoReporter
         return count;
     }
 
-    private static async Task<string?> TryGetServerVersionAsync(
+    internal static async Task<string?> TryGetServerVersionAsync(
         DbConnection connection,
         string? providerName,
         CancellationToken cancellationToken)

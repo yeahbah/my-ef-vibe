@@ -67,6 +67,27 @@ export class EfvibeResultPanel {
     });
   }
 
+  static openExpressionEditor(
+    context: vscode.ExtensionContext,
+    expression: string,
+    onRun: PanelRunHandler,
+    exportDirectory?: string,
+  ): void {
+    const payload: EvaluationJsonPayload = {
+      success: true,
+      value: 'Click Run to evaluate.',
+      sql: [],
+      metrics: {
+        totalMs: 0,
+        sqlCommandCount: 0,
+        resultKind: 'pending',
+      },
+      warnings: [],
+    };
+
+    EfvibeResultPanel.show(context, payload, expression, onRun, exportDirectory);
+  }
+
   static show(
     context: vscode.ExtensionContext,
     payload: EvaluationJsonPayload,

@@ -78,20 +78,20 @@ internal static class EntityDescriptor
         AnsiConsole.WriteLine();
     }
 
-    private enum EntityResolveResult
+    internal enum EntityResolveResult
     {
         NotFound,
         Found,
         Ambiguous,
     }
 
-    private sealed class EntityResolveOutcome
+    internal sealed class EntityResolveOutcome
     {
         internal (string DbSetName, Type EntityType)? Match { get; init; }
         internal IReadOnlyList<(string DbSetName, Type EntityType)>? AmbiguousMatches { get; init; }
     }
 
-    private static EntityResolveResult TryResolveEntity(
+    internal static EntityResolveResult TryResolveEntity(
         IReadOnlyList<(string DbSetName, Type EntityType)> dbSets,
         string query,
         out EntityResolveOutcome outcome)
@@ -162,7 +162,7 @@ internal static class EntityDescriptor
         return EntityResolveResult.NotFound;
     }
 
-    private static IEnumerable<(string DbSetName, Type EntityType)> EnumerateDbSetEntities(object dbContext)
+    internal static IEnumerable<(string DbSetName, Type EntityType)> EnumerateDbSetEntities(object dbContext)
     {
         foreach (var property in dbContext.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -178,7 +178,7 @@ internal static class EntityDescriptor
         }
     }
 
-    private static IEnumerable<MemberRow> DescribeMembers(
+    internal static IEnumerable<MemberRow> DescribeMembers(
         Type entityType,
         object? modelEntity,
         HashSet<Type> entityTypeNames)
@@ -313,7 +313,7 @@ internal static class EntityDescriptor
         return type.Name;
     }
 
-    private static object? TryFindModelEntity(object dbContext, Type entityType)
+    internal static object? TryFindModelEntity(object dbContext, Type entityType)
     {
         var model = dbContext.GetType().GetProperty("Model")?.GetValue(dbContext);
 
@@ -404,7 +404,7 @@ internal static class EntityDescriptor
         return method?.Invoke(target, null) as int?;
     }
 
-    private sealed record MemberRow(string Name, string TypeDisplay, string Nullable, string Notes);
+    internal sealed record MemberRow(string Name, string TypeDisplay, string Nullable, string Notes);
 
     private sealed record ModelPropertyInfo(
         string Name,

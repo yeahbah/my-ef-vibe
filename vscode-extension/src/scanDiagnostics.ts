@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { ScanReviewItem } from './scanReviewTypes';
+import { getScanRuleDocsUrl } from './scanRuleDocs';
 import type { ScanFindingDto, ScanSessionDocument } from './scanTypes';
 
 const DIAGNOSTIC_SOURCE = 'efvibe';
@@ -135,6 +136,17 @@ export function findingToDiagnostic(
       new vscode.DiagnosticRelatedInformation(
         new vscode.Location(uri, range),
         `Note: ${finding.savedNote.trim()}`,
+      ),
+    );
+  }
+
+  const docsUrl = getScanRuleDocsUrl(finding.ruleId);
+
+  if (docsUrl) {
+    related.push(
+      new vscode.DiagnosticRelatedInformation(
+        new vscode.Location(uri, range),
+        `Learn more: ${docsUrl}`,
       ),
     );
   }
