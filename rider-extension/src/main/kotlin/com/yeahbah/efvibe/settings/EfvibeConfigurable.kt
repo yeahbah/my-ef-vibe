@@ -4,6 +4,8 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
+import com.intellij.ui.dsl.builder.bindItem
+import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
 import com.yeahbah.efvibe.services.EfvibeSettingsService

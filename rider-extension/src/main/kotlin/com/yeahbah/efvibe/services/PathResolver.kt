@@ -2,9 +2,6 @@ package com.yeahbah.efvibe.services
 
 import com.intellij.openapi.project.Project
 import java.nio.file.Path
-import kotlin.io.path.absolutePathString
-import kotlin.io.path.isAbsolute
-import kotlin.io.path.normalize
 
 object PathResolver {
     fun solutionDirectory(project: Project): Path =
@@ -16,16 +13,19 @@ object PathResolver {
 
         val base = solutionDirectory(project)
         val expanded = trimmed
-            .replace("\${workspaceFolder}", base.absolutePathString())
-            .replace("\$(SolutionDir)", ensureTrailingSeparator(base.absolutePathString()))
+            .replace("\${workspaceFolder}", absolutePath(base))
+            .replace("\$(SolutionDir)", ensureTrailingSeparator(absolutePath(base)))
 
         val path = Path.of(expanded)
-        return if (path.isAbsolute()) {
-            path.normalize().absolutePathString()
+        return if (path.isAbsolute) {
+            absolutePath(path.normalize())
         } else {
-            base.resolve(path).normalize().absolutePathString()
+            absolutePath(base.resolve(path).normalize())
         }
     }
+
+    private fun absolutePath(path: Path): String =
+        path.toAbsolutePath().normalize().toString()
 
     private fun ensureTrailingSeparator(path: String): String =
         if (path.endsWith('/') || path.endsWith('\\')) path else "$path/"
