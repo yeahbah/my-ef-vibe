@@ -1,0 +1,46 @@
+<idea-plugin>
+    <id>com.yeahbah.efvibe</id>
+    <name>My EF Vibe</name>
+    <vendor email="support@myefvibe.com" url="https://myefvibe.com">yeahbah</vendor>
+
+    <depends>com.intellij.modules.rider</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
+
+    <resource-bundle>messages.MyEfVibeBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="com.yeahbah.efvibe.services.EfvibeSettingsService" />
+        <projectService serviceImplementation="com.yeahbah.efvibe.services.EfvibeProjectService" />
+        <projectConfigurable
+            parentId="language"
+            instance="com.yeahbah.efvibe.settings.EfvibeConfigurable"
+            displayName="My EF Vibe" />
+        <toolWindow
+            id="My EF Vibe"
+            anchor="bottom"
+            factoryClass="com.yeahbah.efvibe.toolwindow.EfvibeToolWindowFactory" />
+    </extensions>
+
+    <actions>
+        <group id="Efvibe.MainMenu" text="My EF Vibe" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last" />
+            <action id="Efvibe.StartRepl" class="com.yeahbah.efvibe.actions.StartReplAction" text="Start REPL" />
+            <action id="Efvibe.RunSelection" class="com.yeahbah.efvibe.actions.RunSelectionAction" text="Run Selection" />
+            <action id="Efvibe.RunSelectionWithPlan" class="com.yeahbah.efvibe.actions.RunSelectionWithPlanAction" text="Run Selection with Plan" />
+            <separator />
+            <action id="Efvibe.ShowDbInfo" class="com.yeahbah.efvibe.actions.ShowDbInfoAction" text="Show DbInfo" />
+            <action id="Efvibe.ShowTables" class="com.yeahbah.efvibe.actions.ShowTablesAction" text="Show Tables" />
+            <separator />
+            <action id="Efvibe.ScanLite" class="com.yeahbah.efvibe.actions.ScanLiteAction" text="Scan Lite" />
+            <action id="Efvibe.ScanDeep" class="com.yeahbah.efvibe.actions.ScanDeepAction" text="Scan Deep" />
+            <separator />
+            <action id="Efvibe.CheckPrerequisites" class="com.yeahbah.efvibe.actions.CheckPrerequisitesAction" text="Check Prerequisites" />
+        </group>
+
+        <group id="Efvibe.EditorPopup" text="My EF Vibe">
+            <add-to-group group-id="EditorPopupMenu" anchor="last" />
+            <action id="Efvibe.Editor.RunSelection" class="com.yeahbah.efvibe.actions.RunSelectionAction" text="Run with My EF Vibe" />
+            <action id="Efvibe.Editor.RunSelectionWithPlan" class="com.yeahbah.efvibe.actions.RunSelectionWithPlanAction" text="Run with My EF Vibe :plan" />
+        </group>
+    </actions>
+</idea-plugin>

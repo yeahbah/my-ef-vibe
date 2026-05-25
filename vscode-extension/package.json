@@ -40,7 +40,8 @@
   },
   "activationEvents": [
     "onStartupFinished",
-    "workspaceContains:**/*.csproj"
+    "workspaceContains:**/*.csproj",
+    "onNotebook:efvibe-notebook"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -174,6 +175,12 @@
         "category": "efvibe"
       },
       {
+        "command": "efvibe.newNotebook",
+        "title": "New Notebook",
+        "category": "efvibe",
+        "icon": "$(notebook)"
+      },
+      {
         "command": "efvibe.setCompareBaseline",
         "title": "Set Compare Baseline",
         "category": "efvibe"
@@ -188,6 +195,18 @@
         "title": "Refresh efvibe Session",
         "category": "efvibe",
         "icon": "$(refresh)"
+      }
+    ],
+    "notebooks": [
+      {
+        "type": "efvibe-notebook",
+        "displayName": "efvibe Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.efvibe-notebook"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "views": {

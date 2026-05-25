@@ -49,8 +49,18 @@ Command Palette → **efvibe: Check Prerequisites** → **efvibe: Run Selection*
 | **efvibe: Scan Workspace** / **Scan Workspace (Deep)** | Project scan + **Scan Review** carousel |
 | **efvibe: Open Scan Review** | Browse findings (Previous / Next, note, dismiss) |
 | **efvibe: Send to REPL** | Send selection to the REPL terminal (`Ctrl/Cmd+Shift+Enter`) |
+| **efvibe: New Notebook** | Create a multi-cell `.efvibe-notebook` for saved LINQ explorations |
 
 **efvibe Session** sidebar: DbSets, **Scan Deep**, **Run Query**, **Start REPL**, session artifacts. **CodeLens:** **Run with efvibe** on query statements.
+
+## Notebooks
+
+Use **efvibe: New Notebook** or create a `*.efvibe-notebook` file. Code cells run through the configured `DbContext` using `efvibe serve` / JSON evaluation and keep rows, SQL, metrics, warnings, and query plans attached to the cell. The notebook has two controllers: **efvibe** and **efvibe :plan**.
+
+Supported command cells:
+
+- `:dbinfo`
+- `:tables`
 
 ## Settings
 

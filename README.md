@@ -27,11 +27,13 @@ Startup banner, session panel, and a LINQ query with translated SQL, results, an
 
 ![efvibe :scan deep with translated SQL and query plan](screenshots/scan-deep.png)
 
-VS Code extension (v0.5.0) — install from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) (search **`efvibe`**). **Run Selection** via `efvibe serve`, result panel, **efvibe Session** sidebar, **Scan Review** carousel ([vscode-extension/README.md](vscode-extension/README.md) · [docs on myefvibe.com](https://myefvibe.com/docs/vscode.html)):
+VS Code extension — install from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) (search **`efvibe`**). **Run Selection** via `efvibe serve`, result panel, multi-cell `.efvibe-notebook` files, **efvibe Session** sidebar, **Scan Review** carousel ([vscode-extension/README.md](vscode-extension/README.md) · [docs on myefvibe.com](https://myefvibe.com/docs/vscode.html)):
 
 ![efvibe VS Code extension: Run Selection with result and SQL](screenshots/vscode1.png)
 
 ![efvibe VS Code extension: Scan Review carousel](screenshots/vscode-scan-review.png)
+
+Rider extension — local MVP under [`rider-extension/`](rider-extension/README.md). It wraps the `efvibe` CLI with Rider settings, terminal REPL launch, Run Selection, dbinfo/tables, scan commands, and a tool window for output.
 
 ## Install
 
@@ -200,6 +202,7 @@ Highlights:
 | [features.md](features.md) | Full REPL and CLI reference |
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md) | Install the VS Code extension ([Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) or VSIX) |
 | [vscode-extension/README.md](vscode-extension/README.md) | VS Code extension (run selection, `efvibe serve`, scan review, editable panel) |
+| [rider-extension/README.md](rider-extension/README.md) | Rider extension MVP (Gradle plugin, settings, actions, tool window) |
 | [docs/visual-studio-extension.md](docs/visual-studio-extension.md) | Visual Studio 2022 extension MVP (VSIX setup, commands, verification) |
 | [docs/vscode-extension-plan.md](docs/vscode-extension-plan.md) | VS Code extension roadmap (phases, CLI hooks, diagnostics) |
 | [docs/efvibe-daemon-and-vscode.md](docs/efvibe-daemon-and-vscode.md) | `efvibe serve` daemon — fast Run Selection in VS Code |
@@ -215,11 +218,11 @@ The open source CLI is free to use under Apache 2.0. See [features.md](features.
 
 ## Publishing
 
-Every push to `main` runs CI (including a VS Code extension compile check), then automatically:
+Every push to `main` runs CI (including VS Code, Visual Studio, and Rider extension package checks), then automatically:
 
 1. Computes the next patch version (max of latest `v*` git tag, NuGet, `.csproj`, and `vscode-extension/package.json`)
 2. Creates and pushes a `v*` tag (e.g. `v0.1.4`)
-3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe), packages the **VS Code extension** and **Visual Studio extension** as `.vsix` files, opens a GitHub Release with all assets, and (when secrets are set) publishes the VS Code package to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) and [Open VSX](https://open-vsx.org/)
+3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe), packages the **VS Code extension** and **Visual Studio extension** as `.vsix` files, packages the **Rider extension** as a JetBrains plugin `.zip`, opens a GitHub Release with all assets, and (when secrets are set) publishes the VS Code package to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) and [Open VSX](https://open-vsx.org/)
 
 Set the repository secret **`NUGET_API_KEY`** ([nuget.org API key](https://www.nuget.org/account/apikeys)) for publish to work.
 

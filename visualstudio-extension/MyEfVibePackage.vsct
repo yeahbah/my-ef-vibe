@@ -6,7 +6,7 @@
   <Commands package="guidMyEfVibePackage">
     <Menus>
       <Menu guid="guidMyEfVibeCommandSet" id="MyEfVibeTopLevelMenu" priority="0x700" type="Menu">
-        <Parent guid="guidSHLMainMenu" id="IDG_VS_MM_TOOLSADDINS" />
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_TOOLS_EXT_TOOLS" />
         <Strings>
           <ButtonText>My EF Vibe</ButtonText>
           <CommandName>My EF Vibe</CommandName>

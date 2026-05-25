@@ -90,10 +90,36 @@ jobs:
             throw "Visual Studio VSIX package was not produced."
           }
 
+  build-rider-extension:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Package Rider extension
+        run: |
+          cd rider-extension
+          gradle buildPlugin --no-daemon
+          test -n "$(ls build/distributions/*.zip)"
+
   release:
     needs:
       - build
       - build-visualstudio-extension
+      - build-rider-extension
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     permissions:
@@ -159,6 +185,7 @@ jobs:
           mv .config/dotnet-tools.json.tmp .config/dotnet-tools.json
           jq --arg v "$VERSION" '.version = $v' vscode-extension/package.json > vscode-extension/package.json.tmp
           mv vscode-extension/package.json.tmp vscode-extension/package.json
+          sed -i "s/^pluginVersion=.*/pluginVersion=${VERSION}/" rider-extension/gradle.properties
           python - <<'PY'
           import os
           import re
@@ -174,6 +201,6 @@ jobs:
             echo "No file changes to commit."
             exit 0
           fi
-          git add src/MyEfVibe/MyEfVibe.csproj .config/dotnet-tools.json vscode-extension/package.json visualstudio-extension/source.extension.vsixmanifest
+          git add src/MyEfVibe/MyEfVibe.csproj .config/dotnet-tools.json vscode-extension/package.json visualstudio-extension/source.extension.vsixmanifest rider-extension/gradle.properties
           git commit -m "chore: bump version to ${VERSION} [skip ci]"
           git push origin HEAD:${{ github.ref_name }}

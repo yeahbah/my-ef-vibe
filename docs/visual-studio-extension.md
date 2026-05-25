@@ -43,6 +43,8 @@ Commands are available from **Tools > My EF Vibe**:
 - **Scan Deep** runs `efvibe scan deep --json --no-banner`.
 - **Check Prerequisites** runs `--about-json` and writes details to the **My EF Vibe** Output pane.
 
+If the menu is not visible, restart Visual Studio after installing the VSIX and open a solution. Confirm the extension is enabled under **Extensions > Manage Extensions > Installed**, then check whether the options page appears at **Tools > Options > My EF Vibe > General**.
+
 ## Tool Windows
 
 - **My EF Vibe Result** shows query rows plus SQL, metrics, warnings, and query plans. It includes **Run** and **Run :plan** buttons for rerunning the current expression.

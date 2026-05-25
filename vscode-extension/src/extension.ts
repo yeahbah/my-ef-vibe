@@ -20,6 +20,7 @@ import { EfvibeStatusBar } from './statusBar';
 import { EvaluationHistoryStore } from './evaluationHistory';
 import { pickEntityCommand } from './entityPicker';
 import { registerPhase3Features, recordEvaluationHistory } from './registerPhase3';
+import { registerEfvibeNotebook } from './notebook';
 
 const OUTPUT_CHANNEL_NAME = 'efvibe';
 
@@ -41,6 +42,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   registerScanService(context);
   registerReplTerminal(context);
+  registerEfvibeNotebook(context);
   const { model: modelTree } = registerSessionExplorer(context);
 
   registerPhase3Features(context, {

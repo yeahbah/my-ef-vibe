@@ -138,7 +138,7 @@ efvibe writes under the session folder:
 
 **CLI:** `--tables-json`, `--describe-json`, `--dbinfo-json`, `--completions-json`, `efvibe language-server`, `efvibe scan note|dismiss`.
 
-**Deferred (Phase 3A notebook):** Multi-cell LINQ notebook editor.
+**Phase 3A notebook:** ✅ MVP implemented. `.efvibe-notebook` files use VS Code's Notebook API with C# LINQ cells, markdown cells, an **efvibe** controller, and an **efvibe :plan** controller. Cell output keeps rows, SQL, metrics, warnings, and query plans with the cell; command cells currently support `:dbinfo` and `:tables`.
 
 **Published:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) (`yeahbah.vscode-efvibe`) — search **`efvibe`**. Open VSX when `OVSX_PAT` is configured in CI.
 

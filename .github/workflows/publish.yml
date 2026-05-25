@@ -94,10 +94,53 @@ jobs:
           name: visualstudio-extension
           path: artifacts/visualstudio-efvibe-${{ needs.resolve-version.outputs.version }}.vsix
 
+  package-rider-extension:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Sync Rider extension version
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          sed -i "s/^pluginVersion=.*/pluginVersion=${VERSION}/" rider-extension/gradle.properties
+
+      - name: Package Rider extension
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          mkdir -p artifacts
+          cd rider-extension
+          gradle buildPlugin --no-daemon
+          zip_path="$(ls build/distributions/*.zip | head -n 1)"
+          test -n "$zip_path"
+          cp "$zip_path" "../artifacts/rider-efvibe-${VERSION}.zip"
+
+      - name: Upload Rider extension package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rider-extension
+          path: artifacts/rider-efvibe-${{ needs.resolve-version.outputs.version }}.zip
+
   publish:
     needs:
       - resolve-version
       - package-visualstudio-extension
+      - package-rider-extension
     runs-on: ubuntu-latest
 
     steps:
@@ -164,6 +207,12 @@ jobs:
           name: visualstudio-extension
           path: ./artifacts
 
+      - name: Download Rider extension package
+        uses: actions/download-artifact@v4
+        with:
+          name: rider-extension
+          path: ./artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -174,6 +223,7 @@ jobs:
             ./artifacts/efvibe.${{ needs.resolve-version.outputs.version }}.nupkg
             ./artifacts/vscode-efvibe-${{ needs.resolve-version.outputs.version }}.vsix
             ./artifacts/visualstudio-efvibe-${{ needs.resolve-version.outputs.version }}.vsix
+            ./artifacts/rider-efvibe-${{ needs.resolve-version.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
