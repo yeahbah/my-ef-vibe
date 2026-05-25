@@ -4,7 +4,7 @@ JetBrains Rider plugin that shells out to the `efvibe` CLI. The plugin owns sett
 
 ## Build
 
-Install Gradle or add a wrapper, then run from this directory:
+Install Gradle 9 or add a wrapper, then run from this directory:
 
 ```bash
 gradle buildPlugin
