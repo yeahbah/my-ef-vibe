@@ -71,7 +71,14 @@ internal static class DbContextActivator
                                                          && TryCreateUsingOptionsConstructor(selectedDbContextType,
                                                              connectionString, provider.Value, host,
                                                              out var optionsInstance))
+        {
+            DbContextHostHints.TryApplyPostgreSqlNamingHint(
+                optionsInstance,
+                host.StartupProjectPath,
+                provider.Value);
+
             return optionsInstance;
+        }
 
         var failureMessage =
             "Unable to construct the DbContext automatically for this project."
@@ -650,6 +657,8 @@ internal static class DbContextActivator
         if (!TryInvokeUseProviderExtension(host, builderInstance, connectionString, providerKey))
             return false;
 
+        ProviderOptionsConfigurator.TryApplyEfCoreNamingConventions(host, builderInstance, providerKey);
+
         var closedOptionsType =
             efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContextOptions`1")!.MakeGenericType(dbContextConcreteType);
 
@@ -696,6 +705,11 @@ internal static class DbContextActivator
             return false;
 
         instance = createdContextInstance;
+
+        DbContextHostHints.TryApplyPostgreSqlNamingHint(
+            instance,
+            host.StartupProjectPath,
+            providerKey);
 
         return true;
     }

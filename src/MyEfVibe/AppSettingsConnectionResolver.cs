@@ -37,6 +37,7 @@ internal static class AppSettingsConnectionResolver
         if (string.IsNullOrWhiteSpace(connectionString))
             return false;
 
+        provider ??= MapDatabaseProviderName(TryReadDatabaseProviderName(startupProjectPath));
         provider ??= InferProvider(efOutputDirectory, connectionString);
 
         if (provider == MyEfVibeProvider.Sqlite
@@ -50,6 +51,25 @@ internal static class AppSettingsConnectionResolver
         }
 
         return true;
+    }
+
+    internal static string? TryReadDatabaseProviderName(string startupProjectPath)
+    {
+        if (string.IsNullOrWhiteSpace(startupProjectPath))
+            return null;
+
+        var startupDirectory = Path.GetDirectoryName(startupProjectPath)!;
+        string? databaseProvider = null;
+
+        foreach (var settingsFileName in new[] { "appsettings.json", "appsettings.Development.json" })
+        {
+            var settingsPath = Path.Combine(startupDirectory, settingsFileName);
+
+            if (TryReadDatabaseProvider(settingsPath, out var candidate))
+                databaseProvider = candidate;
+        }
+
+        return databaseProvider;
     }
 
     private static bool TryResolveLayeredAppSettings(string startupProjectPath, out string connectionString)
@@ -66,6 +86,53 @@ internal static class AppSettingsConnectionResolver
         }
 
         return !string.IsNullOrWhiteSpace(connectionString);
+    }
+
+    private static bool TryReadDatabaseProvider(string settingsPath, out string? databaseProvider)
+    {
+        databaseProvider = null;
+
+        if (!ConfigurationJson.TryParseFile(settingsPath, out var document) || document is null)
+            return false;
+
+        using (document)
+        {
+            if (!document.RootElement.TryGetProperty("EntityFrameworkCoreSettings", out var section))
+                return false;
+
+            if (!section.TryGetProperty("DatabaseProvider", out var providerElement))
+                return false;
+
+            databaseProvider = providerElement.GetString();
+
+            return !string.IsNullOrWhiteSpace(databaseProvider);
+        }
+    }
+
+    private static MyEfVibeProvider? MapDatabaseProviderName(string? databaseProvider)
+    {
+        if (string.IsNullOrWhiteSpace(databaseProvider))
+            return null;
+
+        if (databaseProvider.Contains("postgres", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.Npgsql;
+
+        if (databaseProvider.Contains("mysql", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.MySql;
+
+        if (databaseProvider.Contains("mariadb", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.MariaDb;
+
+        if (databaseProvider.Contains("oracle", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.Oracle;
+
+        if (databaseProvider.Contains("sqlite", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.Sqlite;
+
+        if (databaseProvider.Contains("sql", StringComparison.OrdinalIgnoreCase))
+            return MyEfVibeProvider.SqlServer;
+
+        return null;
     }
 
     private static IEnumerable<string> EnumerateStartupSettingsPaths(string startupProjectPath)
@@ -168,16 +235,16 @@ internal static class AppSettingsConnectionResolver
 
     internal static MyEfVibeProvider? InferProvider(string outputDirectory, string connectionString)
     {
-        if (Directory.Exists(outputDirectory))
-        {
-            var fromArtifacts = TryInferProviderFromDepsJson(outputDirectory, connectionString)
-                                ?? TryInferProviderFromOutputDlls(outputDirectory, connectionString);
+        var fromConnection = InferProviderFromConnectionString(connectionString);
 
-            if (fromArtifacts.HasValue)
-                return fromArtifacts;
-        }
+        if (fromConnection.HasValue)
+            return fromConnection;
 
-        return InferProviderFromConnectionString(connectionString);
+        if (!Directory.Exists(outputDirectory))
+            return null;
+
+        return TryInferProviderFromDepsJson(outputDirectory, connectionString)
+               ?? TryInferProviderFromOutputDlls(outputDirectory, connectionString);
     }
 
     private static MyEfVibeProvider? TryInferProviderFromOutputDlls(
@@ -263,18 +330,15 @@ internal static class AppSettingsConnectionResolver
             && connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase))
             return MyEfVibeProvider.Sqlite;
 
+        if (LooksLikeSqlServerConnection(connectionString))
+            return MyEfVibeProvider.SqlServer;
+
         if (LooksLikeMySqlConnection(connectionString))
         {
             return LooksLikeMariaDbConnection(connectionString)
                 ? MyEfVibeProvider.MariaDb
                 : MyEfVibeProvider.MySql;
         }
-
-        if (connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase)
-            || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
-                && connectionString.Contains("Database=", StringComparison.OrdinalIgnoreCase)
-                && !connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase)))
-            return MyEfVibeProvider.SqlServer;
 
         if (connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
             && connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase))
@@ -283,12 +347,29 @@ internal static class AppSettingsConnectionResolver
         return null;
     }
 
+    internal static bool LooksLikeSqlServerConnection(string connectionString) =>
+        connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
+        || connectionString.Contains("Integrated Security=", StringComparison.OrdinalIgnoreCase)
+        || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
+            && connectionString.Contains(",1433", StringComparison.OrdinalIgnoreCase));
+
     internal static bool LooksLikeMySqlConnection(string connectionString) =>
         connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase)
         || connectionString.Contains("Uid=", StringComparison.OrdinalIgnoreCase)
         || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
-            && connectionString.Contains("User=", StringComparison.OrdinalIgnoreCase)
-            && !connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase));
+            && ContainsMySqlUserKey(connectionString));
+
+    private static bool ContainsMySqlUserKey(string connectionString)
+    {
+        if (connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase)
+            || connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return connectionString.Contains("User=", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool LooksLikeMariaDbConnection(string connectionString) =>
         connectionString.Contains("mariadb", StringComparison.OrdinalIgnoreCase);

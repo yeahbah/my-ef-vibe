@@ -23,12 +23,20 @@ export function getWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
 }
 
 export function resolveSettingPath(value: string, workspaceFolder?: vscode.WorkspaceFolder): string {
-  if (!value.trim()) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
     return '';
   }
 
   const folderPath = workspaceFolder?.uri.fsPath ?? '';
-  return value.replace(/\$\{workspaceFolder\}/g, folderPath).trim();
+  const expanded = trimmed.replace(/\$\{workspaceFolder\}/g, folderPath);
+
+  if (!folderPath || path.isAbsolute(expanded)) {
+    return path.normalize(expanded);
+  }
+
+  return path.normalize(path.join(folderPath, expanded));
 }
 
 export function readSettings(workspaceFolder?: vscode.WorkspaceFolder): EfvibeSettings {

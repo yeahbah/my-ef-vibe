@@ -58,4 +58,22 @@ public sealed class QueryPlanSqlSanitizerTests
         Assert.Contains("LIMIT 10", explainable, StringComparison.Ordinal);
         Assert.DoesNotContain("@p", explainable, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SanitizeSqlForExplain_ToQueryStringParameterWithDbTypeSuffix_InlinesParameter()
+    {
+        const string translated =
+            """
+            -- @__p_0='10' (DbType = Int32)
+            SELECT p.productid
+            FROM production.product AS p
+            LIMIT @__p_0
+            """;
+
+        var explainable = QueryPlanRunner.SanitizeSqlForExplain(translated, MyEfVibeProvider.Npgsql);
+
+        Assert.Contains("LIMIT 10", explainable, StringComparison.Ordinal);
+        Assert.DoesNotContain("@__p_0", explainable, StringComparison.Ordinal);
+        Assert.DoesNotContain("DbType", explainable, StringComparison.Ordinal);
+    }
 }

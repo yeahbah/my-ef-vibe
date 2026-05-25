@@ -24,12 +24,9 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
     {
         var session = await _sessions.GetAsync(scenarioId);
 
-        var (_, metrics) = await QueryEvaluator.EvaluateAsync(
-            session.DbContext,
-            session.ScriptSession,
-            "db.Products.Take(3).ToList();",
-            new DbLogSettings { Enabled = true },
-            session.Host.EnumerateLoadedAssemblies());
+        var (_, metrics) = await EvaluateOrAssertAsync(
+            session,
+            "db.Products.Take(3).ToList();");
 
         Assert.True(metrics.Succeeded);
         Assert.True(metrics.RowCount >= 1);
@@ -53,12 +50,9 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
     {
         var session = await _sessions.GetAsync(scenarioId);
 
-        var (_, metrics) = await QueryEvaluator.EvaluateAsync(
-            session.DbContext,
-            session.ScriptSession,
-            "db.Products.Take(1).ToList();",
-            new DbLogSettings { Enabled = true },
-            session.Host.EnumerateLoadedAssemblies());
+        var (_, metrics) = await EvaluateOrAssertAsync(
+            session,
+            "db.Products.Take(1).ToList();");
 
         Assert.True(metrics.Succeeded);
 
@@ -117,8 +111,42 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
 
         Assert.NotEmpty(withSql);
 
+        var planFailureNotes = withSql
+            .Where(finding => string.IsNullOrWhiteSpace(finding.QueryPlan)
+                              && !string.IsNullOrWhiteSpace(finding.QueryPlanNote))
+            .Select(finding => finding.QueryPlanNote)
+            .Distinct(StringComparer.Ordinal)
+            .Take(3)
+            .ToArray();
+
         Assert.True(
             stats.QueryPlanCount > 0,
-            $"Expected at least one EXPLAIN plan (translated={stats.SqlTranslatedCount}, planFailed={stats.QueryPlanFailedCount}).");
+            $"Expected at least one EXPLAIN plan (translated={stats.SqlTranslatedCount}, planFailed={stats.QueryPlanFailedCount})."
+            + $" Sample plan failure(s): {string.Join(" | ", planFailureNotes)}");
+    }
+
+    private static async Task<(object? Result, EvaluationMetrics Metrics)> EvaluateOrAssertAsync(
+        EfvibeIntegrationSession session,
+        string snippet)
+    {
+        try
+        {
+            return await QueryEvaluator.EvaluateAsync(
+                session.DbContext,
+                session.ScriptSession,
+                snippet,
+                new DbLogSettings { Enabled = true },
+                session.Host.EnumerateLoadedAssemblies());
+        }
+        catch (EvaluationFailedException failure)
+        {
+            var detail = failure.Metrics.Warnings.Count > 0
+                ? failure.Metrics.Warnings[0]
+                : failure.Message;
+
+            Assert.Fail(
+                $"efvibe evaluation failed for scenario `{session.Scenario.Id}` ({detail}){Environment.NewLine}{failure}");
+            throw;
+        }
     }
 }

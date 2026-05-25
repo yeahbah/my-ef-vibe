@@ -44,6 +44,74 @@ internal static class ProviderOptionsConfigurator
         }
     }
 
+    /// <summary>
+    /// Chains <c>UseSnakeCaseNamingConvention</c> (or lowercase) on <see cref="DbContextOptionsBuilder"/>
+    /// when the EF project references <c>EFCore.NamingConventions</c> — required for PostgreSQL samples that
+    /// map <c>Production.Product</c> to <c>production.product</c>.
+    /// </summary>
+    internal static void TryApplyEfCoreNamingConventions(
+        WorkspaceHost host,
+        object dbContextOptionsBuilder,
+        MyEfVibeProvider providerKey)
+    {
+        if (providerKey != MyEfVibeProvider.Npgsql)
+            return;
+
+        TryRegisterNpgsqlModelCustomizer(host, dbContextOptionsBuilder);
+
+        foreach (var methodName in new[] { "UseSnakeCaseNamingConvention", "UseLowerCaseNamingConvention" })
+        {
+            if (TryInvokeDbContextOptionsBuilderExtension(
+                    host,
+                    "EFCore.NamingConventions",
+                    methodName,
+                    dbContextOptionsBuilder))
+                return;
+        }
+    }
+
+    private static void TryRegisterNpgsqlModelCustomizer(WorkspaceHost host, object dbContextOptionsBuilder)
+    {
+        host.PreloadPackageByName("Microsoft.EntityFrameworkCore");
+
+        var efAssembly = host.LoadAssembly("Microsoft.EntityFrameworkCore");
+
+        if (efAssembly is null)
+            return;
+
+        var modelCustomizerType = efAssembly.GetType(
+            "Microsoft.EntityFrameworkCore.Infrastructure.IModelCustomizer",
+            throwOnError: false);
+
+        var replacementType = NpgsqlModelCustomizerEmitter.TryGetOrCreate(host);
+
+        if (modelCustomizerType is null || replacementType is null)
+            return;
+
+        foreach (var replaceMethod in dbContextOptionsBuilder.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public))
+        {
+            if (!string.Equals(replaceMethod.Name, "ReplaceService", StringComparison.Ordinal)
+                || !replaceMethod.IsGenericMethodDefinition)
+                continue;
+
+            var parameters = replaceMethod.GetParameters();
+
+            if (parameters.Length != 0)
+                continue;
+
+            try
+            {
+                var closed = replaceMethod.MakeGenericMethod(modelCustomizerType, replacementType);
+                _ = closed.Invoke(dbContextOptionsBuilder, null);
+                return;
+            }
+            catch
+            {
+                // Fall back to AdventureWorks OnModelCreating when ReplaceService is unavailable.
+            }
+        }
+    }
+
     internal static bool TryInvokeUseProviderWithOptions(
         WorkspaceHost host,
         Assembly providerAssembly,
@@ -102,6 +170,13 @@ internal static class ProviderOptionsConfigurator
             MyEfVibeProvider.MySql or MyEfVibeProvider.MariaDb => MySqlExtensions,
             _ => Array.Empty<OptionalProviderExtension>(),
         };
+
+    private static bool TryInvokeDbContextOptionsBuilderExtension(
+        WorkspaceHost host,
+        string extensionAssemblyName,
+        string extensionMethodName,
+        object dbContextOptionsBuilder) =>
+        TryInvokeProviderBuilderExtension(host, extensionAssemblyName, extensionMethodName, dbContextOptionsBuilder);
 
     private static bool TryInvokeProviderBuilderExtension(
         WorkspaceHost host,

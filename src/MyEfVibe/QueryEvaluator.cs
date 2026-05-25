@@ -141,10 +141,18 @@ internal static class QueryEvaluator
 
         for (var current = failure; current is not null; current = current.InnerException)
         {
-            if (!seen.Add(current.Message))
+            var line = string.IsNullOrWhiteSpace(current.Message)
+                || string.Equals(
+                    current.Message,
+                    "Exception has been thrown by the target of an invocation.",
+                    StringComparison.Ordinal)
+                ? $"{current.GetType().Name}"
+                : $"{current.GetType().Name}: {current.Message}";
+
+            if (!seen.Add(line))
                 continue;
 
-            lines.Add(current.Message);
+            lines.Add(line);
         }
 
         return lines.Count == 0 ? failure.Message : string.Join(Environment.NewLine, lines);

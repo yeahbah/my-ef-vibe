@@ -124,7 +124,7 @@ internal static partial class QueryPlanRunner
     }
 
     private static string InlineParameter(string sql, string name, string value)
-        => sql.Replace($"@{name}", FormatParameterLiteral(value), StringComparison.Ordinal);
+        => sql.Replace($"@{name}", FormatParameterLiteral(CleanParameterValue(value)), StringComparison.Ordinal);
 
     private static bool TryParseToQueryStringParameterComment(string trimmed, Dictionary<string, string> parameters)
     {
@@ -136,7 +136,7 @@ internal static partial class QueryPlanRunner
         if (!match.Success)
             return false;
 
-        parameters[match.Groups["name"].Value] = match.Groups["value"].Value;
+        parameters[match.Groups["name"].Value] = CleanParameterValue(match.Groups["value"].Value);
         return true;
     }
 
@@ -156,10 +156,21 @@ internal static partial class QueryPlanRunner
             if (parameterName.Length == 0)
                 continue;
 
-            parameters[parameterName] = match.Groups["value"].Value.Trim();
+            parameters[parameterName] = CleanParameterValue(match.Groups["value"].Value);
         }
 
         return true;
+    }
+
+    private static string CleanParameterValue(string value)
+    {
+        var trimmed = value.Trim();
+        var typeSuffixIndex = trimmed.IndexOf(" (", StringComparison.Ordinal);
+
+        if (typeSuffixIndex > 0)
+            trimmed = trimmed[..typeSuffixIndex].TrimEnd();
+
+        return trimmed;
     }
 
     private static string FormatParameterLiteral(string value)
@@ -183,7 +194,7 @@ internal static partial class QueryPlanRunner
         return $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
     }
 
-    [GeneratedRegex(@"^-- @(?<name>\w+)='(?<value>.*)'$")]
+    [GeneratedRegex(@"^-- @(?<name>\w+)='(?<value>.*?)'(?:\s+\(.+\))?$")]
     private static partial Regex ParameterCommentRegex();
 
     [GeneratedRegex(@"@(?<name>\w+)\s*=\s*(?<value>[^,]+)")]

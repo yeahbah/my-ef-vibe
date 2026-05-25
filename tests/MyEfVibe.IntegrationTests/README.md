@@ -8,6 +8,7 @@ Live-database tests against the AdventureWorks sample repos on your machine. The
 2. Start each database (Docker compose in each repo, or your own instances).
 3. For Oracle, set `connectionString` in `integration-scenarios.json` or rely on the sample value for `localhost:1521/FREEPDB1`.
 4. For SQLite, ensure `Source/AdventureWorksLT.db` exists under the SQLite repo (tests skip if the DB file is missing).
+5. For PostgreSQL, restore the sample database (see `AdventureWorksPg/AdventureWorks/database/postgres/README.md` or run `AdventureWorks.DbReset.Console` `reset` against your local instance). efvibe sets `EntityFrameworkCoreSettings:DatabaseProvider` hints so the sample applies lowercase schema/table names (`production.product`). Rebuild **myefvibe** after pulling so `DbContextHostHints` is included.
 
 ## Run
 

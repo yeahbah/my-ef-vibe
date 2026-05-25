@@ -56,6 +56,35 @@ public sealed class AppSettingsConnectionResolverTests
     }
 
     [Fact]
+    public void InferProvider_sqlserver_adventureworks_format_beats_mysql_deps_json()
+    {
+        using var temp = new TempDirectory();
+
+        File.WriteAllText(
+            Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.deps.json"),
+            """
+            {
+              "targets": {
+                ".NETCoreApp,Version=v10.0": {
+                  "AdventureWorks.Infrastructure.Persistence/1.0.0": {
+                    "dependencies": {
+                      "MySql.EntityFrameworkCore": "10.0.7"
+                    }
+                  },
+                  "MySql.EntityFrameworkCore/10.0.7": {}
+                }
+              }
+            }
+            """);
+
+        var provider = AppSettingsConnectionResolver.InferProvider(
+            temp.Path,
+            "Server=localhost,1433;Database=AdventureWorks;User Id=sa;Password=AdventureWorks_2022;Encrypt=false;TrustServerCertificate=true");
+
+        Assert.Equal(MyEfVibeProvider.SqlServer, provider);
+    }
+
+    [Fact]
     public void TryResolve_adventureworks_mysql_appsettings()
     {
         using var temp = new TempDirectory();
