@@ -10,15 +10,18 @@ repositories {
     mavenCentral()
     intellijPlatform {
         defaultRepositories()
+        jetbrainsRuntime()
     }
 }
 
 dependencies {
     intellijPlatform {
-        rider(providers.gradleProperty("riderVersion").get(), useInstaller = false)
+        rider(providers.gradleProperty("riderVersion")) {
+            useInstaller = false
+        }
+        jetbrainsRuntime()
         bundledModule("intellij.rider")
         bundledPlugin("org.jetbrains.plugins.terminal")
-        instrumentationTools()
     }
 }
 
