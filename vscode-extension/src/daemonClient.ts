@@ -126,7 +126,7 @@ async function ensureDaemonReady(
     settings.toolPath,
     settings.dotnetFramework,
   );
-  const args = [...invocation.prefixArgs, ...buildServeArgs(settings)];
+  const args = [...invocation.prefixArgs, ...buildServeArgs(settings, searchDirectory)];
 
   const child = spawn(invocation.command, args, {
     cwd,

@@ -19,22 +19,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  resolve-version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
-            10.0.x
 
       - name: Resolve version
         id: version
@@ -53,6 +45,75 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing efvibe version $VERSION"
 
+  package-visualstudio-extension:
+    needs: resolve-version
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Sync Visual Studio extension version
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          [xml]$manifest = Get-Content "visualstudio-extension/source.extension.vsixmanifest"
+          $ns = New-Object System.Xml.XmlNamespaceManager($manifest.NameTable)
+          $ns.AddNamespace("vsix", "http://schemas.microsoft.com/developer/vsx-schema/2011")
+          $identity = $manifest.SelectSingleNode("/vsix:PackageManifest/vsix:Metadata/vsix:Identity", $ns)
+          $identity.Version = $env:VERSION
+          $manifest.Save((Resolve-Path "visualstudio-extension/source.extension.vsixmanifest"))
+
+      - name: Package Visual Studio extension
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          dotnet restore "visualstudio-extension/MyEfVibe.VisualStudio.csproj"
+          dotnet build "visualstudio-extension/MyEfVibe.VisualStudio.csproj" `
+            -c Release `
+            --no-restore `
+            /p:DeployExtension=false `
+            /p:TargetVsixContainerName="visualstudio-efvibe-$env:VERSION.vsix"
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $vsix = Get-ChildItem "visualstudio-extension" -Recurse -Filter "visualstudio-efvibe-$env:VERSION.vsix" | Select-Object -First 1
+          if (-not $vsix) {
+            throw "Visual Studio VSIX package was not produced."
+          }
+          Copy-Item $vsix.FullName "artifacts/visualstudio-efvibe-$env:VERSION.vsix"
+
+      - name: Upload Visual Studio extension package
+        uses: actions/upload-artifact@v4
+        with:
+          name: visualstudio-extension
+          path: artifacts/visualstudio-efvibe-${{ needs.resolve-version.outputs.version }}.vsix
+
+  publish:
+    needs:
+      - resolve-version
+      - package-visualstudio-extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
       - name: Restore
         run: dotnet restore src/MyEfVibe/MyEfVibe.csproj
 
@@ -62,12 +123,12 @@ jobs:
           -c Release
           --no-restore
           -o ./artifacts
-          /p:Version=${{ steps.version.outputs.version }}
-          /p:PackageReleaseNotes="Release ${{ steps.version.outputs.version }}. See https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+          /p:Version=${{ needs.resolve-version.outputs.version }}
+          /p:PackageReleaseNotes="Release ${{ needs.resolve-version.outputs.version }}. See https://github.com/${{ github.repository }}/releases/tag/v${{ needs.resolve-version.outputs.version }}"
 
       - name: Push to NuGet.org
         run: >
-          dotnet nuget push ./artifacts/efvibe.${{ steps.version.outputs.version }}.nupkg
+          dotnet nuget push ./artifacts/efvibe.${{ needs.resolve-version.outputs.version }}.nupkg
           --api-key ${{ secrets.NUGET_API_KEY }}
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
@@ -81,14 +142,14 @@ jobs:
 
       - name: Sync VS Code extension version
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
           jq --arg v "$VERSION" '.version = $v' vscode-extension/package.json > vscode-extension/package.json.tmp
           mv vscode-extension/package.json.tmp vscode-extension/package.json
 
       - name: Package VS Code extension
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.resolve-version.outputs.version }}
         run: |
           mkdir -p artifacts
           cd vscode-extension
@@ -97,22 +158,29 @@ jobs:
           test -f "vscode-efvibe-${VERSION}.vsix"
           cp "vscode-efvibe-${VERSION}.vsix" "../artifacts/vscode-efvibe-${VERSION}.vsix"
 
+      - name: Download Visual Studio extension package
+        uses: actions/download-artifact@v4
+        with:
+          name: visualstudio-extension
+          path: ./artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ needs.resolve-version.outputs.version }}
+          name: v${{ needs.resolve-version.outputs.version }}
           generate_release_notes: true
           files: |
-            ./artifacts/efvibe.${{ steps.version.outputs.version }}.nupkg
-            ./artifacts/vscode-efvibe-${{ steps.version.outputs.version }}.vsix
+            ./artifacts/efvibe.${{ needs.resolve-version.outputs.version }}.nupkg
+            ./artifacts/vscode-efvibe-${{ needs.resolve-version.outputs.version }}.vsix
+            ./artifacts/visualstudio-efvibe-${{ needs.resolve-version.outputs.version }}.vsix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to Open VSX
         continue-on-error: true
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.resolve-version.outputs.version }}
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           if [[ -z "$OVSX_PAT" ]]; then
@@ -125,7 +193,7 @@ jobs:
       - name: Publish to Visual Studio Marketplace
         continue-on-error: true
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.resolve-version.outputs.version }}
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           if [[ -z "$VSCE_PAT" ]]; then

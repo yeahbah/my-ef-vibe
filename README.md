@@ -193,12 +193,14 @@ Highlights:
 | **REPL commands** | [myefvibe.com/docs/repl.html](https://myefvibe.com/docs/repl.html) |
 | **LINQ scan** | [myefvibe.com/docs/scan.html](https://myefvibe.com/docs/scan.html) |
 | **VS Code extension** | [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html) |
+| **Visual Studio extension** | [docs/visual-studio-extension.md](docs/visual-studio-extension.md) |
 
 | Doc (repository) | Description |
 |-----|-------------|
 | [features.md](features.md) | Full REPL and CLI reference |
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md) | Install the VS Code extension ([Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) or VSIX) |
 | [vscode-extension/README.md](vscode-extension/README.md) | VS Code extension (run selection, `efvibe serve`, scan review, editable panel) |
+| [docs/visual-studio-extension.md](docs/visual-studio-extension.md) | Visual Studio 2022 extension MVP (VSIX setup, commands, verification) |
 | [docs/vscode-extension-plan.md](docs/vscode-extension-plan.md) | VS Code extension roadmap (phases, CLI hooks, diagnostics) |
 | [docs/efvibe-daemon-and-vscode.md](docs/efvibe-daemon-and-vscode.md) | `efvibe serve` daemon — fast Run Selection in VS Code |
 | [docs/visual-studio-extension-plan.md](docs/visual-studio-extension-plan.md) | Visual Studio 2022+ extension roadmap (VSIX, Error List, tool windows) |
@@ -217,7 +219,7 @@ Every push to `main` runs CI (including a VS Code extension compile check), then
 
 1. Computes the next patch version (max of latest `v*` git tag, NuGet, `.csproj`, and `vscode-extension/package.json`)
 2. Creates and pushes a `v*` tag (e.g. `v0.1.4`)
-3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe), packages the **VS Code extension** as a `.vsix`, opens a GitHub Release with both assets, and (when secrets are set) publishes to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) and [Open VSX](https://open-vsx.org/)
+3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe), packages the **VS Code extension** and **Visual Studio extension** as `.vsix` files, opens a GitHub Release with all assets, and (when secrets are set) publishes the VS Code package to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) and [Open VSX](https://open-vsx.org/)
 
 Set the repository secret **`NUGET_API_KEY`** ([nuget.org API key](https://www.nuget.org/account/apikeys)) for publish to work.
 

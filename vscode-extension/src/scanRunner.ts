@@ -19,8 +19,12 @@ export interface ScanRunResult {
   output?: ScanCiOutputDocument;
 }
 
-export function buildScanArgs(settings: EfvibeSettings, options: ScanRunOptions): string[] {
-  const args = ['scan', options.mode, ...buildEfvibeArgs(settings), '--json', '--no-banner'];
+export function buildScanArgs(
+  settings: EfvibeSettings,
+  options: ScanRunOptions,
+  searchDirectory?: string,
+): string[] {
+  const args = ['scan', options.mode, ...buildEfvibeArgs(settings, searchDirectory), '--json', '--no-banner'];
 
   if (options.respectDismissals) {
     args.push('--respect-dismissals');
@@ -61,7 +65,7 @@ export async function runScan(
     settings.toolPath,
     settings.dotnetFramework,
   );
-  const args = buildScanArgs(settings, options);
+  const args = buildScanArgs(settings, options, searchDirectory);
 
   try {
     const { stdout, stderr } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {

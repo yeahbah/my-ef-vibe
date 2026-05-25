@@ -63,8 +63,37 @@ jobs:
           npm ci
           npm run lint
 
+  build-visualstudio-extension:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Package Visual Studio extension
+        shell: pwsh
+        run: |
+          dotnet restore "visualstudio-extension/MyEfVibe.VisualStudio.csproj"
+          dotnet build "visualstudio-extension/MyEfVibe.VisualStudio.csproj" `
+            -c Release `
+            --no-restore `
+            /p:DeployExtension=false `
+            /p:TargetVsixContainerName="visualstudio-efvibe-ci.vsix"
+          $vsix = Get-ChildItem "visualstudio-extension" -Recurse -Filter "visualstudio-efvibe-ci.vsix" | Select-Object -First 1
+          if (-not $vsix) {
+            throw "Visual Studio VSIX package was not produced."
+          }
+
   release:
-    needs: build
+    needs:
+      - build
+      - build-visualstudio-extension
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     permissions:
@@ -130,10 +159,21 @@ jobs:
           mv .config/dotnet-tools.json.tmp .config/dotnet-tools.json
           jq --arg v "$VERSION" '.version = $v' vscode-extension/package.json > vscode-extension/package.json.tmp
           mv vscode-extension/package.json.tmp vscode-extension/package.json
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path("visualstudio-extension/source.extension.vsixmanifest")
+          text = path.read_text()
+          version = os.environ["VERSION"]
+          text = re.sub(r'(<Identity\b[^>]*\bVersion=")[^"]+(")', rf'\g<1>{version}\2', text, count=1)
+          path.write_text(text)
+          PY
           if git diff --quiet; then
             echo "No file changes to commit."
             exit 0
           fi
-          git add src/MyEfVibe/MyEfVibe.csproj .config/dotnet-tools.json vscode-extension/package.json
+          git add src/MyEfVibe/MyEfVibe.csproj .config/dotnet-tools.json vscode-extension/package.json visualstudio-extension/source.extension.vsixmanifest
           git commit -m "chore: bump version to ${VERSION} [skip ci]"
           git push origin HEAD:${{ github.ref_name }}

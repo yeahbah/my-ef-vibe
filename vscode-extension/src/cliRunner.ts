@@ -151,23 +151,52 @@ export function resolveToolInvocation(
   };
 }
 
-export function buildServeArgs(settings: EfvibeSettings): string[] {
-  return ['serve', ...buildEfvibeArgs(settings)];
+export function buildServeArgs(settings: EfvibeSettings, baseDirectory?: string): string[] {
+  return ['serve', ...buildEfvibeArgs(settings, baseDirectory)];
 }
 
-export function buildEfvibeArgs(settings: EfvibeSettings): string[] {
+function resolveCliPath(value: string, baseDirectory?: string): string {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  if (!baseDirectory || path.isAbsolute(trimmed)) {
+    return path.normalize(trimmed);
+  }
+
+  return path.normalize(path.join(baseDirectory, trimmed));
+}
+
+function resolveExistingCliPath(value: string, baseDirectory?: string): string {
+  const direct = resolveCliPath(value, undefined);
+
+  if (direct && fs.existsSync(direct)) {
+    return direct;
+  }
+
+  const relativeToBase = resolveCliPath(value, baseDirectory);
+
+  return relativeToBase && fs.existsSync(relativeToBase) ? relativeToBase : '';
+}
+
+export function buildEfvibeArgs(settings: EfvibeSettings, baseDirectory?: string): string[] {
   const args: string[] = [];
+  const workspaceRoot = resolveCliPath(settings.workspaceRoot, baseDirectory);
+  const project = resolveCliPath(settings.project, baseDirectory);
+  const startupProject = resolveExistingCliPath(settings.startupProject, baseDirectory);
 
-  if (settings.workspaceRoot) {
-    args.push('-w', settings.workspaceRoot);
+  if (workspaceRoot) {
+    args.push('-w', workspaceRoot);
   }
 
-  if (settings.project) {
-    args.push('-p', settings.project);
+  if (project) {
+    args.push('-p', project);
   }
 
-  if (settings.startupProject && fs.existsSync(settings.startupProject)) {
-    args.push('-s', settings.startupProject);
+  if (startupProject) {
+    args.push('-s', startupProject);
   }
 
   if (settings.context) {
@@ -204,7 +233,7 @@ export function buildReplCommand(settings: EfvibeSettings, searchDirectory: stri
     settings.toolPath,
     settings.dotnetFramework,
   );
-  return buildCommandLine(invocation, buildEfvibeArgs(settings));
+  return buildCommandLine(invocation, buildEfvibeArgs(settings, searchDirectory));
 }
 
 export interface ExpressionRunOptions {
@@ -217,8 +246,9 @@ export function buildExpressionArgs(
   settings: EfvibeSettings,
   expression: string,
   options: ExpressionRunOptions = {},
+  baseDirectory?: string,
 ): string[] {
-  const args = [...buildEfvibeArgs(settings), '-e', expression];
+  const args = [...buildEfvibeArgs(settings, baseDirectory), '-e', expression];
 
   if (options.format === 'json') {
     args.push('--format', 'json', '--no-banner');
@@ -244,7 +274,7 @@ export function buildExpressionCommand(
     settings.toolPath,
     settings.dotnetFramework,
   );
-  return buildCommandLine(invocation, buildExpressionArgs(settings, expression, options));
+  return buildCommandLine(invocation, buildExpressionArgs(settings, expression, options, searchDirectory));
 }
 
 export interface ExpressionRunResult {
@@ -281,10 +311,15 @@ export async function runExpressionJson(
     settings.toolPath,
     settings.dotnetFramework,
   );
-  const args = buildExpressionArgs(settings, expression, {
-    format: 'json',
-    withPlan: options?.withPlan,
-  });
+  const args = buildExpressionArgs(
+    settings,
+    expression,
+    {
+      format: 'json',
+      withPlan: options?.withPlan,
+    },
+    searchDirectory,
+  );
 
   try {
     const { stdout, stderr } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
@@ -341,7 +376,7 @@ async function runJsonStdout<T>(
     settings.toolPath,
     settings.dotnetFramework,
   );
-  const args = [...buildEfvibeArgs(settings), flag, '--no-banner'];
+  const args = [...buildEfvibeArgs(settings, searchDirectory), flag, '--no-banner'];
 
   try {
     const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
@@ -420,7 +455,7 @@ export async function runDescribeJson(
     settings.toolPath,
     settings.dotnetFramework,
   );
-  const args = [...buildEfvibeArgs(settings), '--describe-json', entityName, '--no-banner'];
+  const args = [...buildEfvibeArgs(settings, searchDirectory), '--describe-json', entityName, '--no-banner'];
 
   try {
     const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
@@ -455,7 +490,7 @@ export async function runCompletionsJson(
     settings.toolPath,
     settings.dotnetFramework,
   );
-  const args = [...buildEfvibeArgs(settings), '--completions-json', prefix, '--no-banner'];
+  const args = [...buildEfvibeArgs(settings, searchDirectory), '--completions-json', prefix, '--no-banner'];
 
   try {
     const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {

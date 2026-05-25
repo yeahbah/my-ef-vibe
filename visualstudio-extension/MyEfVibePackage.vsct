@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidMyEfVibePackage">
+    <Menus>
+      <Menu guid="guidMyEfVibeCommandSet" id="MyEfVibeTopLevelMenu" priority="0x700" type="Menu">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_MM_TOOLSADDINS" />
+        <Strings>
+          <ButtonText>My EF Vibe</ButtonText>
+          <CommandName>My EF Vibe</CommandName>
+        </Strings>
+      </Menu>
+    </Menus>
+
+    <Groups>
+      <Group guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" priority="0x0100">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeTopLevelMenu" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidMyEfVibeCommandSet" id="StartReplCommand" priority="0x0100" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Start REPL</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="RunSelectionCommand" priority="0x0110" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Run Selection</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="ShowDbInfoCommand" priority="0x0120" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Show DbInfo</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="ShowTablesCommand" priority="0x0130" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Show Tables</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="DescribeEntityCommand" priority="0x0140" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Describe Entity...</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="ScanLiteCommand" priority="0x0150" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Scan Lite</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="ScanDeepCommand" priority="0x0160" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Scan Deep</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="CheckPrerequisitesCommand" priority="0x0170" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Check Prerequisites</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidMyEfVibePackage" value="{85e5069c-d3c8-461d-b460-61b4b11d82f9}" />
+    <GuidSymbol name="guidMyEfVibeCommandSet" value="{b020e5ae-d066-4084-8487-85e3fbcd0fe8}">
+      <IDSymbol name="MyEfVibeTopLevelMenu" value="0x1000" />
+      <IDSymbol name="MyEfVibeMainGroup" value="0x1020" />
+      <IDSymbol name="StartReplCommand" value="0x0100" />
+      <IDSymbol name="RunSelectionCommand" value="0x0101" />
+      <IDSymbol name="ShowDbInfoCommand" value="0x0102" />
+      <IDSymbol name="ShowTablesCommand" value="0x0103" />
+      <IDSymbol name="DescribeEntityCommand" value="0x0104" />
+      <IDSymbol name="ScanLiteCommand" value="0x0105" />
+      <IDSymbol name="ScanDeepCommand" value="0x0106" />
+      <IDSymbol name="CheckPrerequisitesCommand" value="0x0107" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>
