@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
   <Metadata>
-    <Identity Id="MyEfVibe.VisualStudio" Version="0.5.17" Language="en-US" Publisher="Arnold Diaz" />
+    <Identity Id="MyEfVibe.VisualStudio" Version="0.5.18" Language="en-US" Publisher="Arnold Diaz" />
     <DisplayName>My EF Vibe</DisplayName>
     <Description xml:space="preserve">Evaluate EF Core LINQ in Visual Studio by launching and querying the efvibe CLI.</Description>
     <MoreInfo>https://myefvibe.com/</MoreInfo>
