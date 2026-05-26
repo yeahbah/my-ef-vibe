@@ -2,7 +2,7 @@
   "name": "vscode-efvibe",
   "displayName": "My EF Vibe",
   "description": "Evaluate EF Core LINQ in VS Code: Run Selection with SQL, deep scan + Scan Review, REPL terminal, and efvibe Session sidebar.",
-  "version": "0.5.12",
+  "version": "0.5.13",
   "icon": "images/icon.png",
   "galleryBanner": {
     "color": "#1a1b26",
