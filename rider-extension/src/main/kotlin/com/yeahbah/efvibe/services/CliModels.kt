@@ -12,3 +12,9 @@ data class CliInvocation(
     val command: String,
     val prefixArgs: List<String> = emptyList(),
 )
+
+data class CliCommandSpec(
+    val command: String,
+    val args: List<String>,
+    val workingDirectory: java.io.File,
+)

@@ -29,11 +29,35 @@ class CliRunner(private val project: Project) {
         return run(args, timeoutMs = 10 * 60_000)
     }
 
+    fun runExpressionPayload(expression: String, withPlan: Boolean, preferDaemon: Boolean = true): ExpressionRunResult {
+        if (preferDaemon) {
+            runCatching {
+                return EfvibeDaemonClient.getInstance(project).runExpression(expression, withPlan)
+            }
+        }
+
+        val result = runExpression(expression, withPlan)
+        return ExpressionRunResult(result, EfvibeJsonParser.parseEvaluation(result.stdout))
+    }
+
     fun runDbInfo(): CliResult =
         run(baseArgs() + listOf("--dbinfo-json", "--no-banner"), timeoutMs = 10 * 60_000)
 
+    fun runDbInfoPayload(): Pair<CliResult, DbInfoPayload?> {
+        val result = runDbInfo()
+        return result to EfvibeJsonParser.parseDbInfo(result.stdout)
+    }
+
     fun runTables(): CliResult =
         run(baseArgs() + listOf("--tables-json", "--no-banner"), timeoutMs = 10 * 60_000)
+
+    fun runTablesPayload(): Pair<CliResult, TablesPayload?> {
+        val result = runTables()
+        return result to EfvibeJsonParser.parseTables(result.stdout)
+    }
+
+    fun runDescribe(entityName: String): CliResult =
+        run(baseArgs() + listOf("--describe-json", entityName, "--no-banner"), timeoutMs = 10 * 60_000)
 
     fun runScan(mode: String): CliResult {
         val args = mutableListOf("scan", mode)
@@ -44,11 +68,39 @@ class CliRunner(private val project: Project) {
         return run(args, timeoutMs = 20 * 60_000)
     }
 
-    private fun run(args: List<String>, timeoutMs: Int): CliResult {
+    fun runScanPayload(mode: String): Pair<CliResult, ScanPayload?> {
+        val result = runScan(mode)
+        return result to EfvibeJsonParser.parseScan(result.stdout)
+    }
+
+    fun runScanNote(finding: ScanFinding, note: String): CliResult =
+        run(scanFindingArgs("note", finding) + listOf("--text", note), timeoutMs = 30_000)
+
+    fun runScanDismiss(finding: ScanFinding, note: String?): CliResult {
+        val args = scanFindingArgs("dismiss", finding).toMutableList()
+        if (!note.isNullOrBlank()) {
+            args += listOf("--note", note.trim())
+        }
+        return run(args, timeoutMs = 30_000)
+    }
+
+    fun buildServeSpec(): CliCommandSpec =
+        buildSpec(listOf("serve") + baseArgs())
+
+    fun buildSpec(args: List<String>): CliCommandSpec {
         val invocation = resolveInvocation()
-        val commandLine = GeneralCommandLine(invocation.command)
-            .withParameters(invocation.prefixArgs + args)
-            .withWorkDirectory(PathResolver.solutionDirectory(project).toFile())
+        return CliCommandSpec(
+            command = invocation.command,
+            args = invocation.prefixArgs + args,
+            workingDirectory = PathResolver.solutionDirectory(project).toFile(),
+        )
+    }
+
+    private fun run(args: List<String>, timeoutMs: Int): CliResult {
+        val spec = buildSpec(args)
+        val commandLine = GeneralCommandLine(spec.command)
+            .withParameters(spec.args)
+            .withWorkDirectory(spec.workingDirectory)
             .withCharset(StandardCharsets.UTF_8)
 
         val output: ProcessOutput = CapturingProcessHandler(commandLine).runProcess(timeoutMs)
@@ -86,6 +138,18 @@ class CliRunner(private val project: Project) {
         if (value.isBlank()) return
         add(name)
         add(value)
+    }
+
+    private fun scanFindingArgs(command: String, finding: ScanFinding): List<String> = buildList {
+        add("scan")
+        add(command)
+        addOption("-w", PathResolver.resolve(settings.workspaceRoot, project))
+        addOption("-p", PathResolver.resolve(settings.project, project))
+        addOption("-c", settings.context.trim())
+        addOption("--file", finding.filePath)
+        addOption("--line", finding.line.toString())
+        addOption("--rule", finding.ruleId)
+        addOption("--code", finding.code)
     }
 
     private fun findDotnetToolsManifest(): java.nio.file.Path? {

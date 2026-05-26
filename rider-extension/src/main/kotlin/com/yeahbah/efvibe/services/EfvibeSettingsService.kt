@@ -4,6 +4,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.openapi.components.StoragePathMacros
 
 data class EfvibeSettingsState(
     var workspaceRoot: String = "",
@@ -20,7 +21,7 @@ data class EfvibeSettingsState(
 )
 
 @Service(Service.Level.PROJECT)
-@State(name = "MyEfVibeSettings", storages = [Storage("efvibe.xml")])
+@State(name = "MyEfVibeSettings", storages = [Storage(StoragePathMacros.WORKSPACE_FILE)])
 class EfvibeSettingsService : PersistentStateComponent<EfvibeSettingsState> {
     private var state = EfvibeSettingsState()
 

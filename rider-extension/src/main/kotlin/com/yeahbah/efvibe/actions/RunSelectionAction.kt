@@ -5,7 +5,6 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.service
 import com.intellij.openapi.ui.Messages
-import com.yeahbah.efvibe.services.CliRunner
 import com.yeahbah.efvibe.services.EfvibeProjectService
 import com.yeahbah.efvibe.services.ExpressionGuard
 
@@ -31,10 +30,9 @@ open class BaseRunSelectionAction(private val withPlan: Boolean) : AnAction() {
         }
 
         EfvibeActionSupport.showToolWindow(project) {
-            project.service<EfvibeProjectService>().panel?.setExpression(expression)
-            EfvibeActionSupport.runInToolWindow(project, if (withPlan) "Run Selection with Plan" else "Run Selection") {
-                CliRunner(project).runExpression(expression, withPlan)
-            }
+            val panel = project.service<EfvibeProjectService>().panel
+            panel?.setExpression(expression)
+            panel?.evaluateExpression(expression, withPlan)
         }
     }
 }

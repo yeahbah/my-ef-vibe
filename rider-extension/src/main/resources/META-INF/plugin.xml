@@ -11,13 +11,14 @@
     <extensions defaultExtensionNs="com.intellij">
         <projectService serviceImplementation="com.yeahbah.efvibe.services.EfvibeSettingsService" />
         <projectService serviceImplementation="com.yeahbah.efvibe.services.EfvibeProjectService" />
+        <projectService serviceImplementation="com.yeahbah.efvibe.services.EfvibeDaemonClient" />
         <projectConfigurable
             parentId="language"
             instance="com.yeahbah.efvibe.settings.EfvibeConfigurable"
             displayName="My EF Vibe" />
         <toolWindow
             id="My EF Vibe"
-            anchor="bottom"
+            anchor="right"
             factoryClass="com.yeahbah.efvibe.toolwindow.EfvibeToolWindowFactory" />
     </extensions>
 

@@ -20,7 +20,7 @@ The generated plugin ZIP is written under `build/distributions/`.
 
 ## Configure
 
-Open **Settings -> Languages & Frameworks -> My EF Vibe** and set:
+Open **Settings -> Languages & Frameworks -> My EF Vibe** for the current Rider project and set:
 
 | Setting | CLI flag |
 |---------|----------|
@@ -35,12 +35,24 @@ Open **Settings -> Languages & Frameworks -> My EF Vibe** and set:
 
 Paths may be absolute, solution-relative, or use `${workspaceFolder}` / `$(SolutionDir)`.
 
+Settings are stored per Rider project in the project workspace state, not globally. Depending on the project format, Rider usually writes them to one of:
+
+- `<project>/.idea/workspace.xml`
+- `<solution>/.idea/.idea.<SolutionName>/.idea/workspace.xml`
+
+Look for the `MyEfVibeSettings` component. This is user-local workspace state and normally should not be committed.
+
 ## Features
 
 - **Tools -> My EF Vibe -> Start REPL** opens a Rider terminal tab and runs the resolved `efvibe` command.
 - **Run Selection** and **Run Selection with Plan** send the selected LINQ expression to `efvibe -e --format json`.
 - **Show DbInfo** and **Show Tables** call `--dbinfo-json` and `--tables-json`.
 - **Scan Lite** and **Scan Deep** call `efvibe scan lite|deep --json`.
-- The **My EF Vibe** tool window includes an editable expression box, Run / Run :plan buttons, and raw JSON/text output.
+- The **My EF Vibe** tool window includes a resizable query editor, Run / Run Plan buttons, result rows, SQL, query plans, messages, session settings, model actions, scan review, history, and a notebook-style multi-cell runner.
+- The **Result** tab includes Export CSV and Export JSON actions for the last successful run.
+- The **Model** tab includes Db Info, Tables, Run Count, Run Sample, and Describe actions for the selected DbSet.
+- The **Scan Review** tab supports finding navigation, Go to code, notes, and dismissals.
+- Run Selection prefers `efvibe serve` for faster repeated evaluations and falls back to one-shot CLI execution.
+- The notebook tab can open/save `.efvibe-notebook` JSON files and run cells separated by `---`.
 
-This is a Phase 0/1 MVP scaffold. Deeper Rider integrations such as Problems/inspections and schema trees can build on the same CLI runner.
+This is a Phase 0/1 Rider experience. Deeper integrations such as Problems/inspections can build on the same CLI runner and scan JSON parser.

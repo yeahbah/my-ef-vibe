@@ -33,7 +33,7 @@ VS Code extension — install from the [Marketplace](https://marketplace.visuals
 
 ![efvibe VS Code extension: Scan Review carousel](screenshots/vscode-scan-review.png)
 
-Rider extension — local MVP under [`rider-extension/`](rider-extension/README.md). It wraps the `efvibe` CLI with Rider settings, terminal REPL launch, Run Selection, dbinfo/tables, scan commands, and a tool window for output.
+Rider extension — local MVP under [`rider-extension/`](rider-extension/README.md). It wraps the `efvibe` CLI with per-project Rider settings, terminal REPL launch, Run Selection, model actions, scan review, notebooks, and a structured tool window for results, SQL, and plans.
 
 ## Install
 

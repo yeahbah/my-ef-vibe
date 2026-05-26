@@ -3,9 +3,13 @@ package com.yeahbah.efvibe.actions
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.components.service
+import com.intellij.openapi.project.Project
 import com.yeahbah.efvibe.services.CliRunner
+import com.yeahbah.efvibe.services.EfvibeProjectService
+import com.yeahbah.efvibe.toolwindow.EfvibeToolWindowPanel
 
-abstract class EfvibeCliAction(private val title: String) : AnAction() {
+abstract class EfvibeCliAction : AnAction() {
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     override fun update(event: AnActionEvent) {
@@ -14,30 +18,41 @@ abstract class EfvibeCliAction(private val title: String) : AnAction() {
 
     override fun actionPerformed(event: AnActionEvent) {
         val project = EfvibeActionSupport.requireProject(event) ?: return
-        EfvibeActionSupport.runInToolWindow(project, title) {
-            run(CliRunner(project))
+        EfvibeActionSupport.showToolWindow(project) {
+            run(project, project.service<EfvibeProjectService>().panel)
         }
     }
 
-    protected abstract fun run(runner: CliRunner): com.yeahbah.efvibe.services.CliResult
+    protected abstract fun run(project: Project, panel: EfvibeToolWindowPanel?)
 }
 
-class ShowDbInfoAction : EfvibeCliAction("DbInfo") {
-    override fun run(runner: CliRunner) = runner.runDbInfo()
+class ShowDbInfoAction : EfvibeCliAction() {
+    override fun run(project: Project, panel: EfvibeToolWindowPanel?) {
+        panel?.runDbInfo()
+    }
 }
 
-class ShowTablesAction : EfvibeCliAction("Tables") {
-    override fun run(runner: CliRunner) = runner.runTables()
+class ShowTablesAction : EfvibeCliAction() {
+    override fun run(project: Project, panel: EfvibeToolWindowPanel?) {
+        panel?.runTables()
+    }
 }
 
-class ScanLiteAction : EfvibeCliAction("Scan Lite") {
-    override fun run(runner: CliRunner) = runner.runScan("lite")
+class ScanLiteAction : EfvibeCliAction() {
+    override fun run(project: Project, panel: EfvibeToolWindowPanel?) {
+        panel?.runScan("lite")
+    }
 }
 
-class ScanDeepAction : EfvibeCliAction("Scan Deep") {
-    override fun run(runner: CliRunner) = runner.runScan("deep")
+class ScanDeepAction : EfvibeCliAction() {
+    override fun run(project: Project, panel: EfvibeToolWindowPanel?) {
+        panel?.runScan("deep")
+    }
 }
 
-class CheckPrerequisitesAction : EfvibeCliAction("Prerequisites") {
-    override fun run(runner: CliRunner) = runner.runAboutJson()
+class CheckPrerequisitesAction : EfvibeCliAction() {
+    override fun run(project: Project, panel: EfvibeToolWindowPanel?) {
+        val result = CliRunner(project).runAboutJson()
+        panel?.appendOutput("Prerequisites", result.stdout.ifBlank { result.stderr })
+    }
 }
