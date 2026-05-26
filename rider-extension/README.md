@@ -2,6 +2,8 @@
 
 JetBrains Rider plugin that shells out to the `efvibe` CLI. The plugin owns settings, actions, terminal/tool-window UX, and output display; `efvibe` remains the evaluation and scan engine.
 
+For a step-by-step setup and usage walkthrough, see [docs/rider-extension.md](../docs/rider-extension.md).
+
 ## Build
 
 Install Gradle 9 or add a wrapper, then run from this directory:

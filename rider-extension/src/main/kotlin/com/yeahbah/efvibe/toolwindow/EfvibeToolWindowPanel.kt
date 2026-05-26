@@ -56,7 +56,6 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     private val sessionText = readOnlyTextArea()
     private val modelText = readOnlyTextArea()
     private val modelTable = JTable()
-    private val scanTable = JTable()
     private val scanDetails = readOnlyTextArea()
     private val historyText = readOnlyTextArea()
     private val notebookCells = JTextArea(
@@ -73,6 +72,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
 
     private var lastPayload: EvaluationPayload? = null
     private var lastScan: ScanPayload? = null
+    private var scanIndex: Int = 0
 
     init {
         background = PanelBackground
@@ -92,13 +92,10 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         modelTable.selectionModel.addListSelectionListener {
             if (!it.valueIsAdjusting) renderSelectedModelRow()
         }
-        scanTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
-        scanTable.selectionModel.addListSelectionListener {
-            if (!it.valueIsAdjusting) renderSelectedScanFinding()
-        }
         styleStatus(status)
-        listOf(resultTable, modelTable, scanTable).forEach(::styleTable)
-        scanTable.setDefaultRenderer(Any::class.java, ScanSeverityRenderer())
+        listOf(resultTable, modelTable).forEach(::styleTable)
+        scanDetails.lineWrap = true
+        scanDetails.wrapStyleWord = true
 
         val toolbar = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
             background = HeaderBackground
@@ -451,27 +448,26 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         }
     }
 
-    private fun renderScan(payload: ScanPayload) {
+    private fun renderScan(payload: ScanPayload, selectedIndex: Int = 0) {
         lastScan = payload
-        val model = DefaultTableModel(arrayOf("Severity", "Rule", "File", "Line", "Message"), 0)
-        payload.findings.forEach {
-            model.addRow(arrayOf(it.severity, it.ruleId, File(it.filePath).name, it.line, it.message))
+        scanIndex = if (payload.findings.isEmpty()) {
+            0
+        } else {
+            selectedIndex.coerceIn(0, payload.findings.lastIndex)
         }
-        scanTable.model = model
-        if (payload.findings.isNotEmpty()) scanTable.setRowSelectionInterval(0, 0)
         renderSelectedScanFinding()
         tabs.selectedIndex = tabs.indexOfTab("Scan Review")
     }
 
     private fun renderSelectedScanFinding() {
         val payload = lastScan ?: return
-        val row = scanTable.selectedRow.takeIf { it >= 0 } ?: 0
-        val finding = payload.findings.getOrNull(row)
+        val finding = payload.findings.getOrNull(scanIndex)
         scanDetails.text = if (finding == null) {
             "No scan findings."
         } else {
-            formatFinding(finding, row + 1, payload.findings.size)
+            formatFinding(finding, scanIndex + 1, payload.findings.size)
         }
+        scanDetails.setCaretPosition(0)
     }
 
     private fun formatFinding(finding: ScanFinding, index: Int, total: Int): String =
@@ -546,22 +542,25 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                 styleButtons(this)
             }
             add(toolbar, BorderLayout.NORTH)
-            add(JBScrollPane(scanTable), BorderLayout.CENTER)
-            add(JBScrollPane(scanDetails), BorderLayout.SOUTH)
+            add(
+                JBScrollPane(scanDetails).apply {
+                    setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS)
+                    setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED)
+                },
+                BorderLayout.CENTER,
+            )
         }
 
     private fun moveScanSelection(delta: Int) {
-        val count = scanTable.rowCount
+        val count = lastScan?.findings?.size ?: 0
         if (count == 0) return
-        val current = scanTable.selectedRow.takeIf { it >= 0 } ?: 0
-        val next = (current + delta + count) % count
-        scanTable.setRowSelectionInterval(next, next)
+        scanIndex = (scanIndex + delta + count) % count
+        renderSelectedScanFinding()
     }
 
     private fun openSelectedScanSource() {
         val payload = lastScan ?: return
-        val row = scanTable.selectedRow.takeIf { it >= 0 } ?: return
-        val finding = payload.findings.getOrNull(row) ?: return
+        val finding = payload.findings.getOrNull(scanIndex) ?: return
         val file = LocalFileSystem.getInstance().findFileByPath(finding.filePath) ?: return
         FileEditorManager.getInstance(project).openTextEditor(
             OpenFileDescriptor(project, file, (finding.line - 1).coerceAtLeast(0), 0),
@@ -571,7 +570,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
 
     private fun selectedScanFinding(): Pair<Int, ScanFinding>? {
         val payload = lastScan ?: return null
-        val row = scanTable.selectedRow.takeIf { it >= 0 } ?: return null
+        val row = scanIndex
         val finding = payload.findings.getOrNull(row) ?: return null
         return row to finding
     }
@@ -602,8 +601,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                     if (payload != null) {
                         val updated = payload.findings.toMutableList()
                         updated[row] = finding.copy(savedNote = note)
-                        renderScan(payload.copy(findings = updated))
-                        scanTable.setRowSelectionInterval(row.coerceAtMost(updated.lastIndex), row.coerceAtMost(updated.lastIndex))
+                        renderScan(payload.copy(findings = updated), row)
                     }
                     status.text = "Note saved."
                 } else {
@@ -636,11 +634,8 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                     val payload = lastScan
                     if (payload != null) {
                         val updated = payload.findings.toMutableList().apply { removeAt(row) }
-                        renderScan(payload.copy(findings = updated, totalFindings = updated.size))
-                        if (updated.isNotEmpty()) {
-                            val next = row.coerceAtMost(updated.lastIndex)
-                            scanTable.setRowSelectionInterval(next, next)
-                        }
+                        val next = if (updated.isEmpty()) 0 else row.coerceAtMost(updated.lastIndex)
+                        renderScan(payload.copy(findings = updated, totalFindings = updated.size), next)
                     }
                     status.text = "Finding dismissed."
                 } else {

@@ -195,6 +195,7 @@ Highlights:
 | **REPL commands** | [myefvibe.com/docs/repl.html](https://myefvibe.com/docs/repl.html) |
 | **LINQ scan** | [myefvibe.com/docs/scan.html](https://myefvibe.com/docs/scan.html) |
 | **VS Code extension** | [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html) |
+| **Rider extension** | [docs/rider-extension.md](docs/rider-extension.md) |
 | **Visual Studio extension** | [docs/visual-studio-extension.md](docs/visual-studio-extension.md) |
 
 | Doc (repository) | Description |
@@ -203,6 +204,7 @@ Highlights:
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md) | Install the VS Code extension ([Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) or VSIX) |
 | [vscode-extension/README.md](vscode-extension/README.md) | VS Code extension (run selection, `efvibe serve`, scan review, editable panel) |
 | [rider-extension/README.md](rider-extension/README.md) | Rider extension MVP (Gradle plugin, settings, actions, tool window) |
+| [docs/rider-extension.md](docs/rider-extension.md) | Step-by-step Rider plugin setup and usage guide |
 | [docs/visual-studio-extension.md](docs/visual-studio-extension.md) | Visual Studio 2022 extension MVP (VSIX setup, commands, verification) |
 | [docs/vscode-extension-plan.md](docs/vscode-extension-plan.md) | VS Code extension roadmap (phases, CLI hooks, diagnostics) |
 | [docs/efvibe-daemon-and-vscode.md](docs/efvibe-daemon-and-vscode.md) | `efvibe serve` daemon — fast Run Selection in VS Code |
