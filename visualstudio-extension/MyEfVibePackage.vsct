@@ -6,7 +6,7 @@
   <Commands package="guidMyEfVibePackage">
     <Menus>
       <Menu guid="guidMyEfVibeCommandSet" id="MyEfVibeTopLevelMenu" priority="0x700" type="Menu">
-        <Parent guid="guidSHLMainMenu" id="IDG_VS_TOOLS_EXT_TOOLS" />
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeToolsGroup" />
         <Strings>
           <ButtonText>My EF Vibe</ButtonText>
           <CommandName>My EF Vibe</CommandName>
@@ -15,6 +15,9 @@
     </Menus>
 
     <Groups>
+      <Group guid="guidMyEfVibeCommandSet" id="MyEfVibeToolsGroup" priority="0x700">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS" />
+      </Group>
       <Group guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" priority="0x0100">
         <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeTopLevelMenu" />
       </Group>
@@ -76,6 +79,7 @@
     <GuidSymbol name="guidMyEfVibePackage" value="{85e5069c-d3c8-461d-b460-61b4b11d82f9}" />
     <GuidSymbol name="guidMyEfVibeCommandSet" value="{b020e5ae-d066-4084-8487-85e3fbcd0fe8}">
       <IDSymbol name="MyEfVibeTopLevelMenu" value="0x1000" />
+      <IDSymbol name="MyEfVibeToolsGroup" value="0x1010" />
       <IDSymbol name="MyEfVibeMainGroup" value="0x1020" />
       <IDSymbol name="StartReplCommand" value="0x0100" />
       <IDSymbol name="RunSelectionCommand" value="0x0101" />

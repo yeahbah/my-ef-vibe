@@ -2,12 +2,19 @@ package com.yeahbah.efvibe.toolwindow
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileTypes.FileType
+import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.google.gson.JsonParser
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
@@ -50,14 +57,14 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     private val status = JLabel("Ready")
     private val tabs = JTabbedPane()
     private val resultTable = JTable()
-    private val sqlText = readOnlyTextArea()
-    private val planText = readOnlyTextArea()
-    private val messagesText = readOnlyTextArea()
-    private val sessionText = readOnlyTextArea()
-    private val modelText = readOnlyTextArea()
+    private val sqlText = HighlightedOutput(project, "sql")
+    private val planText = HighlightedOutput(project, "txt")
+    private val messagesText = HighlightedOutput(project, "txt")
+    private val sessionText = HighlightedOutput(project, "txt")
+    private val modelText = HighlightedOutput(project, "txt")
     private val modelTable = JTable()
-    private val scanDetails = readOnlyTextArea()
-    private val historyText = readOnlyTextArea()
+    private val scanDetails = HighlightedOutput(project, "cs")
+    private val historyText = HighlightedOutput(project, "cs")
     private val notebookCells = JTextArea(
         """
         db.Products.Take(10)
@@ -68,7 +75,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         10,
         80,
     )
-    private val notebookOutput = readOnlyTextArea()
+    private val notebookOutput = HighlightedOutput(project, "cs")
 
     private var lastPayload: EvaluationPayload? = null
     private var lastScan: ScanPayload? = null
@@ -94,8 +101,6 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         }
         styleStatus(status)
         listOf(resultTable, modelTable).forEach(::styleTable)
-        scanDetails.lineWrap = true
-        scanDetails.wrapStyleWord = true
 
         val toolbar = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
             background = HeaderBackground
@@ -119,13 +124,13 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         }
 
         tabs.addTab("Result", buildResultPanel())
-        tabs.addTab("SQL", JBScrollPane(sqlText))
-        tabs.addTab("Plan", JBScrollPane(planText))
-        tabs.addTab("Messages", JBScrollPane(messagesText))
-        tabs.addTab("Session", JBScrollPane(sessionText))
+        tabs.addTab("SQL", sqlText)
+        tabs.addTab("Plan", planText)
+        tabs.addTab("Messages", messagesText)
+        tabs.addTab("Session", sessionText)
         tabs.addTab("Model", buildModelPanel())
         tabs.addTab("Scan Review", buildScanPanel())
-        tabs.addTab("History", JBScrollPane(historyText))
+        tabs.addTab("History", historyText)
         tabs.addTab("Notebook", buildNotebookPanel())
 
         val top = JPanel(BorderLayout()).apply {
@@ -393,7 +398,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                 JSplitPane(
                     JSplitPane.VERTICAL_SPLIT,
                     JBScrollPane(modelTable),
-                    JBScrollPane(modelText),
+                    modelText,
                 ).apply {
                     resizeWeight = 0.65
                 },
@@ -467,7 +472,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         } else {
             formatFinding(finding, scanIndex + 1, payload.findings.size)
         }
-        scanDetails.setCaretPosition(0)
+        scanDetails.moveToStart()
     }
 
     private fun formatFinding(finding: ScanFinding, index: Int, total: Int): String =
@@ -543,10 +548,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             }
             add(toolbar, BorderLayout.NORTH)
             add(
-                JBScrollPane(scanDetails).apply {
-                    setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS)
-                    setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED)
-                },
+                scanDetails,
                 BorderLayout.CENTER,
             )
         }
@@ -665,7 +667,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             }
             add(toolbar, BorderLayout.NORTH)
             add(JBScrollPane(notebookCells), BorderLayout.CENTER)
-            add(JBScrollPane(notebookOutput), BorderLayout.SOUTH)
+            add(notebookOutput, BorderLayout.SOUTH)
         }
 
     private fun openNotebook() {
@@ -856,15 +858,52 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     }
 }
 
-private fun readOnlyTextArea(): JTextArea =
-    JTextArea().apply {
-        isEditable = false
-        lineWrap = false
+private class HighlightedOutput(
+    private val project: Project,
+    extension: String,
+) : JPanel(BorderLayout()) {
+    private val document = EditorFactory.getInstance().createDocument("")
+    private val editor: Editor = EditorFactory.getInstance().createViewer(document, project)
+
+    init {
         background = EditorBackground
-        foreground = Foreground
-        caretColor = Foreground
-        font = Font(Font.MONOSPACED, Font.PLAIN, font.size)
         border = BorderFactory.createEmptyBorder(10, 12, 10, 12)
+        configureEditor(editor, fileTypeFor(extension))
+        add(editor.component, BorderLayout.CENTER)
+    }
+
+    var text: String
+        get() = document.text
+        set(value) {
+            val update = { document.setText(value) }
+            val app = ApplicationManager.getApplication()
+            if (app.isWriteAccessAllowed) {
+                update()
+            } else {
+                app.runWriteAction(update)
+            }
+            moveToStart()
+        }
+
+    fun moveToStart() {
+        editor.caretModel.moveToOffset(0)
+        editor.scrollingModel.scrollVertically(0)
+    }
+
+    private fun configureEditor(editor: Editor, fileType: FileType) {
+        editor.settings.isLineNumbersShown = false
+        editor.settings.isUseSoftWraps = true
+        val editorEx = editor as? EditorEx ?: return
+        editorEx.highlighter = EditorHighlighterFactory.getInstance()
+            .createEditorHighlighter(project, fileType)
+    }
+}
+
+private fun fileTypeFor(extension: String): FileType =
+    if (extension.isBlank()) {
+        PlainTextFileType.INSTANCE
+    } else {
+        FileTypeManager.getInstance().getFileTypeByExtension(extension)
     }
 
 private fun styleStatus(label: JLabel) {

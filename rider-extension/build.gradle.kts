@@ -44,6 +44,13 @@ intellijPlatform {
         }
         ideaVersion {
             sinceBuild = providers.gradleProperty("sinceBuild")
+            untilBuild = providers.gradleProperty("untilBuild")
+        }
+    }
+
+    pluginVerification {
+        ides {
+            current()
         }
     }
 }

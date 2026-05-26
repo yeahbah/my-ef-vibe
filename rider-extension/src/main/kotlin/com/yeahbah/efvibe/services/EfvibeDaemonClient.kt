@@ -2,6 +2,9 @@ package com.yeahbah.efvibe.services
 
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.process.ProcessListener
+import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -59,12 +62,12 @@ class EfvibeDaemonClient(private val project: Project) {
         return state
     }
 
-    private class DaemonState(val handler: OSProcessHandler) : com.intellij.execution.process.ProcessAdapter() {
+    private class DaemonState(val handler: OSProcessHandler) : ProcessListener {
         private val lines = ArrayBlockingQueue<String>(16)
         private val buffer = StringBuilder()
 
-        override fun onTextAvailable(event: com.intellij.execution.process.ProcessEvent, outputType: Key<*>) {
-            if (outputType != com.intellij.execution.process.ProcessOutputTypes.STDOUT) return
+        override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
+            if (outputType != ProcessOutputTypes.STDOUT) return
 
             buffer.append(event.text)
             while (true) {
