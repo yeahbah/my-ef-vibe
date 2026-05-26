@@ -43,7 +43,7 @@ Commands are available from **Tools > My EF Vibe**:
 - **Scan Deep** runs `efvibe scan deep --json --no-banner`.
 - **Check Prerequisites** runs `--about-json` and writes details to the **My EF Vibe** Output pane.
 
-If the menu is not visible, restart Visual Studio after installing the VSIX and open a solution. Confirm the extension is enabled under **Extensions > Manage Extensions > Installed**, then check whether the options page appears at **Tools > Options > My EF Vibe > General**. If the options page exists but the menu is still missing, uninstall the old VSIX, close all Visual Studio instances, reinstall the current VSIX, and start Visual Studio again so the command table cache is rebuilt.
+If the submenu is not visible, look for the fallback command **Tools > My EF Vibe - Check Prerequisites**. If neither the submenu nor the fallback command is visible, restart Visual Studio after installing the VSIX and open a solution. Confirm the extension is enabled under **Extensions > Manage Extensions > Installed**, then check whether the options page appears at **Tools > Options > My EF Vibe > General**. If the options page exists but the menu is still missing, uninstall the old VSIX, close all Visual Studio instances, reinstall the current VSIX, and start Visual Studio again so the command table cache is rebuilt.
 
 ## Tool Windows
 

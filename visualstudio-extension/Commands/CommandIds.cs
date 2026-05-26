@@ -10,4 +10,5 @@ internal static class CommandIds
     internal const int ScanLite = 0x0105;
     internal const int ScanDeep = 0x0106;
     internal const int CheckPrerequisites = 0x0107;
+    internal const int CheckPrerequisitesFallback = 0x0108;
 }

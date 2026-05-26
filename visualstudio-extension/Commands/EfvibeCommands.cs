@@ -27,6 +27,7 @@ internal static class EfvibeCommands
         Add(package, commandService, CommandIds.ScanLite, () => controller.ScanAsync("lite"));
         Add(package, commandService, CommandIds.ScanDeep, () => controller.ScanAsync("deep"));
         Add(package, commandService, CommandIds.CheckPrerequisites, () => controller.CheckPrerequisitesAsync());
+        Add(package, commandService, CommandIds.CheckPrerequisitesFallback, () => controller.CheckPrerequisitesAsync());
     }
 
     private static void Add(
