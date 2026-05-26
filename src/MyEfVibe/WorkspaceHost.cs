@@ -8,6 +8,7 @@ internal sealed class WorkspaceHost : IDisposable
 {
     private readonly WorkspaceAssemblyResolver _resolver;
     private readonly string _targetFrameworkMoniker;
+    private ProjectBuildOutput? _startupBuildOutput;
     private string? _startupOutputDirectory;
     private bool _startupBuildAttempted;
 
@@ -19,6 +20,7 @@ internal sealed class WorkspaceHost : IDisposable
         string startupProjectPath,
         string outputDirectory,
         string targetFrameworkMoniker,
+        ProjectBuildOutput? startupBuildOutput,
         string? startupOutputDirectory,
         string sessionDirectory)
     {
@@ -29,6 +31,7 @@ internal sealed class WorkspaceHost : IDisposable
         StartupProjectPath = startupProjectPath;
         OutputDirectory = outputDirectory;
         _targetFrameworkMoniker = targetFrameworkMoniker;
+        _startupBuildOutput = startupBuildOutput;
         _startupOutputDirectory = startupOutputDirectory;
         SessionDirectory = sessionDirectory;
     }
@@ -126,6 +129,7 @@ internal sealed class WorkspaceHost : IDisposable
             workspaceBuild.StartupProjectPath,
             workspaceBuild.OutputDirectory,
             workspaceBuild.TargetFrameworkMoniker,
+            workspaceBuild.StartupBuildOutput,
             workspaceBuild.StartupOutputDirectory,
             workspaceBuild.SessionDirectory);
     }
@@ -326,16 +330,33 @@ internal sealed class WorkspaceHost : IDisposable
 
         _startupBuildAttempted = true;
 
-        if (WorkspaceBuildResult.TryLocateStartupOutput(StartupProjectPath, _targetFrameworkMoniker, out var startupOutputDirectory))
+        _startupBuildOutput ??= WorkspaceBuilder.GetIsolatedBuildOutput(
+            SessionDirectory,
+            StartupProjectPath,
+            _targetFrameworkMoniker);
+
+        if (WorkspaceBuildResult.TryLocateStartupOutput(
+                StartupProjectPath,
+                _targetFrameworkMoniker,
+                _startupBuildOutput,
+                out var startupOutputDirectory))
         {
             _startupOutputDirectory = startupOutputDirectory;
             return _startupOutputDirectory;
         }
 
         var startupFramework = ProjectTargetFrameworkResolver.ResolveBuildFramework(StartupProjectPath, null);
-        WorkspaceBuilder.RunDotnetBuild(StartupProjectPath, startupFramework);
+        _startupBuildOutput = WorkspaceBuilder.GetIsolatedBuildOutput(
+            SessionDirectory,
+            StartupProjectPath,
+            startupFramework);
+        WorkspaceBuilder.RunDotnetBuild(StartupProjectPath, startupFramework, _startupBuildOutput);
 
-        if (WorkspaceBuildResult.TryLocateStartupOutput(StartupProjectPath, startupFramework, out startupOutputDirectory))
+        if (WorkspaceBuildResult.TryLocateStartupOutput(
+                StartupProjectPath,
+                startupFramework,
+                _startupBuildOutput,
+                out startupOutputDirectory))
             _startupOutputDirectory = startupOutputDirectory;
 
         return _startupOutputDirectory;

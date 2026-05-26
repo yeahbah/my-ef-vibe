@@ -10,6 +10,8 @@ internal sealed record WorkspaceBuildResult(
     string OutputDirectory,
     string PrimaryAssemblyDll,
     string TargetFrameworkMoniker,
+    ProjectBuildOutput ProjectBuildOutput,
+    ProjectBuildOutput? StartupBuildOutput = null,
     string? StartupOutputDirectory = null)
 {
     internal ImmutableHashSet<string> ReferenceAssemblyPaths =>
@@ -19,21 +21,20 @@ internal sealed record WorkspaceBuildResult(
         string sessionDirectory,
         FileInfo csprojFile,
         FileInfo startupProject,
-        string targetFrameworkMoniker)
+        string targetFrameworkMoniker,
+        ProjectBuildOutput projectBuildOutput,
+        ProjectBuildOutput? startupBuildOutput)
     {
-        var projectDirectory =
-            csprojFile.Directory!.FullName.TrimEnd(Path.DirectorySeparatorChar);
-
         var asmNameLogical = CsprojReader.ReadLogicalAssemblyName(csprojFile.FullName);
 
         if (!TryLocateBuiltAssembly(
-                Path.Combine(projectDirectory, "bin"),
+                projectBuildOutput.BaseOutputPath,
                 asmNameLogical,
                 targetFrameworkMoniker,
                 out var dll))
             throw new WorkspaceException(
                 $"Could not find `{asmNameLogical}.dll` after build for `{targetFrameworkMoniker}`."
-                + $" Checked `bin/Debug` and `bin/Release`.");
+                + $" Checked isolated build output `{projectBuildOutput.BaseOutputPath}`.");
 
         var outputDirectory =
             Path.GetDirectoryName(dll)!;
@@ -44,7 +45,8 @@ internal sealed record WorkspaceBuildResult(
                 csprojFile.FullName,
                 startupProject.FullName,
                 StringComparison.OrdinalIgnoreCase)
-            && TryLocateStartupOutput(startupProject.FullName, targetFrameworkMoniker, out var locatedStartupOutput))
+            && startupBuildOutput is not null
+            && TryLocateStartupOutput(startupProject.FullName, targetFrameworkMoniker, startupBuildOutput, out var locatedStartupOutput))
             startupOutputDirectory = locatedStartupOutput;
 
         return new WorkspaceBuildResult(
@@ -54,26 +56,22 @@ internal sealed record WorkspaceBuildResult(
             OutputDirectory: outputDirectory,
             PrimaryAssemblyDll: dll,
             TargetFrameworkMoniker: targetFrameworkMoniker,
+            ProjectBuildOutput: projectBuildOutput,
+            StartupBuildOutput: startupBuildOutput,
             StartupOutputDirectory: startupOutputDirectory);
     }
 
     internal static bool TryLocateStartupOutput(
         string startupProjectPath,
         string targetFrameworkMoniker,
+        ProjectBuildOutput startupBuildOutput,
         out string? outputDirectory)
     {
         outputDirectory = null;
-
-        var startupProjectDirectory =
-            Path.GetDirectoryName(startupProjectPath);
-
-        if (string.IsNullOrEmpty(startupProjectDirectory))
-            return false;
-
         var startupAssemblyName = CsprojReader.ReadLogicalAssemblyName(startupProjectPath);
 
         if (!TryLocateBuiltAssembly(
-                Path.Combine(startupProjectDirectory, "bin"),
+                startupBuildOutput.BaseOutputPath,
                 startupAssemblyName,
                 targetFrameworkMoniker,
                 out var startupDll))
