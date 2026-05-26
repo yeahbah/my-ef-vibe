@@ -15,7 +15,7 @@ object EfvibeActionSupport {
     fun requireProject(event: AnActionEvent): Project? =
         event.project.also {
             if (it == null) {
-                Messages.showWarningDialog("Open a Rider project before using My EF Vibe.", "My EF Vibe")
+                Messages.showWarningDialog("Open a project before using My EF Vibe.", "My EF Vibe")
             }
         }
 

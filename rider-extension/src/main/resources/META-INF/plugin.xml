@@ -3,7 +3,7 @@
     <name>My EF Vibe</name>
     <vendor email="support@myefvibe.com" url="https://myefvibe.com">yeahbah</vendor>
 
-    <depends>com.intellij.modules.rider</depends>
+    <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
 
     <resource-bundle>messages.MyEfVibeBundle</resource-bundle>

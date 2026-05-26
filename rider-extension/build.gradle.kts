@@ -20,7 +20,6 @@ dependencies {
             useInstaller = false
         }
         jetbrainsRuntime()
-        bundledModule("intellij.rider")
         bundledPlugin("org.jetbrains.plugins.terminal")
     }
 }
