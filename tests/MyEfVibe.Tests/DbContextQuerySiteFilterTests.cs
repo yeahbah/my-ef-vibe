@@ -80,6 +80,57 @@ public sealed class DbContextQuerySiteFilterTests
     }
 
     [Fact]
+    public void BelongsToSelectedContext_IncludesMediatrHandlerBoundToSelectedContextInterface()
+    {
+        const string source = """
+            public class GetProductsListQueryHandler : IRequestHandler<GetProductsListQuery, ProductsListVm>
+            {
+                private readonly INorthwindDbContext _context;
+
+                public GetProductsListQueryHandler(INorthwindDbContext context)
+                {
+                    _context = context;
+                }
+            }
+            """;
+
+        var scope = new DbContextScanScope(
+            "NorthwindDbContext",
+            new HashSet<string>(["NorthwindDbContext", "INorthwindDbContext"], StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal));
+        var index = DbContextContainingTypeIndex.Build(source, scope);
+
+        Assert.True(DbContextQuerySiteFilter.BelongsToSelectedContext(
+            "var products = await _context.Products.OrderBy(p => p.ProductName).ToListAsync(cancellationToken);",
+            scope,
+            containingTypeName: "GetProductsListQueryHandler",
+            index));
+    }
+
+    [Fact]
+    public void BelongsToSelectedContext_ExcludesHandlerBoundToOtherContextInterface()
+    {
+        const string source = """
+            public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, UsersVm>
+            {
+                private readonly IUserSetupDbContext _context;
+            }
+            """;
+
+        var scope = new DbContextScanScope(
+            "NorthwindDbContext",
+            new HashSet<string>(["NorthwindDbContext", "INorthwindDbContext"], StringComparer.Ordinal),
+            new HashSet<string>(["UserSetupDbContext", "IUserSetupDbContext"], StringComparer.Ordinal));
+        var index = DbContextContainingTypeIndex.Build(source, scope);
+
+        Assert.False(DbContextQuerySiteFilter.BelongsToSelectedContext(
+            "var users = await _context.Users.ToListAsync(cancellationToken);",
+            scope,
+            containingTypeName: "GetUsersQueryHandler",
+            index));
+    }
+
+    [Fact]
     public void BelongsToSelectedContext_RepositoryBoundToSelected_IncludesDbContextAlias()
     {
         const string source = """

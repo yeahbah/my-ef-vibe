@@ -155,6 +155,6 @@ internal sealed class DbContextContainingTypeIndex
     }
 
     private static bool IsKnownContextType(string typeName, DbContextScanScope scope) =>
-        string.Equals(typeName, scope.SelectedContextTypeName, StringComparison.Ordinal)
+        scope.IsSelectedContextType(typeName)
         || scope.OtherContextTypeNames.Contains(typeName);
 }

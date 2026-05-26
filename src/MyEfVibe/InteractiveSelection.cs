@@ -25,10 +25,13 @@ internal static class InteractiveSelection
         return AnsiConsole.Prompt(
             new SelectionPrompt<T>()
                 .Title(title)
-                .PageSize(Math.Min(12, options.Count))
+                .PageSize(ResolvePromptPageSize(options.Count))
                 .AddChoices(options.Select(static option => option.Value))
                 .UseConverter(value => labels[value].Label));
     }
+
+    internal static int ResolvePromptPageSize(int optionCount) =>
+        Math.Max(3, Math.Min(12, optionCount));
 
     private static string BuildNonInteractiveMessage<T>(string title, IReadOnlyList<SelectionOption<T>> options)
         where T : notnull

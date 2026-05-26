@@ -423,7 +423,7 @@ internal static class DbContextActivator
                 continue;
             }
 
-            if (!TryInvokeCreateDbContext(factoryObject, candidate, dbContextConcreteType, out var created,
+            if (!TryInvokeCreateDbContext(factoryObject, candidate, dbContextConcreteType, host, out var created,
                     out var invokeError))
             {
                 errors ??= [];
@@ -520,6 +520,7 @@ internal static class DbContextActivator
         object factoryObject,
         Type factoryType,
         Type dbContextConcreteType,
+        WorkspaceHost host,
         out object created,
         out string error)
     {
@@ -556,6 +557,12 @@ internal static class DbContextActivator
 
             try
             {
+                var workingDirectory = ResolveDesignTimeFactoryWorkingDirectory(
+                    factoryType,
+                    host.ProjectPath,
+                    host.StartupProjectPath);
+
+                using var currentDirectory = CurrentDirectoryScope.Enter(workingDirectory);
                 var result = createMethod.Invoke(factoryObject, invokeArguments);
 
                 if (result is null)
@@ -588,6 +595,44 @@ internal static class DbContextActivator
             error += $"{Environment.NewLine}{lastFailure}";
 
         return false;
+    }
+
+    internal static string ResolveDesignTimeFactoryWorkingDirectory(
+        Type factoryType,
+        string projectPath,
+        string startupProjectPath)
+    {
+        var factoryAssemblyName = factoryType.Assembly.GetName().Name;
+
+        if (ProjectAssemblyNameMatches(projectPath, factoryAssemblyName))
+            return Path.GetDirectoryName(projectPath)!;
+
+        if (ProjectAssemblyNameMatches(startupProjectPath, factoryAssemblyName))
+            return Path.GetDirectoryName(startupProjectPath)!;
+
+        return Path.GetDirectoryName(startupProjectPath)!;
+    }
+
+    private static bool ProjectAssemblyNameMatches(string projectPath, string? assemblyName) =>
+        !string.IsNullOrWhiteSpace(assemblyName)
+        && string.Equals(
+            CsprojReader.ReadLogicalAssemblyName(projectPath),
+            assemblyName,
+            StringComparison.OrdinalIgnoreCase);
+
+    private sealed class CurrentDirectoryScope : IDisposable
+    {
+        private readonly string _previousDirectory;
+
+        private CurrentDirectoryScope(string workingDirectory)
+        {
+            _previousDirectory = Directory.GetCurrentDirectory();
+            Directory.SetCurrentDirectory(workingDirectory);
+        }
+
+        internal static CurrentDirectoryScope Enter(string workingDirectory) => new(workingDirectory);
+
+        public void Dispose() => Directory.SetCurrentDirectory(_previousDirectory);
     }
 
     private static bool IsDesignTimeFactoryInterface(Type iface, Type dbContextConcreteType)

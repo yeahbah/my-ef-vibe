@@ -20,7 +20,7 @@ internal static class DbContextQuerySiteFilter
         if (UsesContextMemberAlias(statement))
         {
             if (TryGetBoundContextType(containingTypeName, containingTypeIndex, out var boundType)
-                && !string.Equals(boundType, scope.SelectedContextTypeName, StringComparison.Ordinal))
+                && !scope.IsSelectedContextType(boundType))
                 return false;
 
             return true;
@@ -29,7 +29,7 @@ internal static class DbContextQuerySiteFilter
         if (statement.Contains("db.", StringComparison.Ordinal))
         {
             if (TryGetBoundContextType(containingTypeName, containingTypeIndex, out var boundType)
-                && !string.Equals(boundType, scope.SelectedContextTypeName, StringComparison.Ordinal))
+                && !scope.IsSelectedContextType(boundType))
                 return false;
 
             return true;
@@ -51,9 +51,17 @@ internal static class DbContextQuerySiteFilter
         return containingTypeIndex.TryGetBoundContextType(containingTypeName, out boundType!);
     }
 
-    private static bool ReferencesSelectedContextType(string statement, DbContextScanScope scope) =>
-        statement.Contains($"{scope.SelectedContextTypeName}.", StringComparison.Ordinal)
-        || statement.Contains($"<{scope.SelectedContextTypeName}>", StringComparison.Ordinal);
+    private static bool ReferencesSelectedContextType(string statement, DbContextScanScope scope)
+    {
+        foreach (var selected in scope.SelectedContextTypeNames)
+        {
+            if (statement.Contains($"{selected}.", StringComparison.Ordinal)
+                || statement.Contains($"<{selected}>", StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
 
     private static bool ReferencesOtherContextType(string statement, DbContextScanScope scope)
     {

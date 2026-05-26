@@ -86,7 +86,7 @@ internal static class CsprojInspector
             if (string.IsNullOrWhiteSpace(include))
                 continue;
 
-            var normalized = Path.GetFullPath(Path.Combine(projectDirectory, include));
+            var normalized = Path.GetFullPath(Path.Combine(projectDirectory, NormalizeProjectReferencePath(include)));
 
             if (File.Exists(normalized))
                 references.Add(normalized);
@@ -94,6 +94,10 @@ internal static class CsprojInspector
 
         return references;
     }
+
+    internal static string NormalizeProjectReferencePath(string include) =>
+        include.Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar);
 
     private static IEnumerable<string> EnumeratePackageReferenceIds(string csprojAbsolutePath)
     {
