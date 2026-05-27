@@ -18,6 +18,7 @@ import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
@@ -239,7 +240,8 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                         val payload = result.payload
                         if (payload != null) {
                             project.service<EfvibeProjectService>().recordEvaluation(source, payload)
-                            renderEvaluation(source, payload, withPlan)
+                            runCatching { renderEvaluation(source, payload, withPlan) }
+                                .onFailure { showError(it.message ?: it.toString()) }
                             setReady(if (result.usedDaemon) "Ready (daemon)" else "Ready (CLI)")
                         } else {
                             appendOutput(
@@ -991,7 +993,9 @@ private class HighlightedOutput(
     var text: String
         get() = document.text
         set(value) {
-            val update = { document.setText(value) }
+            // Editor documents require \n separators; Windows CLI output often uses \r\n.
+            val normalized = StringUtil.convertLineSeparators(value)
+            val update = { document.setText(normalized) }
             val app = ApplicationManager.getApplication()
             if (app.isWriteAccessAllowed) {
                 update()
