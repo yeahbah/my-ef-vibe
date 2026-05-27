@@ -183,7 +183,16 @@ internal static partial class EfReplQueryableRewriter
         }
 
         if (source.StartsWith("db.", StringComparison.Ordinal))
+        {
+            // Ensure Roslyn binds Queryable.Select (expression trees), not Enumerable.Select,
+            // even when projecting to anonymous types (whose TResult can't be named).
+            if (entityType is not null)
+            {
+                return $"((global::System.Linq.IQueryable<{FormatTypeNameForScript(entityType)}>)({source})).Select({selector})";
+            }
+
             return $"{source}.Select({selector})";
+        }
 
         return $"{Runtime}.Select({source}, {selector})";
     }
@@ -501,6 +510,12 @@ internal static partial class EfReplQueryableRewriter
         if (!working.StartsWith("db.", StringComparison.Ordinal))
             return null;
 
+        // If the user already materialized (ToList/ToArray/etc), any subsequent operators are in-memory
+        // IEnumerable LINQ. Rewriting those operators to Queryable/runtime calls will cause type failures
+        // (e.g. OrderBy after ToList()).
+        if (ContainsMaterializerCall(working))
+            return null;
+
         var pipeline = new List<(string Method, string Argument)>();
 
         while (TryParseAnyTrailingPipelineCall(working, out var methodName, out var argument, out var beforeCall))
@@ -560,6 +575,12 @@ internal static partial class EfReplQueryableRewriter
         return rewritten;
     }
 
+    private static bool ContainsMaterializerCall(string expression) =>
+        expression.Contains(".ToList(", StringComparison.Ordinal)
+        || expression.Contains(".ToArray(", StringComparison.Ordinal)
+        || expression.Contains(".AsEnumerable(", StringComparison.Ordinal)
+        || expression.Contains(".AsAsyncEnumerable(", StringComparison.Ordinal);
+
     private static string ApplySelect(
         string source,
         string selector,
@@ -605,6 +626,16 @@ internal static partial class EfReplQueryableRewriter
         Type? elementType,
         bool descending)
     {
+        // If the source is already a non-`db.*` queryable pipeline (e.g. after `.Select(new {...})`),
+        // prefer leaving the call as an IQueryable extension so Roslyn infers the correct delegate type.
+        // BUT: if the source is a runtime call, it is `object`, so we must keep using runtime methods.
+        if (!source.StartsWith("db.", StringComparison.Ordinal)
+            && !source.StartsWith(Runtime, StringComparison.Ordinal))
+        {
+            var method = descending ? "OrderByDescending" : "OrderBy";
+            return $"{source}.{method}({keySelector})";
+        }
+
         var runtimeMethod = descending
             ? nameof(ReplQueryableRuntime.OrderByDescending)
             : nameof(ReplQueryableRuntime.OrderBy);

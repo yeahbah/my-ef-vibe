@@ -180,6 +180,16 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     }
 
     [Fact]
+    public void SnippetNormalizer_ForEvaluation_OrderByAfterToList_DoesNotUseQueryableRuntime()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.Take(10).ToList().OrderBy(x => x.Name)",
+            typeof(FakeRewriterDbContext));
+
+        Assert.DoesNotContain("ReplQueryableRuntime.OrderBy", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SnippetNormalizer_ForEvaluation_RewritesTakeOnFinalLine()
     {
         var normalized = SnippetNormalizer.ForEvaluation("db.Users.Take(10);", typeof(FakeRewriterDbContext));
@@ -278,7 +288,9 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
             typeof(FakeRewriterDbContext));
 
         Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
-        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take(db.Users.Select", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take(", normalized, StringComparison.Ordinal);
+        Assert.Contains("db.Users", normalized, StringComparison.Ordinal);
+        Assert.Contains(".Select(x => new { x.Id, x.Name })", normalized, StringComparison.Ordinal);
         Assert.Contains(".Where(x => x.Name.Contains(\"Crankarm\"))", normalized, StringComparison.Ordinal);
         Assert.Contains(", 10)", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("ReplQueryableRuntime.Where<", normalized, StringComparison.Ordinal);
