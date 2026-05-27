@@ -24,6 +24,9 @@
       <Group guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" priority="0x0100">
         <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeTopLevelMenu" />
       </Group>
+      <Group guid="guidMyEfVibeCommandSet" id="MyEfVibeEditorGroup" priority="0x0200">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_CODEWIN" />
+      </Group>
     </Groups>
 
     <Buttons>
@@ -33,10 +36,22 @@
           <ButtonText>Start REPL</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="RefreshConnectionCommand" priority="0x0105" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Refresh Connection</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidMyEfVibeCommandSet" id="RunSelectionCommand" priority="0x0110" type="Button">
         <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
         <Strings>
           <ButtonText>Run Selection</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="RunSelectionWithPlanCommand" priority="0x0115" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
+        <Strings>
+          <ButtonText>Run Selection with Plan</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidMyEfVibeCommandSet" id="ShowDbInfoCommand" priority="0x0120" type="Button">
@@ -49,12 +64,6 @@
         <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
         <Strings>
           <ButtonText>Show Tables</ButtonText>
-        </Strings>
-      </Button>
-      <Button guid="guidMyEfVibeCommandSet" id="DescribeEntityCommand" priority="0x0140" type="Button">
-        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeMainGroup" />
-        <Strings>
-          <ButtonText>Describe Entity...</ButtonText>
         </Strings>
       </Button>
       <Button guid="guidMyEfVibeCommandSet" id="ScanLiteCommand" priority="0x0150" type="Button">
@@ -81,6 +90,18 @@
           <ButtonText>My EF Vibe - Check Prerequisites</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="EditorRunSelectionCommand" priority="0x0100" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeEditorGroup" />
+        <Strings>
+          <ButtonText>Run with My EF Vibe</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidMyEfVibeCommandSet" id="EditorRunSelectionWithPlanCommand" priority="0x0110" type="Button">
+        <Parent guid="guidMyEfVibeCommandSet" id="MyEfVibeEditorGroup" />
+        <Strings>
+          <ButtonText>Run with My EF Vibe :plan</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
 
@@ -91,15 +112,19 @@
       <IDSymbol name="MyEfVibeToolsGroup" value="0x1010" />
       <IDSymbol name="MyEfVibeMainGroup" value="0x1020" />
       <IDSymbol name="MyEfVibeDirectToolsGroup" value="0x1030" />
+      <IDSymbol name="MyEfVibeEditorGroup" value="0x1040" />
       <IDSymbol name="StartReplCommand" value="0x0100" />
       <IDSymbol name="RunSelectionCommand" value="0x0101" />
-      <IDSymbol name="ShowDbInfoCommand" value="0x0102" />
-      <IDSymbol name="ShowTablesCommand" value="0x0103" />
-      <IDSymbol name="DescribeEntityCommand" value="0x0104" />
+      <IDSymbol name="RunSelectionWithPlanCommand" value="0x0102" />
+      <IDSymbol name="ShowDbInfoCommand" value="0x0103" />
+      <IDSymbol name="ShowTablesCommand" value="0x0104" />
       <IDSymbol name="ScanLiteCommand" value="0x0105" />
       <IDSymbol name="ScanDeepCommand" value="0x0106" />
       <IDSymbol name="CheckPrerequisitesCommand" value="0x0107" />
       <IDSymbol name="CheckPrerequisitesFallbackCommand" value="0x0108" />
+      <IDSymbol name="RefreshConnectionCommand" value="0x0109" />
+      <IDSymbol name="EditorRunSelectionCommand" value="0x0110" />
+      <IDSymbol name="EditorRunSelectionWithPlanCommand" value="0x0111" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>

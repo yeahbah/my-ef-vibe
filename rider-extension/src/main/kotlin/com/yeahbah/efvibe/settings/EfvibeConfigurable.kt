@@ -8,6 +8,7 @@ import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.yeahbah.efvibe.services.EfvibeDaemonClient
 import com.yeahbah.efvibe.services.EfvibeSettingsService
 import javax.swing.JComponent
 
@@ -81,6 +82,7 @@ class EfvibeConfigurable(private val project: Project) : Configurable {
 
     override fun apply() {
         panel?.apply()
+        project.service<EfvibeDaemonClient>().invalidate()
     }
 
     override fun reset() {

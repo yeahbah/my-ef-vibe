@@ -171,7 +171,7 @@ User secrets use flat keys such as `ConnectionStrings:DefaultConnection` in `~/.
 | `myefvibe-scan-dismissals.json` | Dismissed findings (skipped on future scans) |
 | `myefvibe-scan-notes.json` | Saved notes on findings (shown on next scan, highlighted in yellow) |
 | `myefvibe-export-*.csv/json` | `:export` output |
-| `.build/` | Isolated `dotnet build` output used by efvibe so Visual Studio and the developer's normal `bin/obj` folders are not locked |
+| `.build/` | Isolated `dotnet build` binary output used by efvibe so Visual Studio and the developer's normal `bin` folders are not locked |
 
 During **scan review**, on an empty prompt: **→** / **←** next/prev, **Del** dismiss, plus `:dismiss`, `:note <text>`, `:repeat`, `:end`.
 

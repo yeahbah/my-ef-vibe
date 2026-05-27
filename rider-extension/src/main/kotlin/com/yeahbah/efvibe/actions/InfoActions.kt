@@ -6,6 +6,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.yeahbah.efvibe.services.CliRunner
+import com.yeahbah.efvibe.services.EfvibeDaemonClient
 import com.yeahbah.efvibe.services.EfvibeProjectService
 import com.yeahbah.efvibe.toolwindow.EfvibeToolWindowPanel
 
@@ -54,5 +55,15 @@ class CheckPrerequisitesAction : EfvibeCliAction() {
     override fun run(project: Project, panel: EfvibeToolWindowPanel?) {
         val result = CliRunner(project).runAboutJson()
         panel?.appendOutput("Prerequisites", result.stdout.ifBlank { result.stderr })
+    }
+}
+
+class RefreshConnectionAction : EfvibeCliAction() {
+    override fun run(project: Project, panel: EfvibeToolWindowPanel?) {
+        project.service<EfvibeDaemonClient>().invalidate()
+        panel?.appendOutput(
+            "Refresh Connection",
+            "Connection refreshed. The next query will start a new efvibe session.",
+        )
     }
 }

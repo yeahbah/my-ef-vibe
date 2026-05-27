@@ -21,13 +21,16 @@ internal static class EfvibeCommands
 
         Add(package, commandService, CommandIds.StartRepl, () => controller.StartReplAsync());
         Add(package, commandService, CommandIds.RunSelection, () => controller.RunSelectionAsync(withPlan: false));
+        Add(package, commandService, CommandIds.RunSelectionWithPlan, () => controller.RunSelectionAsync(withPlan: true));
         Add(package, commandService, CommandIds.ShowDbInfo, () => controller.ShowDbInfoAsync());
         Add(package, commandService, CommandIds.ShowTables, () => controller.ShowTablesAsync());
-        Add(package, commandService, CommandIds.DescribeEntity, () => controller.DescribeEntityAsync());
         Add(package, commandService, CommandIds.ScanLite, () => controller.ScanAsync("lite"));
         Add(package, commandService, CommandIds.ScanDeep, () => controller.ScanAsync("deep"));
+        Add(package, commandService, CommandIds.RefreshConnection, () => controller.RefreshConnectionAsync());
         Add(package, commandService, CommandIds.CheckPrerequisites, () => controller.CheckPrerequisitesAsync());
         Add(package, commandService, CommandIds.CheckPrerequisitesFallback, () => controller.CheckPrerequisitesAsync());
+        Add(package, commandService, CommandIds.EditorRunSelection, () => controller.RunSelectionAsync(withPlan: false));
+        Add(package, commandService, CommandIds.EditorRunSelectionWithPlan, () => controller.RunSelectionAsync(withPlan: true));
     }
 
     private static void Add(

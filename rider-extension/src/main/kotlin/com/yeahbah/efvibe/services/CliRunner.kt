@@ -31,8 +31,18 @@ class CliRunner(private val project: Project) {
 
     fun runExpressionPayload(expression: String, withPlan: Boolean, preferDaemon: Boolean = true): ExpressionRunResult {
         if (preferDaemon) {
-            runCatching {
+            val daemonFailure = runCatching {
                 return EfvibeDaemonClient.getInstance(project).runExpression(expression, withPlan)
+            }.exceptionOrNull()
+
+            if (daemonFailure != null) {
+                val fallback = runExpression(expression, withPlan)
+                return ExpressionRunResult(
+                    result = fallback,
+                    payload = EfvibeJsonParser.parseEvaluation(fallback.stdout),
+                    usedDaemon = false,
+                    daemonError = daemonFailure.message ?: daemonFailure.toString(),
+                )
             }
         }
 

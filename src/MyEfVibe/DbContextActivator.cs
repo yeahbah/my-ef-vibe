@@ -889,6 +889,15 @@ internal static class DbContextActivator
             if (providerAssembly is null)
                 continue;
 
+            if (providerKey.UsesMySqlProtocol()
+                && string.Equals(spec.MethodName, "UseMySql", StringComparison.Ordinal)
+                && PomeloMySqlConfigurator.TryInvokeUseMySql(
+                    providerAssembly,
+                    closedBuilderInstance,
+                    connectionString,
+                    providerKey))
+                return true;
+
             if (ProviderOptionsConfigurator.TryInvokeUseProviderWithOptions(
                     host,
                     providerAssembly,
@@ -898,7 +907,9 @@ internal static class DbContextActivator
                     providerKey))
                 return true;
 
-            if (TryInvokeUseProviderExtensionMethod(
+            if (!(providerKey.UsesMySqlProtocol()
+                  && string.Equals(spec.MethodName, "UseMySql", StringComparison.Ordinal))
+                && TryInvokeUseProviderExtensionMethod(
                     providerAssembly,
                     closedBuilderInstance,
                     connectionString,

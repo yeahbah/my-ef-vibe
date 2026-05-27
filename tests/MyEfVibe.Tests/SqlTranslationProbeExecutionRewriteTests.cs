@@ -136,6 +136,50 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     }
 
     [Fact]
+    public void SnippetNormalizer_ForEvaluation_SelectOrderByToList_UsesExpressionOrderBy()
+    {
+        const string probe = "db.Users.Select(x => x.Name).OrderBy(x => x).ToList()";
+
+        var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
+
+        Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.OrderBy<global::System.String, global::System.String>(", normalized, StringComparison.Ordinal);
+        Assert.Contains("x => x)", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_TakeSelectOrderByToList_DoesNotCallSelectOnObject()
+    {
+        const string probe =
+            "db.Users.Take(10).Select(x => new { x.Id, x.Name }).OrderBy(x => x.Name).ToList()";
+
+        var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
+
+        Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.OrderBy<", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Select(global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)", normalized, StringComparison.Ordinal);
+        Assert.Contains("x => new { x.Id, x.Name }", normalized, StringComparison.Ordinal);
+        Assert.Contains("x => x.Name", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Take(db.Users, 10).Select(", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_AsNoTrackingTakeOrderBy_UsesQueryablePipeline()
+    {
+        const string probe =
+            "db.Users.AsNoTracking().Take(10).OrderBy(x => x.Name)";
+
+        var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
+
+        Assert.Contains("ReplQueryableRuntime.OrderBy<", normalized, StringComparison.Ordinal);
+        Assert.Contains("FakeRewriterUser, global::System.String>", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)", normalized, StringComparison.Ordinal);
+        Assert.Contains("x => x.Name", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("AsNoTracking", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enumerable", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SnippetNormalizer_ForEvaluation_RewritesTakeOnFinalLine()
     {
         var normalized = SnippetNormalizer.ForEvaluation("db.Users.Take(10);", typeof(FakeRewriterDbContext));
@@ -175,6 +219,85 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
         Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.First(db.Users)", normalized);
         Assert.DoesNotContain("Queryable.Take", normalized);
     }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_RewritesCountPredicateToQueryableRuntime()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.Count(u => u.Id == 1)",
+            typeof(FakeRewriterDbContext));
+
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Count<", normalized, StringComparison.Ordinal);
+        Assert.Contains("FakeRewriterUser>", normalized, StringComparison.Ordinal);
+        Assert.Contains("db.Users, u => u.Id == 1", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enumerable", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_RewritesWhereToListToQueryableRuntime()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.Where(u => u.Id == 1).ToList()",
+            typeof(FakeRewriterDbContext));
+
+        Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Where<", normalized, StringComparison.Ordinal);
+        Assert.Contains("FakeRewriterUser>(db.Users, u => u.Id == 1)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enumerable", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_RewritesWhereToArrayToQueryableRuntime()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.Where(u => u.Id == 1).ToArray()",
+            typeof(FakeRewriterDbContext));
+
+        Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToArray(", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Where<", normalized, StringComparison.Ordinal);
+        Assert.Contains("FakeRewriterUser>(db.Users, u => u.Id == 1)", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_RewritesWhereCountToQueryableRuntime()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.Where(u => u.Id == 1).Count()",
+            typeof(FakeRewriterDbContext));
+
+        Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.Count(", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Where<", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enumerable", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_RewritesProjectionBeforeWhereWithoutCallingSelectOnObject()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.Select(x => new { x.Id, x.Name }).Where(x => x.Name.Contains(\"Crankarm\")).Take(10).ToList();",
+            typeof(FakeRewriterDbContext));
+
+        Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take(db.Users.Select", normalized, StringComparison.Ordinal);
+        Assert.Contains(".Where(x => x.Name.Contains(\"Crankarm\"))", normalized, StringComparison.Ordinal);
+        Assert.Contains(", 10)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReplQueryableRuntime.Where<", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Select(", normalized[..normalized.IndexOf("db.Users", StringComparison.Ordinal)]);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_DoesNotTypeProjectionTerminalPredicateAsEntity()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.Select(x => new { x.Id, x.Name }).Take(10).FirstOrDefault(x => x.Name.Contains(\"Crankarm\"));",
+            typeof(FakeRewriterDbContext));
+
+        Assert.Equal(
+            "db.Users.Select(x => new { x.Id, x.Name }).Take(10).FirstOrDefault(x => x.Name.Contains(\"Crankarm\"))",
+            normalized);
+        Assert.DoesNotContain("ReplQueryableRuntime.FirstOrDefault<", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("FakeRewriterUser", normalized, StringComparison.Ordinal);
+    }
 }
 
 public sealed class FakeRewriterDbContext : DbContext
@@ -194,4 +317,6 @@ public sealed class FakeRewriterDbContext : DbContext
 public sealed class FakeRewriterUser
 {
     public int Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
 }

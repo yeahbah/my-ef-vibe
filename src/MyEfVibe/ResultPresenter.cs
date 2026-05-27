@@ -35,6 +35,12 @@ internal static class ResultPresenter
             return;
         }
 
+        if (evaluatedProjection is System.Linq.IQueryable queryable)
+        {
+            WriteResultPanel(DescribeDeferredQueryable(queryable));
+            return;
+        }
+
         if (evaluatedProjection is System.Collections.IEnumerable sequence and not string)
         {
             var builder = new System.Text.StringBuilder();
@@ -102,6 +108,12 @@ internal static class ResultPresenter
             return;
         }
 
+        if (evaluatedProjection is System.Linq.IQueryable queryable)
+        {
+            writer.WriteLine(DescribeDeferredQueryable(queryable));
+            return;
+        }
+
         if (evaluatedProjection is System.Collections.IEnumerable sequence and not string)
         {
             var printedRowCount = 0;
@@ -124,5 +136,12 @@ internal static class ResultPresenter
         }
 
         writer.WriteLine(evaluatedProjection);
+    }
+
+    private static string DescribeDeferredQueryable(System.Linq.IQueryable queryable)
+    {
+        var elementTypeName = queryable.ElementType.FullName ?? queryable.ElementType.Name;
+
+        return $"IQueryable<{elementTypeName}> (deferred; add ToList(), ToArray(), First(), Count(), or another terminal operator to execute)";
     }
 }

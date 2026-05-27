@@ -83,7 +83,6 @@ internal static class WorkspaceBuilder
         if (isolatedOutput is not null)
         {
             startInfo.ArgumentList.Add($"-p:BaseOutputPath={EnsureTrailingSeparator(isolatedOutput.BaseOutputPath)}");
-            startInfo.ArgumentList.Add($"-p:BaseIntermediateOutputPath={EnsureTrailingSeparator(isolatedOutput.BaseIntermediateOutputPath)}");
         }
 
         using var buildProcess = Process.Start(startInfo);
@@ -134,8 +133,7 @@ internal static class WorkspaceBuilder
             tfm);
 
         return new ProjectBuildOutput(
-            BaseOutputPath: Path.Combine(root, "bin"),
-            BaseIntermediateOutputPath: Path.Combine(root, "obj"));
+            BaseOutputPath: Path.Combine(root, "bin"));
     }
 
     private static string EnsureTrailingSeparator(string path)
@@ -153,6 +151,4 @@ internal static class WorkspaceBuilder
     }
 }
 
-internal sealed record ProjectBuildOutput(
-    string BaseOutputPath,
-    string BaseIntermediateOutputPath);
+internal sealed record ProjectBuildOutput(string BaseOutputPath);

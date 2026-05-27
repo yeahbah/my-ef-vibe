@@ -61,7 +61,7 @@ internal static class AppSettingsConnectionResolver
         var startupDirectory = Path.GetDirectoryName(startupProjectPath)!;
         string? databaseProvider = null;
 
-        foreach (var settingsFileName in new[] { "appsettings.json", "appsettings.Development.json" })
+        foreach (var settingsFileName in EnumerateSettingsFileNames())
         {
             var settingsPath = Path.Combine(startupDirectory, settingsFileName);
 
@@ -77,7 +77,7 @@ internal static class AppSettingsConnectionResolver
         connectionString = string.Empty;
         var startupDirectory = Path.GetDirectoryName(startupProjectPath)!;
 
-        foreach (var settingsFileName in new[] { "appsettings.json", "appsettings.Development.json" })
+        foreach (var settingsFileName in EnumerateSettingsFileNames())
         {
             var settingsPath = Path.Combine(startupDirectory, settingsFileName);
 
@@ -97,15 +97,23 @@ internal static class AppSettingsConnectionResolver
 
         using (document)
         {
-            if (!document.RootElement.TryGetProperty("EntityFrameworkCoreSettings", out var section))
-                return false;
+            if (document.RootElement.TryGetProperty("EntityFrameworkCoreSettings", out var section)
+                && section.TryGetProperty("DatabaseProvider", out var providerElement))
+            {
+                databaseProvider = providerElement.GetString();
 
-            if (!section.TryGetProperty("DatabaseProvider", out var providerElement))
-                return false;
+                return !string.IsNullOrWhiteSpace(databaseProvider);
+            }
 
-            databaseProvider = providerElement.GetString();
+            if (document.RootElement.TryGetProperty("Database", out var databaseSection)
+                && databaseSection.TryGetProperty("Provider", out var databaseProviderElement))
+            {
+                databaseProvider = databaseProviderElement.GetString();
 
-            return !string.IsNullOrWhiteSpace(databaseProvider);
+                return !string.IsNullOrWhiteSpace(databaseProvider);
+            }
+
+            return false;
         }
     }
 
@@ -140,7 +148,7 @@ internal static class AppSettingsConnectionResolver
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var startupDirectory = Path.GetDirectoryName(startupProjectPath)!;
 
-        foreach (var settingsFileName in new[] { "appsettings.json", "appsettings.Development.json" })
+        foreach (var settingsFileName in EnumerateSettingsFileNames())
         {
             foreach (var directory in EnumerateStartupSearchDirectories(startupDirectory))
             {
@@ -150,6 +158,47 @@ internal static class AppSettingsConnectionResolver
                     yield return candidate;
             }
         }
+    }
+
+    private static IEnumerable<string> EnumerateSettingsFileNames()
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var fileName in EnumerateSettingsFileNamesCore())
+        {
+            if (seen.Add(fileName))
+                yield return fileName;
+        }
+    }
+
+    private static IEnumerable<string> EnumerateSettingsFileNamesCore()
+    {
+        yield return "appsettings.json";
+        yield return "appsettings.Development.json";
+
+        var environmentName = ResolveEnvironmentName();
+
+        if (!string.IsNullOrWhiteSpace(environmentName)
+            && !string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase))
+            yield return $"appsettings.{environmentName}.json";
+    }
+
+    private static string? ResolveEnvironmentName()
+    {
+        foreach (var variableName in new[]
+                 {
+                     "ASPNETCORE_ENVIRONMENT",
+                     "DOTNET_ENVIRONMENT",
+                     "APPSETTING_ASPNETCORE_ENVIRONMENT",
+                 })
+        {
+            var value = Environment.GetEnvironmentVariable(variableName);
+
+            if (!string.IsNullOrWhiteSpace(value))
+                return value.Trim();
+        }
+
+        return null;
     }
 
     private static IEnumerable<string> EnumerateStartupSearchDirectories(string startupProjectDirectory)
@@ -330,9 +379,6 @@ internal static class AppSettingsConnectionResolver
             && connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase))
             return MyEfVibeProvider.Sqlite;
 
-        if (LooksLikeSqlServerConnection(connectionString))
-            return MyEfVibeProvider.SqlServer;
-
         if (LooksLikeMySqlConnection(connectionString))
         {
             return LooksLikeMariaDbConnection(connectionString)
@@ -340,9 +386,11 @@ internal static class AppSettingsConnectionResolver
                 : MyEfVibeProvider.MySql;
         }
 
-        if (connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
-            && connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase))
+        if (LooksLikeOracleConnection(connectionString))
             return MyEfVibeProvider.Oracle;
+
+        if (LooksLikeSqlServerConnection(connectionString))
+            return MyEfVibeProvider.SqlServer;
 
         return null;
     }
@@ -361,6 +409,11 @@ internal static class AppSettingsConnectionResolver
         || connectionString.Contains("Uid=", StringComparison.OrdinalIgnoreCase)
         || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
             && ContainsMySqlUserKey(connectionString));
+
+    internal static bool LooksLikeOracleConnection(string connectionString) =>
+        connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
+        && (connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
+            || connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase));
 
     private static bool ContainsMySqlUserKey(string connectionString)
     {

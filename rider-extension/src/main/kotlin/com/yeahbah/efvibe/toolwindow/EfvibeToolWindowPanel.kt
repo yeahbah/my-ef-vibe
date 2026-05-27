@@ -1,6 +1,11 @@
 package com.yeahbah.efvibe.toolwindow
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
@@ -12,6 +17,7 @@ import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
@@ -20,6 +26,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
 import com.yeahbah.efvibe.services.CliRunner
 import com.yeahbah.efvibe.services.DbInfoPayload
+import com.yeahbah.efvibe.services.EfvibeDaemonClient
 import com.yeahbah.efvibe.services.EvaluationPayload
 import com.yeahbah.efvibe.services.EfvibeProjectService
 import com.yeahbah.efvibe.services.EfvibeSettingsService
@@ -30,14 +37,12 @@ import com.yeahbah.efvibe.services.TablesPayload
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
-import java.awt.FlowLayout
 import java.awt.Font
 import java.awt.datatransfer.StringSelection
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.swing.BorderFactory
-import javax.swing.JButton
 import javax.swing.JFileChooser
 import javax.swing.JLabel
 import javax.swing.JOptionPane
@@ -49,6 +54,7 @@ import javax.swing.SwingUtilities
 import javax.swing.JTable
 import javax.swing.ListSelectionModel
 import javax.swing.UIManager
+import javax.swing.Icon
 import javax.swing.table.DefaultTableCellRenderer
 import javax.swing.table.DefaultTableModel
 
@@ -102,26 +108,25 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         styleStatus(status)
         listOf(resultTable, modelTable).forEach(::styleTable)
 
-        val toolbar = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
-            background = HeaderBackground
-            border = BorderFactory.createEmptyBorder(8, 10, 8, 10)
-            add(JButton("Run").apply {
-                addActionListener { runCurrentExpression(withPlan = false) }
-            })
-            add(JButton("Run Plan").apply {
-                addActionListener { runCurrentExpression(withPlan = true) }
-            })
-            add(JButton("Scan Lite").apply {
-                addActionListener { runScan("lite") }
-            })
-            add(JButton("Scan Deep").apply {
-                addActionListener { runScan("deep") }
-            })
-            add(JButton("Copy Tab").apply {
-                addActionListener { copyActiveTab() }
-            })
-            styleButtons(this)
-        }
+        val toolbar = createToolbar(
+            "MyEfVibe.MainToolbar",
+            HeaderBackground,
+            toolbarAction("Run", "Run the LINQ expression and show the result.", AllIcons.Actions.Execute) {
+                runCurrentExpression(withPlan = false)
+            },
+            toolbarAction("Run Plan", "Run the LINQ expression and open the query plan tab.", AllIcons.Actions.Profile) {
+                runCurrentExpression(withPlan = true)
+            },
+            toolbarAction("Scan Lite", "Run a fast EF query scan for common issues.", AllIcons.Actions.Find) {
+                runScan("lite")
+            },
+            toolbarAction("Scan Deep", "Run the deep scan with SQL translation and query plans.", AllIcons.Actions.SearchWithHistory) {
+                runScan("deep")
+            },
+            toolbarAction("Copy Tab", "Copy the active tab contents to the clipboard.", AllIcons.Actions.Copy) {
+                copyActiveTab()
+            },
+        )
 
         tabs.addTab("Result", buildResultPanel())
         tabs.addTab("SQL", sqlText)
@@ -154,6 +159,37 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         renderSession()
     }
 
+    private fun createToolbar(
+        place: String,
+        backgroundColor: Color,
+        vararg actions: AnAction,
+    ): JPanel {
+        val group = DefaultActionGroup().apply {
+            actions.forEach(::add)
+        }
+        val toolbar = ActionManager.getInstance().createActionToolbar(place, group, true).apply {
+            targetComponent = this@EfvibeToolWindowPanel
+        }
+
+        return JPanel(BorderLayout()).apply {
+            background = backgroundColor
+            border = BorderFactory.createEmptyBorder(6, 8, 6, 8)
+            add(toolbar.component, BorderLayout.WEST)
+        }
+    }
+
+    private fun toolbarAction(
+        text: String,
+        description: String,
+        icon: Icon,
+        action: () -> Unit,
+    ): AnAction =
+        object : DumbAwareAction(text, description, icon) {
+            override fun actionPerformed(event: AnActionEvent) {
+                action()
+            }
+        }
+
     fun setExpression(value: String) {
         expression.text = value
     }
@@ -173,7 +209,15 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             return
         }
 
-        setBusy(if (withPlan) "Running query plan..." else "Running query...")
+        val daemonReady = EfvibeDaemonClient.getInstance(project).isReady()
+        setBusy(
+            when {
+                withPlan && daemonReady -> "Running query plan (daemon)..."
+                withPlan -> "Starting efvibe daemon..."
+                daemonReady -> "Running query (daemon)..."
+                else -> "Starting efvibe daemon..."
+            },
+        )
         ApplicationManager.getApplication().executeOnPooledThread {
             val run = runCatching {
                 CliRunner(project).runExpressionPayload(source, withPlan)
@@ -182,17 +226,25 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             SwingUtilities.invokeLater {
                 run.fold(
                     onSuccess = { result ->
+                        if (!result.usedDaemon && !result.daemonError.isNullOrBlank()) {
+                            appendOutput(
+                                "Daemon unavailable",
+                                "efvibe serve was not used; fell back to one-shot CLI.\n${result.daemonError}",
+                            )
+                        }
+
                         val payload = result.payload
                         if (payload != null) {
                             project.service<EfvibeProjectService>().recordEvaluation(source, payload)
                             renderEvaluation(source, payload, withPlan)
+                            setReady(if (result.usedDaemon) "Ready (daemon)" else "Ready (CLI)")
                         } else {
                             appendOutput(
                                 "Evaluation failed",
                                 result.result.stderr.ifBlank { result.result.stdout.ifBlank { "No JSON payload returned." } },
                             )
+                            setReady()
                         }
-                        setReady()
                     },
                     onFailure = {
                         showError(it.message ?: it.toString())
@@ -206,18 +258,19 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     private fun buildResultPanel(): JPanel =
         JPanel(BorderLayout()).apply {
             background = PanelBackground
-            val toolbar = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
-                background = ToolbarBackground
-                border = BorderFactory.createEmptyBorder(6, 8, 6, 8)
-                add(JButton("Export CSV").apply {
-                    addActionListener { exportLast("csv") }
-                })
-                add(JButton("Export JSON").apply {
-                    addActionListener { exportLast("json") }
-                })
-                styleButtons(this)
-            }
-            add(toolbar, BorderLayout.NORTH)
+            add(
+                createToolbar(
+                    "MyEfVibe.ResultToolbar",
+                    ToolbarBackground,
+                    toolbarAction("Export CSV", "Export the latest result rows as CSV.", AllIcons.Actions.ListFiles) {
+                        exportLast("csv")
+                    },
+                    toolbarAction("Export JSON", "Export the latest result rows as JSON.", AllIcons.Actions.Download) {
+                        exportLast("json")
+                    },
+                ),
+                BorderLayout.NORTH,
+            )
             add(JBScrollPane(resultTable), BorderLayout.CENTER)
         }
 
@@ -342,6 +395,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             model.addRow(columns.map { row[it].orEmpty() }.toTypedArray())
         }
         resultTable.model = model
+        resizeColumnsToContent(resultTable)
     }
 
     private fun renderDbInfo(payload: DbInfoPayload) {
@@ -359,6 +413,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             tableModel.addRow(arrayOf(it.dbSet, it.entityType, it.entityTypeFullName))
         }
         modelTable.model = tableModel
+        resizeColumnsToContent(modelTable)
         modelText.text = if (payload.tables.isEmpty()) {
             "No DbSets returned for ${payload.dbContext}."
         } else {
@@ -373,27 +428,28 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     private fun buildModelPanel(): JPanel =
         JPanel(BorderLayout()).apply {
             background = PanelBackground
-            val toolbar = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
-                background = ToolbarBackground
-                border = BorderFactory.createEmptyBorder(6, 8, 6, 8)
-                add(JButton("Db Info").apply {
-                    addActionListener { runDbInfo() }
-                })
-                add(JButton("Tables").apply {
-                    addActionListener { runTables() }
-                })
-                add(JButton("Run Count").apply {
-                    addActionListener { selectedDbSet()?.let { evaluateExpression("db.$it.Count()", withPlan = false) } }
-                })
-                add(JButton("Run Sample").apply {
-                    addActionListener { selectedDbSet()?.let { evaluateExpression("db.$it.Take(10)", withPlan = false) } }
-                })
-                add(JButton("Describe").apply {
-                    addActionListener { selectedDbSet()?.let { runDescribe(it) } }
-                })
-                styleButtons(this)
-            }
-            add(toolbar, BorderLayout.NORTH)
+            add(
+                createToolbar(
+                    "MyEfVibe.ModelToolbar",
+                    ToolbarBackground,
+                    toolbarAction("Db Info", "Load DbContext metadata and connection details.", AllIcons.General.Information) {
+                        runDbInfo()
+                    },
+                    toolbarAction("Tables", "Load DbSets and mapped entity types.", AllIcons.Nodes.DataTables) {
+                        runTables()
+                    },
+                    toolbarAction("Run Count", "Run Count() for the selected DbSet.", AllIcons.Actions.GroupBy) {
+                        selectedDbSet()?.let { evaluateExpression("db.$it.Count()", withPlan = false) }
+                    },
+                    toolbarAction("Run Sample", "Run Take(10) for the selected DbSet.", AllIcons.Actions.Execute) {
+                        selectedDbSet()?.let { evaluateExpression("db.$it.Take(10)", withPlan = false) }
+                    },
+                    toolbarAction("Describe", "Describe the selected entity shape.", AllIcons.Actions.Properties) {
+                        selectedDbSet()?.let { runDescribe(it) }
+                    },
+                ),
+                BorderLayout.NORTH,
+            )
             add(
                 JSplitPane(
                     JSplitPane.VERTICAL_SPLIT,
@@ -520,33 +576,32 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     private fun buildScanPanel(): JPanel =
         JPanel(BorderLayout()).apply {
             background = PanelBackground
-            val toolbar = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
-                background = ToolbarBackground
-                border = BorderFactory.createEmptyBorder(6, 8, 6, 8)
-                add(JButton("Previous").apply {
-                    addActionListener { moveScanSelection(-1) }
-                })
-                add(JButton("Next").apply {
-                    addActionListener { moveScanSelection(1) }
-                })
-                add(JButton("Go to code").apply {
-                    addActionListener { openSelectedScanSource() }
-                })
-                add(JButton("Note").apply {
-                    addActionListener { saveSelectedScanNote() }
-                })
-                add(JButton("Dismiss").apply {
-                    addActionListener { dismissSelectedScanFinding() }
-                })
-                add(JButton("Copy Finding").apply {
-                    addActionListener {
+            add(
+                createToolbar(
+                    "MyEfVibe.ScanToolbar",
+                    ToolbarBackground,
+                    toolbarAction("Previous", "Show the previous scan finding.", AllIcons.Actions.Back) {
+                        moveScanSelection(-1)
+                    },
+                    toolbarAction("Next", "Show the next scan finding.", AllIcons.Actions.Forward) {
+                        moveScanSelection(1)
+                    },
+                    toolbarAction("Go to code", "Open the source location for the current finding.", AllIcons.Actions.EditSource) {
+                        openSelectedScanSource()
+                    },
+                    toolbarAction("Note", "Add or update a note for this finding.", AllIcons.Actions.Edit) {
+                        saveSelectedScanNote()
+                    },
+                    toolbarAction("Dismiss", "Dismiss this finding with an optional note.", AllIcons.Actions.Cancel) {
+                        dismissSelectedScanFinding()
+                    },
+                    toolbarAction("Copy Finding", "Copy the current finding details to the clipboard.", AllIcons.Actions.Copy) {
                         CopyPasteManager.getInstance().setContents(StringSelection(scanDetails.text))
                         status.text = "Copied finding to clipboard."
-                    }
-                })
-                styleButtons(this)
-            }
-            add(toolbar, BorderLayout.NORTH)
+                    },
+                ),
+                BorderLayout.NORTH,
+            )
             add(
                 scanDetails,
                 BorderLayout.CENTER,
@@ -651,21 +706,22 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     private fun buildNotebookPanel(): JPanel =
         JPanel(BorderLayout()).apply {
             background = PanelBackground
-            val toolbar = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
-                background = ToolbarBackground
-                border = BorderFactory.createEmptyBorder(6, 8, 6, 8)
-                add(JButton("Open").apply {
-                    addActionListener { openNotebook() }
-                })
-                add(JButton("Save").apply {
-                    addActionListener { saveNotebook() }
-                })
-                add(JButton("Run All").apply {
-                    addActionListener { runNotebook() }
-                })
-                styleButtons(this)
-            }
-            add(toolbar, BorderLayout.NORTH)
+            add(
+                createToolbar(
+                    "MyEfVibe.NotebookToolbar",
+                    ToolbarBackground,
+                    toolbarAction("Open", "Open an efvibe notebook file.", AllIcons.Actions.ProjectDirectory) {
+                        openNotebook()
+                    },
+                    toolbarAction("Save", "Save the current notebook cells.", AllIcons.Actions.Commit) {
+                        saveNotebook()
+                    },
+                    toolbarAction("Run All", "Run every notebook cell in order.", AllIcons.Actions.Execute) {
+                        runNotebook()
+                    },
+                ),
+                BorderLayout.NORTH,
+            )
             add(JBScrollPane(notebookCells), BorderLayout.CENTER)
             add(notebookOutput, BorderLayout.SOUTH)
         }
@@ -775,6 +831,24 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             appendLine()
             appendLine("Resolved REPL command:")
             appendLine(CliRunner(project).buildReplCommandLine())
+            appendLine()
+            appendLine("Daemon:")
+            appendLine(
+                if (EfvibeDaemonClient.getInstance(project).isReady()) {
+                    "Running (efvibe serve)"
+                } else {
+                    "Not started — Run will start efvibe serve and reuse the loaded workspace."
+                },
+            )
+            appendLine("Serve command:")
+            appendLine(formatServeCommandLine())
+        }
+    }
+
+    private fun formatServeCommandLine(): String {
+        val spec = CliRunner(project).buildServeSpec()
+        return (listOf(spec.command) + spec.args).joinToString(" ") { token ->
+            if (token.any { it.isWhitespace() || it == '"' }) "\"${token.replace("\"", "\\\"")}\"" else token
         }
     }
 
@@ -853,8 +927,8 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         status.text = text
     }
 
-    private fun setReady() {
-        status.text = "Ready"
+    private fun setReady(message: String = "Ready") {
+        status.text = message
     }
 }
 
@@ -934,39 +1008,29 @@ private fun styleTable(table: JTable) {
     table.setDefaultRenderer(Object::class.java, ZebraTableRenderer())
 }
 
-private fun styleButtons(panel: JPanel) {
-    for (component in panel.components) {
-        if (component is JButton) {
-            val kind = when (component.text) {
-                "Run", "Run Plan", "Run All" -> ButtonKind.Primary
-                "Dismiss" -> ButtonKind.Danger
-                else -> ButtonKind.Secondary
-            }
-            styleButton(component, kind)
-        }
-    }
-}
+private fun resizeColumnsToContent(table: JTable) {
+    val model = table.model
+    val columnModel = table.columnModel
 
-private fun styleButton(button: JButton, kind: ButtonKind) {
-    button.isOpaque = true
-    button.isContentAreaFilled = true
-    button.isBorderPainted = false
-    button.setFocusPainted(false)
-    button.font = button.font.deriveFont(Font.BOLD, button.font.size2D)
-    button.border = BorderFactory.createEmptyBorder(6, 12, 6, 12)
-    when (kind) {
-        ButtonKind.Primary -> {
-            button.background = Accent
-            button.foreground = Color.WHITE
+    for (viewColumn in 0 until table.columnCount) {
+        val modelColumn = table.convertColumnIndexToModel(viewColumn)
+        val header = table.tableHeader.defaultRenderer
+            .getTableCellRendererComponent(
+                table,
+                model.getColumnName(modelColumn),
+                false,
+                false,
+                -1,
+                viewColumn,
+            )
+        var preferredWidth = header.preferredSize.width
+
+        for (row in 0 until table.rowCount) {
+            val cell = table.prepareRenderer(table.getCellRenderer(row, viewColumn), row, viewColumn)
+            preferredWidth = maxOf(preferredWidth, cell.preferredSize.width)
         }
-        ButtonKind.Secondary -> {
-            button.background = ButtonBackground
-            button.foreground = Foreground
-        }
-        ButtonKind.Danger -> {
-            button.background = Danger
-            button.foreground = Color.WHITE
-        }
+
+        columnModel.getColumn(viewColumn).preferredWidth = preferredWidth + TableColumnPadding
     }
 }
 
@@ -1013,12 +1077,6 @@ private class ScanSeverityRenderer : ZebraTableRenderer() {
     }
 }
 
-private enum class ButtonKind {
-    Primary,
-    Secondary,
-    Danger,
-}
-
 private val PanelBackground = JBColor(Color(0xF8FAFC), Color(0x1F232A))
 private val HeaderBackground = JBColor(Color(0xEEF2FF), Color(0x2B2342))
 private val ToolbarBackground = JBColor(Color(0xF1F5F9), Color(0x252A33))
@@ -1026,17 +1084,16 @@ private val EditorBackground = UIManager.getColor("TextArea.background") ?: JBCo
 private val TableBackground = UIManager.getColor("Table.background") ?: JBColor(Color.WHITE, Color(0x1E1F22))
 private val TableStripeBackground = JBColor(Color(0xF8FAFC), Color(0x25272D))
 private val BorderColor = JBColor(Color(0xCBD5E1), Color(0x3C3F46))
-private val ButtonBackground = JBColor(Color(0xE2E8F0), Color(0x3A3F4B))
 private val SelectionBackground = JBColor(Color(0xDBEAFE), Color(0x3B4A6B))
 private val SelectionForeground = UIManager.getColor("Table.selectionForeground") ?: JBColor(Color(0x0F172A), Color.WHITE)
 private val Foreground = UIManager.getColor("Label.foreground") ?: JBColor(Color(0x0F172A), Color(0xE5E7EB))
 private val HeaderForeground = JBColor(Color(0x312E81), Color(0xEDE9FE))
-private val Accent = JBColor(Color(0x4F46E5), Color(0x7C3AED))
 private val Danger = JBColor(Color(0xDC2626), Color(0xEF4444))
 private val Warning = JBColor(Color(0xB45309), Color(0xFBBF24))
 private val Info = JBColor(Color(0x2563EB), Color(0x60A5FA))
 private val StatusBackground = JBColor(Color(0xECFDF5), Color(0x123524))
 private val StatusForeground = JBColor(Color(0x047857), Color(0xA7F3D0))
+private const val TableColumnPadding = 28
 
 private fun appendBlock(current: String, title: String, text: String): String {
     val separator = if (current.isBlank()) "" else "\n\n"

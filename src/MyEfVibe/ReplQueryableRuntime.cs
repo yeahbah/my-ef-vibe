@@ -60,8 +60,36 @@ public static class ReplQueryableRuntime
         return method.MakeGenericMethod(typeof(TSource), typeof(TResult)).Invoke(null, [source, selector])!;
     }
 
+    /// <summary>
+    /// Projection after a runtime <see cref="IQueryable"/> step (e.g. <see cref="Take"/>); infers
+    /// <c>TResult</c> from the expression tree (supports anonymous types).
+    /// </summary>
+    public static object Select(object source, Expression selector) =>
+        InvokeQueryableSelect(source, selector);
+
     public static object Take(object source, object count) =>
         InvokeQueryable("Take", source, count);
+
+    public static object Skip(object source, object count) =>
+        InvokeQueryable("Skip", source, count);
+
+    public static object OrderBy(object source, Expression keySelector) =>
+        InvokeQueryableOrderBy("OrderBy", source, keySelector);
+
+    public static object OrderBy<TSource, TKey>(object source, Expression<Func<TSource, TKey>> keySelector) =>
+        InvokeQueryableOrderBy("OrderBy", source, keySelector);
+
+    public static object OrderByDescending(object source, Expression keySelector) =>
+        InvokeQueryableOrderBy("OrderByDescending", source, keySelector);
+
+    public static object OrderByDescending<TSource, TKey>(object source, Expression<Func<TSource, TKey>> keySelector) =>
+        InvokeQueryableOrderBy("OrderByDescending", source, keySelector);
+
+    public static object Count(object source) =>
+        InvokeQueryable("Count", source);
+
+    public static object Count<T>(object source, Expression<Func<T, bool>> predicate) =>
+        InvokeQueryable("Count", source, predicate);
 
     public static object ToArray(object source) =>
         InvokeEnumerable("ToArray", source);
@@ -92,6 +120,47 @@ public static class ReplQueryableRuntime
 
     public static Task<object?> SingleOrDefaultAsync<T>(object source, Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default) =>
         InvokeEfAsync("SingleOrDefaultAsync", source, cancellationToken, predicate);
+
+    public static Task<object?> CountAsync(object source, CancellationToken cancellationToken = default) =>
+        InvokeEfAsync("CountAsync", source, cancellationToken);
+
+    public static Task<object?> CountAsync<T>(object source, Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default) =>
+        InvokeEfAsync("CountAsync", source, cancellationToken, predicate);
+
+    private static object InvokeQueryableSelect(object source, Expression selector)
+    {
+        if (selector is not LambdaExpression lambda)
+        {
+            throw new InvalidOperationException(
+                $"Expected a lambda expression for Select but received '{selector.NodeType}'.");
+        }
+
+        var sourceType = GetQueryableElementType(source);
+        var method = FindQueryableMethod("Select", 2)
+            ?? throw new InvalidOperationException("Queryable.Select was not found.");
+
+        return method.MakeGenericMethod(sourceType, lambda.ReturnType).Invoke(null, [source, selector])!;
+    }
+
+    private static object InvokeQueryableOrderBy(string methodName, object source, Expression keySelector)
+    {
+        if (keySelector is not LambdaExpression lambda)
+        {
+            throw new InvalidOperationException(
+                $"Expected a lambda expression for {methodName} but received '{keySelector.NodeType}'.");
+        }
+
+        return InvokeQueryableOrderBy(methodName, source, lambda);
+    }
+
+    private static object InvokeQueryableOrderBy(string methodName, object source, LambdaExpression keySelector)
+    {
+        var sourceType = GetQueryableElementType(source);
+        var method = FindQueryableMethod(methodName, 2)
+            ?? throw new InvalidOperationException($"Queryable.{methodName} was not found.");
+
+        return method.MakeGenericMethod(sourceType, keySelector.ReturnType).Invoke(null, [source, keySelector])!;
+    }
 
     private static object InvokeQueryable(string methodName, object source, object? secondArgument = null)
     {

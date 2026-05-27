@@ -26,6 +26,7 @@
         <group id="Efvibe.MainMenu" text="My EF Vibe" popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last" />
             <action id="Efvibe.StartRepl" class="com.yeahbah.efvibe.actions.StartReplAction" text="Start REPL" />
+            <action id="Efvibe.RefreshConnection" class="com.yeahbah.efvibe.actions.RefreshConnectionAction" text="Refresh Connection" />
             <action id="Efvibe.RunSelection" class="com.yeahbah.efvibe.actions.RunSelectionAction" text="Run Selection" />
             <action id="Efvibe.RunSelectionWithPlan" class="com.yeahbah.efvibe.actions.RunSelectionWithPlanAction" text="Run Selection with Plan" />
             <separator />

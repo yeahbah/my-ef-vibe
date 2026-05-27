@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MyEfVibe.VisualStudio.Models;
 
 namespace MyEfVibe.VisualStudio.Services;
 
@@ -61,6 +62,54 @@ internal sealed class CliRunner
         args.AddRange(BuildBaseArgs(settings));
 
         return BuildCommandLine(invocation.Command, args);
+    }
+
+    public CliInvocationSpec BuildServeSpec(EfvibeSettings settings)
+    {
+        var invocation = ResolveInvocation(settings);
+        var args = new List<string>(invocation.PrefixArgs);
+        args.Add("serve");
+        args.AddRange(BuildBaseArgs(settings));
+
+        return new CliInvocationSpec
+        {
+            Command = invocation.Command,
+            Args = args.ToArray(),
+            WorkingDirectory = _solutionDirectory,
+        };
+    }
+
+    public async Task<ExpressionRunResult> RunExpressionPayloadAsync(
+        EfvibeWorkspace.WorkspaceContext workspace,
+        string expression,
+        bool withPlan,
+        bool preferDaemon,
+        CancellationToken cancellationToken)
+    {
+        var settings = workspace.Settings;
+
+        if (preferDaemon)
+        {
+            try
+            {
+                var daemon = EfvibeDaemonClient.GetOrCreate(workspace);
+                return await Task.Run(() => daemon.RunExpression(expression, withPlan), cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                var fallback = await RunExpressionJsonAsync(settings, expression, withPlan, cancellationToken);
+                return new ExpressionRunResult(
+                    fallback,
+                    JsonLineParser.ParseFirstJsonLine<EvaluationJsonPayload>(fallback.Stdout),
+                    usedDaemon: false,
+                    daemonError: ex.Message);
+            }
+        }
+
+        var result = await RunExpressionJsonAsync(settings, expression, withPlan, cancellationToken);
+        return new ExpressionRunResult(
+            result,
+            JsonLineParser.ParseFirstJsonLine<EvaluationJsonPayload>(result.Stdout));
     }
 
     public async Task<CliRunResult> RunExpressionJsonAsync(
@@ -137,6 +186,34 @@ internal sealed class CliRunner
         AddOption(args, "--min-severity", settings.ScanMinSeverity);
 
         return RunAsync(settings, args, TimeSpan.FromMinutes(20), cancellationToken);
+    }
+
+    public Task<CliRunResult> RunScanNoteAsync(
+        EfvibeSettings settings,
+        ScanFinding finding,
+        string note,
+        CancellationToken cancellationToken)
+    {
+        var args = BuildScanFindingArgs(settings, "note", finding);
+        args.Add("--text");
+        args.Add(note);
+        return RunAsync(settings, args, TimeSpan.FromSeconds(30), cancellationToken);
+    }
+
+    public Task<CliRunResult> RunScanDismissAsync(
+        EfvibeSettings settings,
+        ScanFinding finding,
+        string? note,
+        CancellationToken cancellationToken)
+    {
+        var args = BuildScanFindingArgs(settings, "dismiss", finding);
+        if (!string.IsNullOrWhiteSpace(note))
+        {
+            args.Add("--note");
+            args.Add(note.Trim());
+        }
+
+        return RunAsync(settings, args, TimeSpan.FromSeconds(30), cancellationToken);
     }
 
     public void StartReplInExternalTerminal(EfvibeSettings settings)
@@ -277,8 +354,21 @@ internal sealed class CliRunner
     private static string BuildCommandLine(string command, IReadOnlyList<string> args) =>
         QuoteArg(command) + (args.Count == 0 ? string.Empty : " " + BuildArguments(args));
 
-    private static string BuildArguments(IEnumerable<string> args) =>
+    internal static string BuildArguments(IEnumerable<string> args) =>
         string.Join(" ", args.Select(QuoteArg));
+
+    private List<string> BuildScanFindingArgs(EfvibeSettings settings, string command, ScanFinding finding)
+    {
+        var args = new List<string> { "scan", command };
+        AddOption(args, "-w", settings.WorkspaceRoot);
+        AddOption(args, "-p", settings.Project);
+        AddOption(args, "-c", settings.Context);
+        AddOption(args, "--file", finding.FilePath);
+        AddOption(args, "--line", finding.Line.ToString());
+        AddOption(args, "--rule", finding.RuleId);
+        AddOption(args, "--code", finding.Code);
+        return args;
+    }
 
     private static string QuoteArg(string value)
     {

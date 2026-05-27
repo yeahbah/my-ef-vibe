@@ -11,10 +11,8 @@ public sealed class WorkspaceBuilderTests
         var output = WorkspaceBuilder.GetIsolatedBuildOutput(sessionDirectory, projectPath, "net10.0");
 
         Assert.StartsWith(Path.Combine(sessionDirectory, ".build"), output.BaseOutputPath);
-        Assert.StartsWith(Path.Combine(sessionDirectory, ".build"), output.BaseIntermediateOutputPath);
         Assert.DoesNotContain(Path.Combine("Sample.Project", "bin"), output.BaseOutputPath);
         Assert.EndsWith(Path.Combine("net10.0", "bin"), output.BaseOutputPath.TrimEnd(Path.DirectorySeparatorChar));
-        Assert.EndsWith(Path.Combine("net10.0", "obj"), output.BaseIntermediateOutputPath.TrimEnd(Path.DirectorySeparatorChar));
     }
 
     [Fact]
@@ -50,7 +48,6 @@ public sealed class WorkspaceBuilderTests
             Assert.True(File.Exists(result.PrimaryAssemblyDll));
             Assert.StartsWith(Path.Combine(sessionDirectory, ".build"), result.PrimaryAssemblyDll);
             Assert.False(Directory.Exists(Path.Combine(projectDirectory, "bin")));
-            Assert.False(Directory.Exists(Path.Combine(projectDirectory, "obj")));
         }
         finally
         {
