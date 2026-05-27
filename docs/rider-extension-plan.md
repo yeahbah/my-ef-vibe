@@ -177,7 +177,7 @@ my-ef-vibe/
     rider-extension-plan.md
 ```
 
-**Distribution:** [JetBrains Marketplace](https://plugins.jetbrains.com/) — plugin id `com.yeahbah.efvibe`.
+**Distribution:** [JetBrains Marketplace — My EF Vibe](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe) (plugin id `com.yeahbah.efvibe`).
 
 ## UX flows
 
@@ -266,7 +266,7 @@ Same contract as VS Code — see [vscode-extension-plan.md](./vscode-extension-p
 | Diagnostics | Problems panel | Error List | Inspections |
 | REPL host | Integrated terminal | Terminal | Terminal tab |
 | Settings | `settings.json` | Tools → Options | Settings UI |
-| Marketplace | Open VSX / VS Marketplace | VS Marketplace | JetBrains Marketplace |
+| Marketplace | Open VSX / VS Marketplace | VS Marketplace | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe) |
 | **Engine** | **efvibe CLI** | **efvibe CLI** | **efvibe CLI** |
 
 All three should share: JSON evaluation shape, scan JSON files, session path rules, and icon/branding (**My EF Vibe** / `efvibe` CLI).

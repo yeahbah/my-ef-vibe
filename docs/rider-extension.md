@@ -6,16 +6,24 @@ This guide walks through installing and configuring the My EF Vibe Rider plugin 
 
 ## 1. Install the plugin
 
-1. Build or download the Rider plugin ZIP.
-2. In Rider, open **Settings > Plugins**.
+### From JetBrains Marketplace (recommended)
+
+1. In Rider, open **Settings → Plugins → Marketplace**.
+2. Search for **My EF Vibe**, or open [My EF Vibe on JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe) and click **Install to IDE**.
+3. Restart Rider when prompted.
+
+### From disk (offline or pre-release)
+
+1. Download `rider-efvibe-<version>.zip` from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe/releases), or build locally (below).
+2. In Rider, open **Settings → Plugins**.
 3. Click the gear icon and choose **Install Plugin from Disk...**.
-4. Select `rider-efvibe-0.1.0.zip`.
+4. Select the ZIP file.
 5. Restart Rider when prompted.
 
 For local development builds, the ZIP is generated at:
 
 ```bash
-rider-extension/build/distributions/rider-efvibe-0.1.0.zip
+rider-extension/build/distributions/rider-efvibe-<version>.zip
 ```
 
 ## 2. Open your solution

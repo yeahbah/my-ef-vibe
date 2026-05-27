@@ -144,6 +144,16 @@ efvibe -p ... -c MyDbContext -e "db.Products.Take(5).ToList()" --format json --n
 
 See [docs/efvibe-daemon-and-vscode.md](docs/efvibe-daemon-and-vscode.md) and [vscode-extension/README.md](vscode-extension/README.md).
 
+### Rider extension
+
+Install from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe): **Settings → Plugins → Marketplace**, search **`My EF Vibe`**. See [docs/rider-extension.md](docs/rider-extension.md).
+
+| Area | Behavior |
+|------|----------|
+| Run Selection | `efvibe serve` daemon (default) or one-shot `-e --format json` |
+| DbInfo / Tables / Describe / Scan | Same daemon when possible; CLI fallback |
+| Tool window | Query editor, results, SQL, plan, model, scan review, notebook |
+
 ### VS Code extension (v0.5+)
 
 Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe): Extensions → search **`efvibe`** (`yeahbah.vscode-efvibe`). See [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md).

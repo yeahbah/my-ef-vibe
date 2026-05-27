@@ -413,7 +413,7 @@
         "efvibe.useDaemon": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Use long-running `efvibe serve` for Run Selection (fast, warm DbContext). Requires a local CLI build with `serve` support. Falls back to one-shot `efvibe -e` if the daemon cannot start. Disable for `resultDestination: terminal` workflows or debugging."
+          "markdownDescription": "Use long-running `efvibe serve` for workspace commands (Run Selection, tables, describe, DbInfo, scan, completions). Requires a local CLI build with `serve` support. Falls back to one-shot CLI if the daemon cannot start. Disable for `resultDestination: terminal` workflows or debugging."
         },
         "efvibe.scan.mode": {
           "type": "string",

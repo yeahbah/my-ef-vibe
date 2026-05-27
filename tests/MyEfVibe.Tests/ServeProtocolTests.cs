@@ -45,6 +45,16 @@ public sealed class ServeProtocolTests
     }
 
     [Fact]
+    public void TryParseRequest_parses_completions()
+    {
+        var request = ServeProtocol.TryParseRequest("""{"type":"completions","prefix":"db.Pro"}""");
+
+        Assert.NotNull(request);
+        Assert.Equal("completions", request!.Type);
+        Assert.Equal("db.Pro", request.Prefix);
+    }
+
+    [Fact]
     public void TryParseRequest_returns_null_for_invalid_json()
     {
         Assert.Null(ServeProtocol.TryParseRequest("not json"));

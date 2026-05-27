@@ -33,7 +33,7 @@ VS Code extension — install from the [Marketplace](https://marketplace.visuals
 
 ![efvibe VS Code extension: Scan Review carousel](screenshots/vscode-scan-review.png)
 
-Rider extension — local MVP under [`rider-extension/`](rider-extension/README.md). It wraps the `efvibe` CLI with per-project Rider settings, terminal REPL launch, Run Selection, model actions, scan review, notebooks, and a structured tool window for results, SQL, and plans.
+Rider extension — install from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe) (search **`My EF Vibe`**). Per-project settings, `efvibe serve` daemon, terminal REPL, Run Selection, model actions, scan review, notebooks, and a structured tool window ([rider-extension/README.md](rider-extension/README.md) · [docs/rider-extension.md](docs/rider-extension.md)):
 
 ## Install
 
@@ -225,7 +225,7 @@ Every push to `main` runs CI (including VS Code, Visual Studio, and Rider extens
 
 1. Computes the next patch version (max of latest `v*` git tag, NuGet, `.csproj`, and `vscode-extension/package.json`)
 2. Creates and pushes a `v*` tag (e.g. `v0.1.4`)
-3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe), packages the **VS Code extension** and **Visual Studio extension** as `.vsix` files, packages the **Rider extension** as a JetBrains plugin `.zip`, opens a GitHub Release with all assets, and (when secrets are set) publishes the VS Code package to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) and [Open VSX](https://open-vsx.org/), and the Rider plugin to the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/com.yeahbah.efvibe)
+3. Publishes that version to [NuGet](https://www.nuget.org/packages/efvibe), packages the **VS Code extension** and **Visual Studio extension** as `.vsix` files, packages the **Rider extension** as a JetBrains plugin `.zip`, opens a GitHub Release with all assets, and (when secrets are set) publishes the VS Code package to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) and [Open VSX](https://open-vsx.org/), and the Rider plugin to the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe)
 
 Set the repository secret **`NUGET_API_KEY`** ([nuget.org API key](https://www.nuget.org/account/apikeys)) for publish to work.
 
@@ -235,7 +235,7 @@ Optional secrets for extension marketplaces (skipped when unset):
 |--------|---------|
 | `OVSX_PAT` | [Open VSX](https://open-vsx.org/) — token from your publisher account |
 | `VSCE_PAT` | [Visual Studio Marketplace](https://marketplace.visualstudio.com/) — Azure DevOps PAT with **Marketplace (Publish)** scope |
-| `PUBLISH_TOKEN` | [JetBrains Marketplace](https://plugins.jetbrains.com/) — personal access token from **Account Settings → My Tokens** ([plugin `com.yeahbah.efvibe`](https://plugins.jetbrains.com/plugin/com.yeahbah.efvibe)) |
+| `PUBLISH_TOKEN` | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe) — personal access token from **Account Settings → My Tokens** (plugin id `com.yeahbah.efvibe`) |
 
 **Install the extension:** Extensions → search **`efvibe`** → **My EF Vibe** ([yeahbah.vscode-efvibe](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe)), or `code --install-extension yeahbah.vscode-efvibe`. For offline or pre-release builds, use a `.vsix` from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe/releases) (see [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md)).
 

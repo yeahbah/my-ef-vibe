@@ -64,6 +64,8 @@ internal static class ServeProtocol
         public bool RespectDismissals { get; init; }
 
         public string? MinSeverity { get; init; }
+
+        public string? Prefix { get; init; }
     }
 
     private sealed class ServeReadyResponse

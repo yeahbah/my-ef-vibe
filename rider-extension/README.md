@@ -4,6 +4,12 @@ JetBrains Rider plugin that shells out to the `efvibe` CLI. The plugin owns sett
 
 For a step-by-step setup and usage walkthrough, see [docs/rider-extension.md](../docs/rider-extension.md).
 
+## Install
+
+Install from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe): **Settings → Plugins → Marketplace**, search **`My EF Vibe`**.
+
+For offline or pre-release builds, download `rider-efvibe-<version>.zip` from [GitHub Releases](https://github.com/yeahbah/my-ef-vibe/releases) and use **Install Plugin from Disk…**.
+
 ## Build
 
 Install Gradle 9 or add a wrapper, then run from this directory:
@@ -20,7 +26,7 @@ gradle runIde
 
 The generated plugin ZIP is written under `build/distributions/`.
 
-Publish to the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/com.yeahbah.efvibe) (CI uses the `PUBLISH_TOKEN` repository secret):
+Publish to the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31961-my-ef-vibe) (CI uses the `PUBLISH_TOKEN` repository secret):
 
 ```bash
 export PUBLISH_TOKEN='your-marketplace-token'

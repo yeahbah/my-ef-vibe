@@ -9,6 +9,7 @@ import { getDbContextSessionDirectory } from './sessionPaths';
 import { getExpressionFromEditor, type ExpressionSelectionKind } from './expressionSelection';
 import { checkPrerequisites, formatPrerequisiteMessage } from './prerequisites';
 import { invalidateEfvibeDaemon } from './daemonClient';
+import { invalidateCompletionCache } from './efvibeCompletion';
 import { validateReadOnlyExpression } from './expressionGuard';
 import { EfvibeResultPanel, formatEvaluationForOutput, type PanelRunRequest } from './resultPanel';
 import { generateReplTask } from './replTask';
@@ -82,6 +83,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           || event.affectsConfiguration('efvibe.provider')
           || event.affectsConfiguration('efvibe.useDaemon')) {
           invalidateEfvibeDaemon();
+          invalidateCompletionCache();
         }
 
         statusBar?.showConfigured();

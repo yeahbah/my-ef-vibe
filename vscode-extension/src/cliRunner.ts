@@ -291,7 +291,7 @@ export async function runExpressionJson(
   expression: string,
   options?: Pick<ExpressionRunOptions, 'withPlan'> & { preferDaemon?: boolean },
 ): Promise<ExpressionRunResult> {
-  if (options?.preferDaemon !== false) {
+  if (shouldPreferDaemon(settings, options?.preferDaemon)) {
     try {
       const { runExpressionViaDaemon } = await import('./daemonClient');
       return await runExpressionViaDaemon(
@@ -440,8 +440,14 @@ export async function runTablesJson(
   settings: EfvibeSettings,
   searchDirectory: string,
   cwd: string,
+  options?: { preferDaemon?: boolean },
 ): Promise<TablesJsonPayload | undefined> {
-  return runJsonStdout<TablesJsonPayload>(settings, searchDirectory, cwd, '--tables-json');
+  return runJsonWithDaemonFallback(
+    settings,
+    options?.preferDaemon,
+    () => import('./daemonClient').then((m) => m.runTablesViaDaemon(settings, searchDirectory, cwd)),
+    () => runJsonStdout<TablesJsonPayload>(settings, searchDirectory, cwd, '--tables-json'),
+  );
 }
 
 export async function runDescribeJson(
@@ -449,34 +455,48 @@ export async function runDescribeJson(
   searchDirectory: string,
   cwd: string,
   entityName: string,
+  options?: { preferDaemon?: boolean },
 ): Promise<DescribeJsonPayload | undefined> {
-  const invocation = resolveToolInvocation(
-    searchDirectory,
-    settings.toolPath,
-    settings.dotnetFramework,
+  return runJsonWithDaemonFallback(
+    settings,
+    options?.preferDaemon,
+    () => import('./daemonClient').then((m) => m.runDescribeViaDaemon(settings, searchDirectory, cwd, entityName)),
+    async () => {
+      const invocation = resolveToolInvocation(
+        searchDirectory,
+        settings.toolPath,
+        settings.dotnetFramework,
+      );
+      const args = [...buildEfvibeArgs(settings, searchDirectory), '--describe-json', entityName, '--no-banner'];
+
+      try {
+        const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
+          cwd,
+          timeout: 10 * 60_000,
+          maxBuffer: 4 * 1024 * 1024,
+          windowsHide: true,
+        });
+
+        return parseJsonLine<DescribeJsonPayload>(stdout);
+      } catch {
+        return undefined;
+      }
+    },
   );
-  const args = [...buildEfvibeArgs(settings, searchDirectory), '--describe-json', entityName, '--no-banner'];
-
-  try {
-    const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
-      cwd,
-      timeout: 10 * 60_000,
-      maxBuffer: 4 * 1024 * 1024,
-      windowsHide: true,
-    });
-
-    return parseJsonLine<DescribeJsonPayload>(stdout);
-  } catch {
-    return undefined;
-  }
 }
 
 export async function runDbInfoJson(
   settings: EfvibeSettings,
   searchDirectory: string,
   cwd: string,
+  options?: { preferDaemon?: boolean },
 ): Promise<DbInfoJsonPayload | undefined> {
-  return runJsonStdout<DbInfoJsonPayload>(settings, searchDirectory, cwd, '--dbinfo-json');
+  return runJsonWithDaemonFallback(
+    settings,
+    options?.preferDaemon,
+    () => import('./daemonClient').then((m) => m.runDbInfoViaDaemon(settings, searchDirectory, cwd)),
+    () => runJsonStdout<DbInfoJsonPayload>(settings, searchDirectory, cwd, '--dbinfo-json'),
+  );
 }
 
 export async function runCompletionsJson(
@@ -484,26 +504,34 @@ export async function runCompletionsJson(
   searchDirectory: string,
   cwd: string,
   prefix: string,
+  options?: { preferDaemon?: boolean },
 ): Promise<CompletionsJsonPayload | undefined> {
-  const invocation = resolveToolInvocation(
-    searchDirectory,
-    settings.toolPath,
-    settings.dotnetFramework,
+  return runJsonWithDaemonFallback(
+    settings,
+    options?.preferDaemon,
+    () => import('./daemonClient').then((m) => m.runCompletionsViaDaemon(settings, searchDirectory, cwd, prefix)),
+    async () => {
+      const invocation = resolveToolInvocation(
+        searchDirectory,
+        settings.toolPath,
+        settings.dotnetFramework,
+      );
+      const args = [...buildEfvibeArgs(settings, searchDirectory), '--completions-json', prefix, '--no-banner'];
+
+      try {
+        const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
+          cwd,
+          timeout: 10 * 60_000,
+          maxBuffer: 4 * 1024 * 1024,
+          windowsHide: true,
+        });
+
+        return parseJsonLine<CompletionsJsonPayload>(stdout);
+      } catch {
+        return undefined;
+      }
+    },
   );
-  const args = [...buildEfvibeArgs(settings, searchDirectory), '--completions-json', prefix, '--no-banner'];
-
-  try {
-    const { stdout } = await execFileAsync(invocation.command, [...invocation.prefixArgs, ...args], {
-      cwd,
-      timeout: 10 * 60_000,
-      maxBuffer: 4 * 1024 * 1024,
-      windowsHide: true,
-    });
-
-    return parseJsonLine<CompletionsJsonPayload>(stdout);
-  } catch {
-    return undefined;
-  }
 }
 
 function parseJsonLine<T>(stdout: string): T | undefined {
@@ -521,4 +549,26 @@ function parseJsonLine<T>(stdout: string): T | undefined {
   } catch {
     return undefined;
   }
+}
+
+function shouldPreferDaemon(settings: EfvibeSettings, preferDaemon?: boolean): boolean {
+  return preferDaemon ?? settings.useDaemon;
+}
+
+async function runJsonWithDaemonFallback<T>(
+  settings: EfvibeSettings,
+  preferDaemon: boolean | undefined,
+  daemonRequest: () => Promise<string>,
+  fallback: () => Promise<T | undefined>,
+): Promise<T | undefined> {
+  if (shouldPreferDaemon(settings, preferDaemon)) {
+    try {
+      const line = await daemonRequest();
+      return parseJsonLine<T>(line);
+    } catch {
+      // Fall back to one-shot when serve is unavailable or the daemon crashed.
+    }
+  }
+
+  return fallback();
 }

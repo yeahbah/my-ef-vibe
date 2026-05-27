@@ -10,6 +10,7 @@ export interface ScanRunOptions {
   mode: ScanMode;
   respectDismissals?: boolean;
   minSeverity?: string;
+  preferDaemon?: boolean;
 }
 
 export interface ScanRunResult {
@@ -54,7 +55,7 @@ function parseScanStdout(stdout: string): ScanCiOutputDocument | undefined {
   }
 }
 
-export async function runScan(
+async function runScanOneShot(
   settings: EfvibeSettings,
   searchDirectory: string,
   cwd: string,
@@ -98,4 +99,35 @@ export async function runScan(
       output: parseScanStdout(stdout),
     };
   }
+}
+
+export async function runScan(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+  options: ScanRunOptions,
+): Promise<ScanRunResult> {
+  const preferDaemon = options.preferDaemon ?? settings.useDaemon;
+
+  if (preferDaemon) {
+    try {
+      const { runScanViaDaemon } = await import('./daemonClient');
+      const stdout = await runScanViaDaemon(settings, searchDirectory, cwd, {
+        mode: options.mode,
+        respectDismissals: options.respectDismissals,
+        minSeverity: options.minSeverity,
+      });
+
+      return {
+        exitCode: 0,
+        stdout,
+        stderr: '',
+        output: parseScanStdout(stdout),
+      };
+    } catch {
+      // Fall back to one-shot when serve is unavailable or the daemon crashed.
+    }
+  }
+
+  return runScanOneShot(settings, searchDirectory, cwd, options);
 }

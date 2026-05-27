@@ -48,7 +48,7 @@ internal static class ServeCommandRunner
                 if (request is null || string.IsNullOrWhiteSpace(request.Type))
                 {
                     ServeProtocol.WriteError(
-                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|ping|shutdown\",...}.");
+                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|completions|ping|shutdown\",...}.");
                     continue;
                 }
 
@@ -116,6 +116,16 @@ internal static class ServeCommandRunner
                             ServeProtocol.WriteError(failure.Message);
                         }
 
+                        break;
+
+                    case "completions":
+                        if (request.Prefix is null)
+                        {
+                            ServeProtocol.WriteError("completions requires \"prefix\".");
+                            break;
+                        }
+
+                        CompletionsJsonReporter.Write(runtime.DbContext, request.Prefix);
                         break;
 
                     default:

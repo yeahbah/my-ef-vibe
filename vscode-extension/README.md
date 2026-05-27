@@ -20,7 +20,7 @@ Run **[efvibe](https://myefvibe.com/)** inside VS Code — evaluate EF Core LINQ
 2. **`efvibe` CLI** on PATH: `dotnet tool install -g efvibe`
 3. Workspace settings: `efvibe.project`, `efvibe.context` (and usually `efvibe.startupProject`)
 
-**Run Selection** uses `efvibe serve` by default (`efvibe.useDaemon`: true) so build + DbContext stay warm.
+**Run Selection**, model tree (tables / describe / DbInfo), scan, and `db.*` completions use `efvibe serve` by default (`efvibe.useDaemon`: true) so build + DbContext stay warm.
 
 ## Quick start
 
@@ -68,7 +68,7 @@ Supported command cells:
 |---------|-------------|
 | `efvibe.project` / `efvibe.startupProject` / `efvibe.context` | EF project, config host, DbContext type name |
 | `efvibe.resultDestination` | `panel` (default), `output`, or `terminal` |
-| `efvibe.useDaemon` | `true` (default): Run Selection uses `efvibe serve` |
+| `efvibe.useDaemon` | `true` (default): workspace commands use `efvibe serve` (eval, tables, describe, DbInfo, scan, completions) |
 | `efvibe.dbLog` | Show executed SQL (default `true`) |
 | `efvibe.scan.mode` | `lite` or `deep` for workspace scan |
 | `efvibe.toolPath` | Optional path to a local `efvibe` / `myefvibe` build |

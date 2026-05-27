@@ -11,25 +11,32 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 @Service(Service.Level.PROJECT)
 class EfvibeDaemonClient(private val project: Project) {
+    /** Serializes daemon requests (one stdin write + one stdout line at a time). */
+    private val requestLock = ReentrantLock()
+    /** Protects process start, stop, and session key. */
     private val lifecycleLock = ReentrantLock()
     private var daemon: DaemonState? = null
     private var sessionKey: String? = null
 
     fun isReady(): Boolean =
-        lifecycleLock.withLock {
-            daemon?.takeIf { !it.handler.isProcessTerminated && it.ready } != null
+        requestLock.withLock {
+            lifecycleLock.withLock {
+                daemon?.takeIf { !it.handler.isProcessTerminated && it.ready } != null
+            }
         }
 
     fun warmup() {
-        lifecycleLock.withLock {
-            ensureStartedLocked()
+        requestLock.withLock {
+            lifecycleLock.withLock {
+                ensureStartedLocked()
+            }
         }
     }
 
@@ -65,26 +72,28 @@ class EfvibeDaemonClient(private val project: Project) {
     }
 
     private fun runCommand(requestJson: String, timeoutMinutes: Long = COMMAND_TIMEOUT_MINUTES): String =
-        lifecycleLock.withLock {
-            val state = ensureStartedLocked()
-            val input = state.handler.processInput
-                ?: throw IllegalStateException("efvibe daemon stdin is not available.")
-            input.write("$requestJson\n".toByteArray(StandardCharsets.UTF_8))
-            input.flush()
+        requestLock.withLock {
+            lifecycleLock.withLock {
+                val state = ensureStartedLocked()
+                val input = state.handler.processInput
+                    ?: throw IllegalStateException("efvibe daemon stdin is not available.")
+                input.write("$requestJson\n".toByteArray(StandardCharsets.UTF_8))
+                input.flush()
 
-            val line = state.waitForLine(timeoutMinutes, TimeUnit.MINUTES)
-                ?: throw IllegalStateException("efvibe daemon timed out waiting for a response.")
-            when (parseMessageType(line)) {
-                "error" -> throw IllegalStateException(parseMessageText(line) ?: "efvibe daemon error.")
-                else -> line
+                val line = state.waitForLine(timeoutMinutes, TimeUnit.MINUTES)
+                    ?: throw IllegalStateException("efvibe daemon timed out waiting for a response.")
+                when (parseMessageType(line)) {
+                    "error" -> throw IllegalStateException(parseMessageText(line) ?: "efvibe daemon error.")
+                    else -> line
+                }
             }
         }
 
     fun invalidate() {
-        lifecycleLock.withLock {
-            daemon?.handler?.destroyProcess()
-            daemon = null
-            sessionKey = null
+        requestLock.withLock {
+            lifecycleLock.withLock {
+                invalidateLocked()
+            }
         }
     }
 
@@ -158,7 +167,7 @@ class EfvibeDaemonClient(private val project: Project) {
     }
 
     private class DaemonState(val handler: OSProcessHandler) : ProcessListener {
-        private val lines = ArrayBlockingQueue<String>(64)
+        private val lines = LinkedBlockingQueue<String>()
         private val buffer = StringBuilder()
         private val stderr = StringBuilder()
         var ready: Boolean = false
@@ -178,7 +187,7 @@ class EfvibeDaemonClient(private val project: Project) {
                 val line = buffer.substring(0, index).trim()
                 buffer.delete(0, index + 1)
                 if (line.isNotEmpty()) {
-                    lines.offer(line)
+                    lines.put(line)
                 }
             }
         }

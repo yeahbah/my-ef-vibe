@@ -15,6 +15,7 @@ internal sealed class EfvibeDaemonClient : IDisposable
     private static readonly ConcurrentDictionary<string, EfvibeDaemonClient> Clients = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly object _lifecycleLock = new();
+    private readonly SemaphoreSlim _requestSerializer = new(1, 1);
     private readonly string _sessionKey;
     private readonly Func<CliInvocationSpec> _buildServeSpec;
 
@@ -49,38 +50,61 @@ internal sealed class EfvibeDaemonClient : IDisposable
 
     internal ExpressionRunResult RunExpression(string expression, bool withPlan)
     {
-        lock (_lifecycleLock)
+        _requestSerializer.Wait();
+        try
         {
-            var state = EnsureStartedLocked();
-            var request = JsonSerializer.Serialize(new
+            lock (_lifecycleLock)
             {
-                type = "eval",
-                expression,
-                withPlan,
-            });
+                var state = EnsureStartedLocked();
+                var request = JsonSerializer.Serialize(new
+                {
+                    type = "eval",
+                    expression,
+                    withPlan,
+                });
 
-            state.WriteLine(request);
-            var line = state.WaitForLine(TimeSpan.FromMinutes(10))
-                ?? throw new InvalidOperationException("efvibe daemon timed out waiting for an evaluation response.");
+                state.WriteLine(request);
+                var line = state.WaitForLine(TimeSpan.FromMinutes(10))
+                    ?? throw new InvalidOperationException("efvibe daemon timed out waiting for an evaluation response.");
 
-            var payload = JsonLineParser.ParseFirstJsonLine<EvaluationJsonPayload>(line);
-            var exitCode = payload?.Success == true ? 0 : 20;
-            return new ExpressionRunResult(
-                new CliRunResult { ExitCode = exitCode, Stdout = line, Stderr = string.Empty },
-                payload,
-                usedDaemon: true);
+                var messageType = ParseMessageType(line);
+                if (messageType == "error")
+                {
+                    throw new InvalidOperationException(ParseMessageText(line) ?? "efvibe daemon error.");
+                }
+
+                var payload = JsonLineParser.ParseFirstJsonLine<EvaluationJsonPayload>(line);
+                var exitCode = payload?.Success == true ? 0 : 20;
+                return new ExpressionRunResult(
+                    new CliRunResult { ExitCode = exitCode, Stdout = line, Stderr = string.Empty },
+                    payload,
+                    usedDaemon: true);
+            }
+        }
+        finally
+        {
+            _requestSerializer.Release();
         }
     }
 
     public void Dispose()
     {
-        lock (_lifecycleLock)
+        _requestSerializer.Wait();
+        try
         {
-            if (_disposed)
-                return;
+            lock (_lifecycleLock)
+            {
+                if (_disposed)
+                    return;
 
-            _disposed = true;
-            StopLocked();
+                _disposed = true;
+                StopLocked();
+            }
+        }
+        finally
+        {
+            _requestSerializer.Release();
+            _requestSerializer.Dispose();
         }
     }
 

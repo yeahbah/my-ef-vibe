@@ -59,6 +59,7 @@ Optional: `ping`, `shutdown`, `plan` (or `withPlan` on eval).
 |--------|------|
 | Process manager | Start `efvibe serve` on first Run; one process per workspace profile |
 | Transport | JSON lines to stdin; JSON lines from stdout |
+| Request queue | **One in-flight request** per daemon — concurrent Run/scan actions wait in a FIFO queue instead of interleaving stdin writes |
 | Lifecycle | Restart daemon when settings change; handle crash/timeout |
 | UI | Unchanged — result panel uses same `EvaluationJsonPayload` |
 | Start REPL | Optional separate terminal for humans (`:tables`, `:scan`, etc.) |
@@ -96,6 +97,7 @@ flowchart TB
 - **CLI:** `efvibe serve` — `ServeCommandRunner`, `ServeProtocol`, `WorkspaceRuntimeBootstrap`
 - **Protocol:** line-delimited JSON on stdin; first stdout line `{"type":"ready",...}`; eval returns same JSON as `-e --format json`
 - **VS Code v0.2.2:** `daemonClient.ts` — `efvibe.useDaemon` (default `true`); falls back to one-shot `efvibe -e` if serve is missing or fails
+- **Editor clients:** Rider, VS Code, and Visual Studio serialize daemon requests (one stdin write + one stdout line at a time) so overlapping toolbar/UI actions do not corrupt the protocol
 
 ### Serve usage (manual)
 
@@ -105,6 +107,11 @@ efvibe serve -p ./MyApp.Data.csproj -s ./MyApp.Api.csproj -c AppDbContext
 # stdin:
 {"type":"eval","expression":"db.Products.Count()"}
 {"type":"eval","expression":"db.Products.Take(5).ToList()","withPlan":true}
+{"type":"tables"}
+{"type":"describe","entity":"Products"}
+{"type":"dbinfo"}
+{"type":"scan","mode":"lite","respectDismissals":true}
+{"type":"completions","prefix":"db.Pro"}
 {"type":"shutdown"}
 ```
 

@@ -4,7 +4,8 @@ import { buildServeArgs, resolveToolInvocation, type ExpressionRunResult } from 
 import { parseEvaluationJson } from './evaluationTypes';
 
 const READY_TIMEOUT_MS = 10 * 60_000;
-const EVAL_TIMEOUT_MS = 10 * 60_000;
+const COMMAND_TIMEOUT_MS = 10 * 60_000;
+const SCAN_TIMEOUT_MS = 20 * 60_000;
 
 interface DaemonState {
   key: string;
@@ -19,6 +20,10 @@ interface DaemonState {
 }
 
 let daemonState: DaemonState | undefined;
+/** Bumped on invalidate so queued work aborts instead of writing to a dead session. */
+let sessionGeneration = 0;
+/** Serializes all daemon stdin/stdout traffic (one in-flight request per process). */
+let serialTail: Promise<void> = Promise.resolve();
 
 function settingsKey(settings: EfvibeSettings, searchDirectory: string, cwd: string): string {
   return JSON.stringify({
@@ -36,17 +41,39 @@ function settingsKey(settings: EfvibeSettings, searchDirectory: string, cwd: str
   });
 }
 
+function rejectPendingLine(error: Error): void {
+  if (!daemonState?.pendingLine) {
+    return;
+  }
+
+  const pending = daemonState.pendingLine;
+  daemonState.pendingLine = undefined;
+  clearTimeout(pending.timer);
+  pending.reject(error);
+}
+
+function enqueueSerial<T>(work: () => Promise<T>): Promise<T> {
+  const generation = sessionGeneration;
+  const run = serialTail.then(async () => {
+    if (generation !== sessionGeneration) {
+      throw new Error('efvibe daemon session invalidated.');
+    }
+
+    return work();
+  });
+  serialTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 function disposeDaemon(): void {
   if (!daemonState) {
     return;
   }
 
-  if (daemonState.pendingLine) {
-    clearTimeout(daemonState.pendingLine.timer);
-    daemonState.pendingLine.reject(new Error('efvibe daemon stopped.'));
-    daemonState.pendingLine = undefined;
-  }
-
+  rejectPendingLine(new Error('efvibe daemon stopped.'));
   daemonState.process.kill();
   daemonState = undefined;
 }
@@ -86,7 +113,7 @@ function waitForLine(timeoutMs: number): Promise<string> {
   }
 
   if (daemonState.pendingLine) {
-    return Promise.reject(new Error('efvibe daemon request already in flight.'));
+    return Promise.reject(new Error('efvibe daemon protocol desynchronized (duplicate waiter).'));
   }
 
   return new Promise((resolve, reject) => {
@@ -105,6 +132,35 @@ function waitForLine(timeoutMs: number): Promise<string> {
 
 function drainStdoutBuffer(): void {
   appendStdout('');
+}
+
+function parseServeError(line: string): string | undefined {
+  try {
+    const payload = JSON.parse(line) as { type?: string; message?: string };
+    if (payload.type === 'error') {
+      return payload.message ?? 'efvibe daemon error.';
+    }
+  } catch {
+    // Not a serve error envelope; caller handles the line.
+  }
+
+  return undefined;
+}
+
+async function writeRequestAndWaitForLine(requestJson: string, timeoutMs: number): Promise<string> {
+  if (!daemonState) {
+    throw new Error('efvibe daemon failed to start.');
+  }
+
+  const linePromise = waitForLine(timeoutMs);
+  daemonState.process.stdin.write(`${requestJson}\n`);
+  const line = await linePromise;
+  const error = parseServeError(line);
+  if (error) {
+    throw new Error(error);
+  }
+
+  return line;
 }
 
 async function ensureDaemonReady(
@@ -205,7 +261,22 @@ async function ensureDaemonReady(
 }
 
 export function invalidateEfvibeDaemon(): void {
+  sessionGeneration++;
   disposeDaemon();
+}
+
+/** Sends one serve request and returns the single JSON response line (serialized with other daemon calls). */
+export async function runDaemonJson(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+  request: Record<string, unknown>,
+  timeoutMs: number = COMMAND_TIMEOUT_MS,
+): Promise<string> {
+  return enqueueSerial(async () => {
+    await ensureDaemonReady(settings, searchDirectory, cwd);
+    return writeRequestAndWaitForLine(JSON.stringify(request), timeoutMs);
+  });
 }
 
 export async function runExpressionViaDaemon(
@@ -215,22 +286,71 @@ export async function runExpressionViaDaemon(
   expression: string,
   withPlan = false,
 ): Promise<ExpressionRunResult> {
-  await ensureDaemonReady(settings, searchDirectory, cwd);
+  return enqueueSerial(async () => {
+    await ensureDaemonReady(settings, searchDirectory, cwd);
 
-  if (!daemonState) {
-    throw new Error('efvibe daemon failed to start.');
+    const request = JSON.stringify({ type: 'eval', expression, withPlan });
+    const line = await writeRequestAndWaitForLine(request, COMMAND_TIMEOUT_MS);
+    const payload = parseEvaluationJson(line);
+
+    return {
+      exitCode: payload?.success ? 0 : 20,
+      stdout: line,
+      stderr: '',
+      payload,
+    };
+  });
+}
+
+export async function runDbInfoViaDaemon(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+): Promise<string> {
+  return runDaemonJson(settings, searchDirectory, cwd, { type: 'dbinfo' });
+}
+
+export async function runTablesViaDaemon(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+): Promise<string> {
+  return runDaemonJson(settings, searchDirectory, cwd, { type: 'tables' });
+}
+
+export async function runDescribeViaDaemon(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+  entityName: string,
+): Promise<string> {
+  return runDaemonJson(settings, searchDirectory, cwd, { type: 'describe', entity: entityName });
+}
+
+export async function runCompletionsViaDaemon(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+  prefix: string,
+): Promise<string> {
+  return runDaemonJson(settings, searchDirectory, cwd, { type: 'completions', prefix });
+}
+
+export async function runScanViaDaemon(
+  settings: EfvibeSettings,
+  searchDirectory: string,
+  cwd: string,
+  options: { mode: string; respectDismissals?: boolean; minSeverity?: string },
+): Promise<string> {
+  const request: Record<string, unknown> = {
+    type: 'scan',
+    mode: options.mode,
+    respectDismissals: options.respectDismissals ?? false,
+  };
+
+  if (options.minSeverity?.trim()) {
+    request.minSeverity = options.minSeverity.trim();
   }
 
-  const request = JSON.stringify({ type: 'eval', expression, withPlan }) + '\n';
-  daemonState.process.stdin.write(request);
-
-  const line = await waitForLine(EVAL_TIMEOUT_MS);
-  const payload = parseEvaluationJson(line);
-
-  return {
-    exitCode: payload?.success ? 0 : 20,
-    stdout: line,
-    stderr: '',
-    payload,
-  };
+  return runDaemonJson(settings, searchDirectory, cwd, request, SCAN_TIMEOUT_MS);
 }
