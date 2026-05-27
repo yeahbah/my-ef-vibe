@@ -157,6 +157,9 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         )
         add(status, BorderLayout.SOUTH)
         renderSession()
+        ApplicationManager.getApplication().executeOnPooledThread {
+            runCatching { EfvibeDaemonClient.getInstance(project).warmup() }
+        }
     }
 
     private fun createToolbar(
@@ -285,18 +288,21 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     }
 
     fun runDbInfo() {
-        setBusy("Loading DbInfo...")
+        setBusy(if (EfvibeDaemonClient.getInstance(project).isReady()) "Loading DbInfo (daemon)..." else "Starting efvibe daemon...")
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = runCatching { CliRunner(project).runDbInfoPayload() }
             SwingUtilities.invokeLater {
                 result.fold(
-                    onSuccess = { (cli, payload) ->
+                    onSuccess = { response ->
+                        reportDaemonFallback(response.daemonError)
+                        val cli = response.result
+                        val payload = response.payload
                         if (payload != null) {
                             renderDbInfo(payload)
                         } else {
                             appendOutput("DbInfo", cli.stderr.ifBlank { cli.stdout })
                         }
-                        setReady()
+                        setReady(if (response.usedDaemon) "Ready (daemon)" else "Ready (CLI)")
                     },
                     onFailure = {
                         showError(it.message ?: it.toString())
@@ -308,18 +314,21 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     }
 
     fun runTables() {
-        setBusy("Loading tables...")
+        setBusy(if (EfvibeDaemonClient.getInstance(project).isReady()) "Loading tables (daemon)..." else "Starting efvibe daemon...")
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = runCatching { CliRunner(project).runTablesPayload() }
             SwingUtilities.invokeLater {
                 result.fold(
-                    onSuccess = { (cli, payload) ->
+                    onSuccess = { response ->
+                        reportDaemonFallback(response.daemonError)
+                        val cli = response.result
+                        val payload = response.payload
                         if (payload != null) {
                             renderTables(payload)
                         } else {
                             appendOutput("Tables", cli.stderr.ifBlank { cli.stdout })
                         }
-                        setReady()
+                        setReady(if (response.usedDaemon) "Ready (daemon)" else "Ready (CLI)")
                     },
                     onFailure = {
                         showError(it.message ?: it.toString())
@@ -331,18 +340,27 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     }
 
     fun runScan(mode: String) {
-        setBusy("Running scan $mode...")
+        setBusy(
+            if (EfvibeDaemonClient.getInstance(project).isReady()) {
+                "Running scan $mode (daemon)..."
+            } else {
+                "Starting efvibe daemon..."
+            },
+        )
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = runCatching { CliRunner(project).runScanPayload(mode) }
             SwingUtilities.invokeLater {
                 result.fold(
-                    onSuccess = { (cli, payload) ->
+                    onSuccess = { response ->
+                        reportDaemonFallback(response.daemonError)
+                        val cli = response.result
+                        val payload = response.payload
                         if (payload != null) {
                             renderScan(payload)
                         } else {
                             appendOutput("Scan $mode", cli.stderr.ifBlank { cli.stdout })
                         }
-                        setReady()
+                        setReady(if (response.usedDaemon) "Ready (daemon)" else "Ready (CLI)")
                     },
                     onFailure = {
                         showError(it.message ?: it.toString())
@@ -498,13 +516,29 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     }
 
     private fun runDescribe(entity: String) {
-        setBusy("Describing $entity...")
+        setBusy(
+            if (EfvibeDaemonClient.getInstance(project).isReady()) {
+                "Describing $entity (daemon)..."
+            } else {
+                "Starting efvibe daemon..."
+            },
+        )
         ApplicationManager.getApplication().executeOnPooledThread {
-            val result = CliRunner(project).runDescribe(entity)
+            val result = runCatching { CliRunner(project).runDescribe(entity) }
             SwingUtilities.invokeLater {
-                modelText.text = result.stdout.ifBlank { result.stderr.ifBlank { "No describe output." } }
-                tabs.selectedIndex = tabs.indexOfTab("Model")
-                setReady()
+                result.fold(
+                    onSuccess = { response ->
+                        reportDaemonFallback(response.daemonError)
+                        val cli = response.result
+                        modelText.text = cli.stdout.ifBlank { cli.stderr.ifBlank { "No describe output." } }
+                        tabs.selectedIndex = tabs.indexOfTab("Model")
+                        setReady(if (response.usedDaemon) "Ready (daemon)" else "Ready (CLI)")
+                    },
+                    onFailure = {
+                        showError(it.message ?: it.toString())
+                        setReady()
+                    },
+                )
             }
         }
     }
@@ -784,12 +818,12 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                     appendLine("## Cell ${index + 1}")
                     when (cell.lowercase()) {
                         ":dbinfo" -> {
-                            val (_, payload) = CliRunner(project).runDbInfoPayload()
-                            appendLine(payload?.let { formatDbInfoText(it) } ?: "No DbInfo payload.")
+                            val response = CliRunner(project).runDbInfoPayload()
+                            appendLine(response.payload?.let { formatDbInfoText(it) } ?: "No DbInfo payload.")
                         }
                         ":tables" -> {
-                            val (_, payload) = CliRunner(project).runTablesPayload()
-                            appendLine(payload?.let { formatTablesText(it) } ?: "No tables payload.")
+                            val response = CliRunner(project).runTablesPayload()
+                            appendLine(response.payload?.let { formatTablesText(it) } ?: "No tables payload.")
                         }
                         else -> {
                             val result = CliRunner(project).runExpressionPayload(cell, withPlan = false)
@@ -921,6 +955,14 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                 "\"${jsonEscape(it.key)}\": \"${jsonEscape(it.value)}\""
             }
         }
+    }
+
+    private fun reportDaemonFallback(daemonError: String?) {
+        if (daemonError.isNullOrBlank()) return
+        appendOutput(
+            "Daemon unavailable",
+            "efvibe serve was not used; fell back to one-shot CLI.\n$daemonError",
+        )
     }
 
     private fun setBusy(text: String) {

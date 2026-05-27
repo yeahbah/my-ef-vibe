@@ -53,20 +53,33 @@ class CliRunner(private val project: Project) {
     fun runDbInfo(): CliResult =
         run(baseArgs() + listOf("--dbinfo-json", "--no-banner"), timeoutMs = 10 * 60_000)
 
-    fun runDbInfoPayload(): Pair<CliResult, DbInfoPayload?> {
-        val result = runDbInfo()
-        return result to EfvibeJsonParser.parseDbInfo(result.stdout)
-    }
+    fun runDbInfoPayload(preferDaemon: Boolean = true): DaemonJsonResult<DbInfoPayload?> =
+        runJsonWithDaemon(
+            preferDaemon = preferDaemon,
+            daemonRequest = { EfvibeDaemonClient.getInstance(project).runDbInfo() },
+            fallback = { runDbInfo() },
+            parse = { EfvibeJsonParser.parseDbInfo(it) },
+        )
 
     fun runTables(): CliResult =
         run(baseArgs() + listOf("--tables-json", "--no-banner"), timeoutMs = 10 * 60_000)
 
-    fun runTablesPayload(): Pair<CliResult, TablesPayload?> {
-        val result = runTables()
-        return result to EfvibeJsonParser.parseTables(result.stdout)
-    }
+    fun runTablesPayload(preferDaemon: Boolean = true): DaemonJsonResult<TablesPayload?> =
+        runJsonWithDaemon(
+            preferDaemon = preferDaemon,
+            daemonRequest = { EfvibeDaemonClient.getInstance(project).runTables() },
+            fallback = { runTables() },
+            parse = { EfvibeJsonParser.parseTables(it) },
+        )
 
-    fun runDescribe(entityName: String): CliResult =
+    fun runDescribe(entityName: String, preferDaemon: Boolean = true): DaemonRunResult =
+        runWithDaemon(
+            preferDaemon = preferDaemon,
+            daemonRequest = { EfvibeDaemonClient.getInstance(project).runDescribe(entityName) },
+            fallback = { runDescribeCli(entityName) },
+        )
+
+    private fun runDescribeCli(entityName: String): CliResult =
         run(baseArgs() + listOf("--describe-json", entityName, "--no-banner"), timeoutMs = 10 * 60_000)
 
     fun runScan(mode: String): CliResult {
@@ -78,10 +91,19 @@ class CliRunner(private val project: Project) {
         return run(args, timeoutMs = 20 * 60_000)
     }
 
-    fun runScanPayload(mode: String): Pair<CliResult, ScanPayload?> {
-        val result = runScan(mode)
-        return result to EfvibeJsonParser.parseScan(result.stdout)
-    }
+    fun runScanPayload(mode: String, preferDaemon: Boolean = true): DaemonJsonResult<ScanPayload?> =
+        runJsonWithDaemon(
+            preferDaemon = preferDaemon,
+            daemonRequest = {
+                EfvibeDaemonClient.getInstance(project).runScan(
+                    mode,
+                    settings.scanRespectDismissals,
+                    settings.scanMinSeverity,
+                )
+            },
+            fallback = { runScan(mode) },
+            parse = { EfvibeJsonParser.parseScan(it) },
+        )
 
     fun runScanNote(finding: ScanFinding, note: String): CliResult =
         run(scanFindingArgs("note", finding) + listOf("--text", note), timeoutMs = 30_000)
@@ -104,6 +126,61 @@ class CliRunner(private val project: Project) {
             args = invocation.prefixArgs + args,
             workingDirectory = PathResolver.solutionDirectory(project).toFile(),
         )
+    }
+
+    private inline fun <T> runJsonWithDaemon(
+        preferDaemon: Boolean,
+        crossinline daemonRequest: () -> String,
+        fallback: () -> CliResult,
+        crossinline parse: (String) -> T?,
+    ): DaemonJsonResult<T> {
+        if (preferDaemon) {
+            val failure = runCatching {
+                val stdout = daemonRequest()
+                return DaemonJsonResult(
+                    result = CliResult(0, stdout, ""),
+                    payload = parse(stdout),
+                    usedDaemon = true,
+                )
+            }.exceptionOrNull()
+
+            if (failure != null) {
+                val cli = fallback()
+                return DaemonJsonResult(
+                    result = cli,
+                    payload = parse(cli.stdout),
+                    usedDaemon = false,
+                    daemonError = failure.message ?: failure.toString(),
+                )
+            }
+        }
+
+        val cli = fallback()
+        return DaemonJsonResult(cli, parse(cli.stdout))
+    }
+
+    private inline fun runWithDaemon(
+        preferDaemon: Boolean,
+        crossinline daemonRequest: () -> String,
+        fallback: () -> CliResult,
+    ): DaemonRunResult {
+        if (preferDaemon) {
+            val failure = runCatching {
+                val stdout = daemonRequest()
+                return DaemonRunResult(CliResult(0, stdout, ""), usedDaemon = true)
+            }.exceptionOrNull()
+
+            if (failure != null) {
+                val cli = fallback()
+                return DaemonRunResult(
+                    result = cli,
+                    usedDaemon = false,
+                    daemonError = failure.message ?: failure.toString(),
+                )
+            }
+        }
+
+        return DaemonRunResult(fallback())
     }
 
     private fun run(args: List<String>, timeoutMs: Int): CliResult {

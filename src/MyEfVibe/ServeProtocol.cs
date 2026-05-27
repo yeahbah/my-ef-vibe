@@ -56,6 +56,14 @@ internal static class ServeProtocol
         public string? Expression { get; init; }
 
         public bool WithPlan { get; init; }
+
+        public string? Entity { get; init; }
+
+        public string? Mode { get; init; }
+
+        public bool RespectDismissals { get; init; }
+
+        public string? MinSeverity { get; init; }
     }
 
     private sealed class ServeReadyResponse

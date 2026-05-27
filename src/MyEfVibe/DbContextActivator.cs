@@ -603,14 +603,26 @@ internal static class DbContextActivator
         string startupProjectPath)
     {
         var factoryAssemblyName = factoryType.Assembly.GetName().Name;
+        var projectDirectory = Path.GetDirectoryName(projectPath)!;
+        var startupDirectory = Path.GetDirectoryName(startupProjectPath)!;
 
         if (ProjectAssemblyNameMatches(projectPath, factoryAssemblyName))
-            return Path.GetDirectoryName(projectPath)!;
+            return projectDirectory;
 
         if (ProjectAssemblyNameMatches(startupProjectPath, factoryAssemblyName))
-            return Path.GetDirectoryName(startupProjectPath)!;
+            return startupDirectory;
 
-        return Path.GetDirectoryName(startupProjectPath)!;
+        // Heuristic fallback:
+        // - Visual Studio / ef tools commonly run with cwd = startup project directory
+        // - but many design-time factories expect relative files (seed JSON, etc.) from the EF project directory.
+        // Prefer the directory that looks more "application-root-like" based on appsettings presence.
+        var projectHasAppSettings = File.Exists(Path.Combine(projectDirectory, "appsettings.json"));
+        var startupHasAppSettings = File.Exists(Path.Combine(startupDirectory, "appsettings.json"));
+
+        if (projectHasAppSettings && !startupHasAppSettings)
+            return projectDirectory;
+
+        return startupDirectory;
     }
 
     private static bool ProjectAssemblyNameMatches(string projectPath, string? assemblyName) =>

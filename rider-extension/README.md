@@ -20,6 +20,13 @@ gradle runIde
 
 The generated plugin ZIP is written under `build/distributions/`.
 
+Publish to the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/com.yeahbah.efvibe) (CI uses the `PUBLISH_TOKEN` repository secret):
+
+```bash
+export PUBLISH_TOKEN='your-marketplace-token'
+gradle publishPlugin
+```
+
 ## Configure
 
 Open **Settings -> Languages & Frameworks -> My EF Vibe** for the current Rider project and set:

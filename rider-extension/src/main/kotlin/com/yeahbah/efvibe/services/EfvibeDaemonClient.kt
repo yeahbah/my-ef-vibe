@@ -27,20 +27,57 @@ class EfvibeDaemonClient(private val project: Project) {
             daemon?.takeIf { !it.handler.isProcessTerminated && it.ready } != null
         }
 
-    fun runExpression(expression: String, withPlan: Boolean): ExpressionRunResult =
+    fun warmup() {
+        lifecycleLock.withLock {
+            ensureStartedLocked()
+        }
+    }
+
+    fun runExpression(expression: String, withPlan: Boolean): ExpressionRunResult {
+        val line = runCommand(
+            """{"type":"eval","expression":${jsonString(expression)},"withPlan":$withPlan}""",
+            COMMAND_TIMEOUT_MINUTES,
+        )
+        val payload = EfvibeJsonParser.parseEvaluation(line)
+        val exitCode = if (payload?.success == true) 0 else 20
+        return ExpressionRunResult(CliResult(exitCode, line, ""), payload, usedDaemon = true)
+    }
+
+    fun runDbInfo(): String =
+        runCommand("""{"type":"dbinfo"}""")
+
+    fun runTables(): String =
+        runCommand("""{"type":"tables"}""")
+
+    fun runDescribe(entity: String): String =
+        runCommand("""{"type":"describe","entity":${jsonString(entity)}}""")
+
+    fun runScan(mode: String, respectDismissals: Boolean, minSeverity: String): String {
+        val minSeverityField = if (minSeverity.isBlank()) {
+            ""
+        } else {
+            ""","minSeverity":${jsonString(minSeverity.trim())}"""
+        }
+        return runCommand(
+            """{"type":"scan","mode":${jsonString(mode)},"respectDismissals":$respectDismissals$minSeverityField}""",
+            SCAN_TIMEOUT_MINUTES,
+        )
+    }
+
+    private fun runCommand(requestJson: String, timeoutMinutes: Long = COMMAND_TIMEOUT_MINUTES): String =
         lifecycleLock.withLock {
             val state = ensureStartedLocked()
-            val request = """{"type":"eval","expression":${jsonString(expression)},"withPlan":$withPlan}"""
             val input = state.handler.processInput
                 ?: throw IllegalStateException("efvibe daemon stdin is not available.")
-            input.write("$request\n".toByteArray(StandardCharsets.UTF_8))
+            input.write("$requestJson\n".toByteArray(StandardCharsets.UTF_8))
             input.flush()
 
-            val line = state.waitForLine(EVAL_TIMEOUT_MINUTES, TimeUnit.MINUTES)
-                ?: throw IllegalStateException("efvibe daemon timed out waiting for an evaluation response.")
-            val payload = EfvibeJsonParser.parseEvaluation(line)
-            val exitCode = if (payload?.success == true) 0 else 20
-            ExpressionRunResult(CliResult(exitCode, line, ""), payload, usedDaemon = true)
+            val line = state.waitForLine(timeoutMinutes, TimeUnit.MINUTES)
+                ?: throw IllegalStateException("efvibe daemon timed out waiting for a response.")
+            when (parseMessageType(line)) {
+                "error" -> throw IllegalStateException(parseMessageText(line) ?: "efvibe daemon error.")
+                else -> line
+            }
         }
 
     fun invalidate() {
@@ -158,7 +195,8 @@ class EfvibeDaemonClient(private val project: Project) {
 
     companion object {
         private const val READY_TIMEOUT_MINUTES = 10L
-        private const val EVAL_TIMEOUT_MINUTES = 10L
+        private const val COMMAND_TIMEOUT_MINUTES = 10L
+        private const val SCAN_TIMEOUT_MINUTES = 20L
 
         fun getInstance(project: Project): EfvibeDaemonClient =
             project.service()

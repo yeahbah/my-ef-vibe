@@ -13,6 +13,8 @@ object PathResolver {
 
         val base = solutionDirectory(project)
         val expanded = trimmed
+            // Rider stores many settings paths using IntelliJ-style macros.
+            .replace("\$PROJECT_DIR\$", absolutePath(base))
             .replace("\${workspaceFolder}", absolutePath(base))
             .replace("\$(SolutionDir)", ensureTrailingSeparator(absolutePath(base)))
 

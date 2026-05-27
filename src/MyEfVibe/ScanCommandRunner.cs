@@ -251,7 +251,7 @@ internal static class ScanCommandRunner
         LinqScanSeverity? failOn) =>
         minSeverity ?? failOn;
 
-    private static bool TryParseMode(string? raw, out LinqScanMode mode)
+    internal static bool TryParseMode(string? raw, out LinqScanMode mode)
     {
         mode = LinqScanMode.Lite;
 
@@ -273,7 +273,7 @@ internal static class ScanCommandRunner
         return false;
     }
 
-    private static bool TryParseOptionalSeverity(
+    internal static bool TryParseOptionalSeverity(
         string? raw,
         out LinqScanSeverity? severity,
         out string? error)

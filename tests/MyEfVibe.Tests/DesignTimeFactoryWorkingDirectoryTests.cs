@@ -47,6 +47,23 @@ public sealed class DesignTimeFactoryWorkingDirectoryTests
         Assert.Equal(Path.GetDirectoryName(startupProjectPath), workingDirectory);
     }
 
+    [Fact]
+    public void ResolveDesignTimeFactoryWorkingDirectory_falls_back_to_ef_project_when_it_has_appsettings()
+    {
+        using var temp = new TempDirectory();
+        var projectPath = WriteProject(temp.Path, "Src/Persistence/Persistence.csproj", "Northwind.Persistence");
+        var startupProjectPath = WriteProject(temp.Path, "Src/WebUI/WebUI.csproj", "Northwind.WebUI");
+
+        File.WriteAllText(Path.Combine(Path.GetDirectoryName(projectPath)!, "appsettings.json"), "{}");
+
+        var workingDirectory = DbContextActivator.ResolveDesignTimeFactoryWorkingDirectory(
+            typeof(DesignTimeFactoryMarker),
+            projectPath,
+            startupProjectPath);
+
+        Assert.Equal(Path.GetDirectoryName(projectPath), workingDirectory);
+    }
+
     private static string FactoryAssemblyName => typeof(DesignTimeFactoryMarker).Assembly.GetName().Name!;
 
     private static string WriteProject(string root, string relativePath, string assemblyName)

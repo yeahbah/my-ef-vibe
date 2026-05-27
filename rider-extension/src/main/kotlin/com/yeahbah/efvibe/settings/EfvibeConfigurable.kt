@@ -29,11 +29,13 @@ class EfvibeConfigurable(private val project: Project) : Configurable {
                 textField()
                     .align(com.intellij.ui.dsl.builder.AlignX.FILL)
                     .bindText(settings::project)
+                    .comment("Supports \$PROJECT_DIR\$, \${workspaceFolder}, and \$(SolutionDir).")
             }
             row("Startup project:") {
                 textField()
                     .align(com.intellij.ui.dsl.builder.AlignX.FILL)
                     .bindText(settings::startupProject)
+                    .comment("Supports \$PROJECT_DIR\$, \${workspaceFolder}, and \$(SolutionDir).")
             }
             row("DbContext:") {
                 textField()

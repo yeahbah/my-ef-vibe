@@ -253,3 +253,32 @@ jobs:
           cd vscode-extension
           npx --yes @vscode/vsce publish "vscode-efvibe-${VERSION}.vsix" -p "$VSCE_PAT" \
             --baseImagesUrl "https://github.com/yeahbah/my-ef-vibe/raw/HEAD/vscode-extension/images"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.0.0'
+
+      - name: Sync Rider extension version
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          sed -i "s/^pluginVersion=.*/pluginVersion=${VERSION}/" rider-extension/gradle.properties
+
+      - name: Publish to JetBrains Marketplace
+        continue-on-error: true
+        env:
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: |
+          if [[ -z "$PUBLISH_TOKEN" ]]; then
+            echo "PUBLISH_TOKEN secret is not set; skipping JetBrains Marketplace."
+            exit 0
+          fi
+          cd rider-extension
+          gradle publishPlugin --no-daemon

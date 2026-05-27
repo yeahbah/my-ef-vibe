@@ -47,7 +47,8 @@ internal static class ServeCommandRunner
 
                 if (request is null || string.IsNullOrWhiteSpace(request.Type))
                 {
-                    ServeProtocol.WriteError("Invalid request JSON. Expected {\"type\":\"eval|ping|shutdown\",...}.");
+                    ServeProtocol.WriteError(
+                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|ping|shutdown\",...}.");
                     continue;
                 }
 
@@ -73,6 +74,47 @@ internal static class ServeCommandRunner
                             request.Expression,
                             request.WithPlan,
                             cancellationToken);
+
+                        break;
+
+                    case "dbinfo":
+                        await DbInfoJsonReporter.WriteAsync(runtime.DbContext, runtime.Host, cancellationToken);
+                        break;
+
+                    case "tables":
+                        TablesJsonReporter.Write(runtime.DbContext);
+                        break;
+
+                    case "describe":
+                        if (string.IsNullOrWhiteSpace(request.Entity))
+                        {
+                            ServeProtocol.WriteError("describe requires \"entity\".");
+                            break;
+                        }
+
+                        DescribeJsonReporter.Write(runtime.DbContext, request.Entity);
+                        break;
+
+                    case "scan":
+                        if (string.IsNullOrWhiteSpace(request.Mode))
+                        {
+                            ServeProtocol.WriteError("scan requires \"mode\" (lite or deep).");
+                            break;
+                        }
+
+                        try
+                        {
+                            await ServeScanner.WriteJsonScanAsync(
+                                runtime,
+                                request.Mode,
+                                request.RespectDismissals,
+                                request.MinSeverity,
+                                cancellationToken);
+                        }
+                        catch (Exception failure)
+                        {
+                            ServeProtocol.WriteError(failure.Message);
+                        }
 
                         break;
 
