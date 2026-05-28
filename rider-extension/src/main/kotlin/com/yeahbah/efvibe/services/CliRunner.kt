@@ -5,7 +5,9 @@ import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import java.io.File
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import kotlin.io.path.exists
 
 class CliRunner(private val project: Project) {
@@ -190,9 +192,23 @@ class CliRunner(private val project: Project) {
             .withWorkDirectory(spec.workingDirectory)
             .withCharset(StandardCharsets.UTF_8)
 
-        val output: ProcessOutput = CapturingProcessHandler(commandLine).runProcess(timeoutMs)
-
-        return CliResult(output.exitCode, output.stdout, output.stderr)
+        return try {
+            val output: ProcessOutput = CapturingProcessHandler(commandLine).runProcess(timeoutMs)
+            CliResult(output.exitCode, output.stdout, output.stderr)
+        } catch (t: Throwable) {
+            val cmd = (listOf(spec.command) + spec.args).joinToString(" ") { quote(it) }
+            val hint = buildString {
+                appendLine(t.message ?: t.toString())
+                appendLine()
+                appendLine("Failed to start efvibe.")
+                appendLine("Command: $cmd")
+                appendLine("Working dir: ${spec.workingDirectory}")
+                appendLine()
+                appendLine("Fix: set 'My EF Vibe' settings → 'efvibe executable' to the full path (e.g. ~/.dotnet/tools/efvibe),")
+                appendLine("or ensure Rider's PATH includes the directory containing 'efvibe'.")
+            }
+            CliResult(127, "", hint)
+        }
     }
 
     private fun resolveInvocation(): CliInvocation {
@@ -207,7 +223,37 @@ class CliRunner(private val project: Project) {
             return CliInvocation("dotnet", prefixArgs)
         }
 
+        resolveEfvibeOnCommonPaths()?.let { return CliInvocation(it) }
         return CliInvocation("efvibe")
+    }
+
+    private fun resolveEfvibeOnCommonPaths(): String? {
+        // 1) Rider/IDE environment PATH (may differ from interactive shell PATH)
+        System.getenv("PATH")
+            ?.split(File.pathSeparatorChar)
+            ?.asSequence()
+            ?.mapNotNull { dir -> dir.takeIf { it.isNotBlank() }?.let { java.nio.file.Path.of(it, "efvibe") } }
+            ?.firstOrNull { p -> Files.exists(p) && Files.isRegularFile(p) && Files.isExecutable(p) }
+            ?.let { return it.toAbsolutePath().normalize().toString() }
+
+        val home = System.getProperty("user.home").orEmpty()
+        if (home.isNotBlank()) {
+            val candidates = listOf(
+                java.nio.file.Path.of(home, ".dotnet", "tools", "efvibe"),
+                java.nio.file.Path.of(home, ".local", "bin", "efvibe"),
+            )
+            candidates.firstOrNull { p -> Files.exists(p) && Files.isRegularFile(p) && Files.isExecutable(p) }
+                ?.let { return it.toAbsolutePath().normalize().toString() }
+        }
+
+        val systemCandidates = listOf(
+            java.nio.file.Path.of("/usr/local/bin/efvibe"),
+            java.nio.file.Path.of("/usr/bin/efvibe"),
+        )
+        systemCandidates.firstOrNull { p -> Files.exists(p) && Files.isRegularFile(p) && Files.isExecutable(p) }
+            ?.let { return it.toAbsolutePath().normalize().toString() }
+
+        return null
     }
 
     private fun baseArgs(): List<String> = buildList {
