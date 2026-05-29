@@ -14,6 +14,7 @@ internal static class LinqDeepSqlTranslator
         ScriptSession session,
         WorkspaceHost host,
         string statementOrCode,
+        IEnumerable<string>? contextInstanceIdentifiers = null,
         CancellationToken cancellationToken = default)
     {
         if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statementOrCode))
@@ -53,7 +54,8 @@ internal static class LinqDeepSqlTranslator
             statementOrCode,
             representativeEntity,
             session.DbContext.GetType(),
-            queryEntityType);
+            queryEntityType,
+            contextInstanceIdentifiers);
 
         if (probe is null)
         {

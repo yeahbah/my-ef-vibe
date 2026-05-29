@@ -6,14 +6,15 @@ internal static class LinqDeepExpressionAdapter
         string statementOrExpression,
         string? representativeEntityTypeName = null,
         Type? dbContextType = null,
-        string? queryEntityTypeName = null)
+        string? queryEntityTypeName = null,
+        IEnumerable<string>? contextInstanceIdentifiers = null)
     {
         var normalized = NormalizeStatement(statementOrExpression);
 
         if (string.IsNullOrWhiteSpace(normalized))
             return null;
 
-        normalized = ReplaceContextAliases(normalized);
+        normalized = ReplaceContextAliases(normalized, contextInstanceIdentifiers);
 
         var probe = SqlTranslationProbe.TryCreateProbeExpression(normalized);
 
@@ -140,11 +141,11 @@ internal static class LinqDeepExpressionAdapter
         return rhs;
     }
 
-    private static string ReplaceContextAliases(string code)
+    private static string ReplaceContextAliases(string code, IEnumerable<string>? contextInstanceIdentifiers)
     {
         try
         {
-            return DbContextAliasSyntaxRewriter.Rewrite(code);
+            return DbContextAliasSyntaxRewriter.Rewrite(code, contextInstanceIdentifiers);
         }
         catch (Exception)
         {

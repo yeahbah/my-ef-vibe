@@ -63,14 +63,14 @@ internal sealed class DbContextContainingTypeIndex
     {
         foreach (var parameter in typeDeclaration.ParameterList?.Parameters ?? [])
         {
-            if (TryGetTypeName(parameter.Type, out var typeName)
+            if (DbContextTypeNameSyntax.TryGetSimpleTypeName(parameter.Type, out var typeName)
                 && IsKnownContextType(typeName, scope))
                 return typeName;
         }
 
         foreach (var field in typeDeclaration.Members.OfType<FieldDeclarationSyntax>())
         {
-            if (!TryGetTypeName(field.Declaration.Type, out var typeName))
+            if (!DbContextTypeNameSyntax.TryGetSimpleTypeName(field.Declaration.Type, out var typeName))
                 continue;
 
             if (IsKnownContextType(typeName, scope))
@@ -79,7 +79,7 @@ internal sealed class DbContextContainingTypeIndex
 
         foreach (var property in typeDeclaration.Members.OfType<PropertyDeclarationSyntax>())
         {
-            if (!TryGetTypeName(property.Type, out var typeName))
+            if (!DbContextTypeNameSyntax.TryGetSimpleTypeName(property.Type, out var typeName))
                 continue;
 
             if (IsKnownContextType(typeName, scope))
@@ -90,7 +90,7 @@ internal sealed class DbContextContainingTypeIndex
         {
             foreach (var baseType in typeDeclaration.BaseList.Types)
             {
-                if (TryGetTypeName(baseType.Type, out var baseTypeName)
+                if (DbContextTypeNameSyntax.TryGetSimpleTypeName(baseType.Type, out var baseTypeName)
                     && IsKnownContextType(baseTypeName, scope))
                     return baseTypeName;
 
@@ -133,28 +133,6 @@ internal sealed class DbContextContainingTypeIndex
                || text.Contains("EfRepository", StringComparison.Ordinal);
     }
 
-    private static bool TryGetTypeName(TypeSyntax? typeSyntax, out string typeName)
-    {
-        typeName = string.Empty;
-
-        switch (typeSyntax)
-        {
-            case IdentifierNameSyntax identifier:
-                typeName = identifier.Identifier.Text;
-                return true;
-
-            case QualifiedNameSyntax qualified:
-                return TryGetTypeName(qualified.Right, out typeName);
-
-            case AliasQualifiedNameSyntax aliasQualified:
-                return TryGetTypeName(aliasQualified.Name, out typeName);
-
-            default:
-                return false;
-        }
-    }
-
     private static bool IsKnownContextType(string typeName, DbContextScanScope scope) =>
-        scope.IsSelectedContextType(typeName)
-        || scope.OtherContextTypeNames.Contains(typeName);
+        DbContextTypeNameSyntax.Classify(typeName, scope) != DbContextTypeClassification.None;
 }

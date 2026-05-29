@@ -56,6 +56,7 @@ internal static class LinqQuerySiteCollector
 
         var root = tree.GetCompilationUnitRoot();
         var containingTypeIndex = DbContextContainingTypeIndex.Build(sourceText, scope);
+        var instanceIndex = DbContextInstanceIdentifierIndex.Build(sourceText, scope);
 
         foreach (var invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
@@ -66,7 +67,7 @@ internal static class LinqQuerySiteCollector
 
             var statement = GetStatementText(invocation);
 
-            if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement))
+            if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement, scope, instanceIndex))
                 continue;
 
             var containingTypeName = GetContainingTypeName(invocation);
@@ -75,13 +76,19 @@ internal static class LinqQuerySiteCollector
                     statement,
                     scope,
                     containingTypeName,
-                    containingTypeIndex))
+                    containingTypeIndex,
+                    instanceIndex))
                 continue;
 
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
             var preview = ToPreviewLine(statement);
 
-            yield return new LinqQuerySite(absolutePath, line, preview, statement);
+            yield return new LinqQuerySite(
+                absolutePath,
+                line,
+                preview,
+                statement,
+                instanceIndex.SelectedContextIdentifiers);
         }
     }
 

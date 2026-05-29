@@ -19,7 +19,10 @@ internal static class LinqEfQueryHeuristics
         "HttpContext.",
     ];
 
-    internal static bool LooksLikeEfQuery(string statement)
+    internal static bool LooksLikeEfQuery(
+        string statement,
+        DbContextScanScope? scope = null,
+        DbContextInstanceIdentifierIndex? instanceIndex = null)
     {
         if (string.IsNullOrWhiteSpace(statement))
             return false;
@@ -32,7 +35,26 @@ internal static class LinqEfQueryHeuristics
                 return false;
         }
 
-        foreach (var prefix in DbContextQueryMarkers.MemberPrefixes)
+        if (instanceIndex is not null)
+        {
+            foreach (var prefix in instanceIndex.EnumerateSelectedMemberPrefixes())
+            {
+                if (normalized.Contains(prefix, StringComparison.Ordinal))
+                    return true;
+            }
+        }
+
+        if (scope is not null)
+        {
+            foreach (var selected in scope.SelectedContextTypeNames)
+            {
+                if (normalized.Contains($"{selected}.", StringComparison.Ordinal)
+                    || normalized.Contains($"<{selected}>", StringComparison.Ordinal))
+                    return true;
+            }
+        }
+
+        foreach (var prefix in DbContextQueryMarkers.BuiltInMemberPrefixes)
         {
             if (normalized.Contains(prefix, StringComparison.Ordinal))
                 return true;

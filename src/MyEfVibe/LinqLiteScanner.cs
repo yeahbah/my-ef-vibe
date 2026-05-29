@@ -69,6 +69,9 @@ internal static class LinqLiteScanner
         var containingTypeIndex = scope is null
             ? new DbContextContainingTypeIndex()
             : DbContextContainingTypeIndex.Build(sourceText, scope);
+        var instanceIndex = scope is null
+            ? DbContextInstanceIdentifierIndex.Empty
+            : DbContextInstanceIdentifierIndex.Build(sourceText, scope);
         var findings = new List<LinqScanFinding>();
         var reported = new HashSet<string>(StringComparer.Ordinal);
 
@@ -81,7 +84,7 @@ internal static class LinqLiteScanner
 
             var statement = GetStatementText(invocation);
 
-            if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement))
+            if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement, scope, instanceIndex))
                 continue;
 
             var containingTypeName = GetContainingTypeName(invocation);
@@ -91,7 +94,8 @@ internal static class LinqLiteScanner
                     statement,
                     scope,
                     containingTypeName,
-                    containingTypeIndex))
+                    containingTypeIndex,
+                    instanceIndex))
                 continue;
 
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
@@ -114,10 +118,10 @@ internal static class LinqLiteScanner
         }
 
         foreach (var loop in root.DescendantNodes().OfType<ForEachStatementSyntax>())
-            AnalyzeLoop(absolutePath, loop, findings, reported, scope, containingTypeIndex);
+            AnalyzeLoop(absolutePath, loop, findings, reported, scope, containingTypeIndex, instanceIndex);
 
         foreach (var loop in root.DescendantNodes().OfType<ForStatementSyntax>())
-            AnalyzeLoop(absolutePath, loop, findings, reported, scope, containingTypeIndex);
+            AnalyzeLoop(absolutePath, loop, findings, reported, scope, containingTypeIndex, instanceIndex);
 
         return findings;
     }
@@ -128,7 +132,8 @@ internal static class LinqLiteScanner
         List<LinqScanFinding> findings,
         HashSet<string> reported,
         DbContextScanScope? scope,
-        DbContextContainingTypeIndex containingTypeIndex)
+        DbContextContainingTypeIndex containingTypeIndex,
+        DbContextInstanceIdentifierIndex instanceIndex)
     {
         var bodyText = loopStatement.ToString();
 
@@ -141,7 +146,8 @@ internal static class LinqLiteScanner
                 bodyText,
                 scope,
                 containingTypeName,
-                containingTypeIndex))
+                containingTypeIndex,
+                instanceIndex))
             return;
 
         var line = loopStatement.GetLocation().GetLineSpan().StartLinePosition.Line + 1;

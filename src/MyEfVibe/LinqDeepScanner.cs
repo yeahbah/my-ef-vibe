@@ -42,6 +42,7 @@ internal static class LinqDeepScanner
                 session,
                 host,
                 site.Statement,
+                site.ContextInstanceIdentifiers,
                 cancellationToken);
 
             sqlBySite[siteKey] = translation;

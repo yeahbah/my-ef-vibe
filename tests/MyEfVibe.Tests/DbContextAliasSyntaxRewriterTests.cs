@@ -31,4 +31,14 @@ public sealed class DbContextAliasSyntaxRewriterTests
 
         Assert.StartsWith("db.Products", rewritten, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Rewrite_custom_discovered_identifier_becomes_db()
+    {
+        const string code = "_store.Products.Take(10)";
+
+        var rewritten = DbContextAliasSyntaxRewriter.Rewrite(code, ["_store"]);
+
+        Assert.StartsWith("db.Products", rewritten, StringComparison.Ordinal);
+    }
 }

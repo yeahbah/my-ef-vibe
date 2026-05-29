@@ -6,10 +6,14 @@ internal static class DbContextQuerySiteFilter
         string statement,
         DbContextScanScope? scope,
         string? containingTypeName,
-        DbContextContainingTypeIndex? containingTypeIndex)
+        DbContextContainingTypeIndex? containingTypeIndex,
+        DbContextInstanceIdentifierIndex? instanceIndex = null)
     {
         if (scope is null)
             return true;
+
+        if (instanceIndex?.StatementReferencesOtherContextInstance(statement) == true)
+            return false;
 
         if (ReferencesOtherContextType(statement, scope))
             return false;
@@ -17,7 +21,10 @@ internal static class DbContextQuerySiteFilter
         if (ReferencesSelectedContextType(statement, scope))
             return true;
 
-        if (UsesContextMemberAlias(statement))
+        if (instanceIndex?.StatementReferencesSelectedContextInstance(statement) == true)
+            return true;
+
+        if (UsesBuiltInContextMemberAlias(statement))
         {
             if (TryGetBoundContextType(containingTypeName, containingTypeIndex, out var boundType)
                 && !scope.IsSelectedContextType(boundType))
@@ -75,9 +82,9 @@ internal static class DbContextQuerySiteFilter
         return false;
     }
 
-    private static bool UsesContextMemberAlias(string statement)
+    private static bool UsesBuiltInContextMemberAlias(string statement)
     {
-        foreach (var prefix in DbContextQueryMarkers.MemberPrefixes)
+        foreach (var prefix in DbContextQueryMarkers.BuiltInMemberPrefixes)
         {
             if (prefix.Equals("db.", StringComparison.Ordinal))
                 continue;

@@ -5,48 +5,71 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace MyEfVibe;
 
 /// <summary>
-/// Rewrites common injected DbContext parameter/field names to the REPL global <c>db</c> for deep-scan SQL translation.
+/// Rewrites DbContext instance identifiers to the REPL global <c>db</c> for deep-scan SQL translation.
 /// </summary>
 internal sealed class DbContextAliasSyntaxRewriter : CSharpSyntaxRewriter
 {
-    private static readonly HashSet<string> DbContextIdentifiers = new(StringComparer.Ordinal)
-    {
-        "dbContext",
-        "_dbContext",
-        "DbContext",
-        "_context",
-        "applicationDbContext",
-        "_applicationDbContext",
-        "appDbContext",
-        "_appDbContext",
-    };
+    private readonly HashSet<string> _replaceableIdentifiers;
 
-    internal static string Rewrite(string code)
+    private DbContextAliasSyntaxRewriter(IEnumerable<string> replaceableIdentifiers)
+    {
+        _replaceableIdentifiers = new HashSet<string>(replaceableIdentifiers, StringComparer.Ordinal);
+        _replaceableIdentifiers.Add("db");
+    }
+
+    internal static string Rewrite(string code, IEnumerable<string>? contextInstanceIdentifiers = null)
     {
         if (string.IsNullOrWhiteSpace(code))
             return code;
 
-        if (!MightContainDbContextReference(code))
+        var identifiers = BuildReplaceableIdentifiers(contextInstanceIdentifiers);
+
+        if (!MightContainReplaceableReference(code, identifiers))
             return code;
 
         var tree = CSharpSyntaxTree.ParseText(code, CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
-        var rewritten = new DbContextAliasSyntaxRewriter().Visit(tree.GetRoot());
+        var rewritten = new DbContextAliasSyntaxRewriter(identifiers).Visit(tree.GetRoot());
 
         return rewritten.ToFullString();
     }
 
-    private static bool MightContainDbContextReference(string code) =>
-        code.Contains("dbContext", StringComparison.Ordinal)
-        || code.Contains("DbContext", StringComparison.Ordinal)
-        || code.Contains("_context", StringComparison.Ordinal)
-        || code.Contains("applicationDbContext", StringComparison.Ordinal)
-        || code.Contains("appDbContext", StringComparison.Ordinal)
-        || code.Contains("db.", StringComparison.Ordinal);
+    private static HashSet<string> BuildReplaceableIdentifiers(IEnumerable<string>? contextInstanceIdentifiers)
+    {
+        var identifiers = new HashSet<string>(DbContextQueryMarkers.BuiltInReplaceableIdentifiers, StringComparer.Ordinal);
+
+        if (contextInstanceIdentifiers is not null)
+        {
+            foreach (var identifier in contextInstanceIdentifiers)
+            {
+                if (!string.IsNullOrWhiteSpace(identifier))
+                    identifiers.Add(identifier);
+            }
+        }
+
+        return identifiers;
+    }
+
+    private static bool MightContainReplaceableReference(string code, HashSet<string> identifiers)
+    {
+        if (code.Contains("db.", StringComparison.Ordinal))
+            return true;
+
+        foreach (var identifier in identifiers)
+        {
+            if (identifier.Equals("db", StringComparison.Ordinal))
+                continue;
+
+            if (code.Contains(identifier, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
 
     public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
     {
         if (node.Expression is ThisExpressionSyntax
-            && ShouldReplaceMemberName(node.Name.Identifier.Text))
+            && _replaceableIdentifiers.Contains(node.Name.Identifier.Text))
         {
             return SyntaxFactory.IdentifierName("db");
         }
@@ -61,14 +84,11 @@ internal sealed class DbContextAliasSyntaxRewriter : CSharpSyntaxRewriter
         if (string.Equals(identifier, "db", StringComparison.Ordinal))
             return base.VisitIdentifierName(node);
 
-        if (DbContextIdentifiers.Contains(identifier) && ShouldReplaceDbContextIdentifier(node))
+        if (_replaceableIdentifiers.Contains(identifier) && ShouldReplaceDbContextIdentifier(node))
             return SyntaxFactory.IdentifierName("db");
 
         return base.VisitIdentifierName(node);
     }
-
-    private static bool ShouldReplaceMemberName(string name) =>
-        DbContextIdentifiers.Contains(name);
 
     private static bool ShouldReplaceDbContextIdentifier(IdentifierNameSyntax node) =>
         !IsParameterReference(node)

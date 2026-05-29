@@ -71,6 +71,67 @@ public sealed class LinqQuerySiteCollectorTests
     }
 
     [Fact]
+    public void Collect_finds_query_sites_with_nonstandard_context_field_name()
+    {
+        using var temp = new TempDirectory();
+        var dbDir = Path.Combine(temp.Path, "Database");
+        var apiDir = Path.Combine(temp.Path, "Api");
+        Directory.CreateDirectory(dbDir);
+        Directory.CreateDirectory(apiDir);
+
+        var dbProject = Path.Combine(dbDir, "App.Database.csproj");
+        File.WriteAllText(
+            dbProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+            </Project>
+            """);
+
+        File.WriteAllText(
+            Path.Combine(dbDir, "AppDbContext.cs"),
+            """
+            using Microsoft.EntityFrameworkCore;
+            public class AppDbContext : DbContext
+            {
+                public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+                public DbSet<Widget> Widgets => Set<Widget>();
+            }
+            public class Widget { public int Id { get; set; } }
+            """);
+
+        var apiProject = Path.Combine(apiDir, "App.Api.csproj");
+        File.WriteAllText(
+            apiProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="../Database/App.Database.csproj" />
+              </ItemGroup>
+              <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+            </Project>
+            """);
+
+        File.WriteAllText(
+            Path.Combine(apiDir, "WidgetService.cs"),
+            """
+            using Microsoft.EntityFrameworkCore;
+            public sealed class WidgetService
+            {
+                private readonly AppDbContext _inventory;
+                public WidgetService(AppDbContext inventory) => _inventory = inventory;
+                public void Load() => _inventory.Widgets.Where(w => w.Id > 0).ToList();
+            }
+            """);
+
+        var sites = LinqQuerySiteCollector.Collect(dbProject, apiProject, "AppDbContext");
+
+        Assert.Contains(sites, site => site.Statement.Contains("_inventory.Widgets", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Collect_finds_sites_in_wide_world_importers_entities_controller_when_present()
     {
         var repoRoot = FindRepoRoot();
