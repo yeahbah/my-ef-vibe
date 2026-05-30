@@ -1,4 +1,5 @@
 using CommandLine;
+using Microsoft.CodeAnalysis.Options;
 using Spectre.Console;
 
 namespace MyEfVibe;
@@ -7,144 +8,109 @@ internal static class Program
 {
     public static Task<int> Main(string[] args)
     {
-        if (args.Length > 0 && string.Equals(args[0], "scan", StringComparison.OrdinalIgnoreCase))
+        if (args.Length > 0)
         {
-            if (args.Length > 1 && string.Equals(args[1], "note", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(args[0], "scan", StringComparison.OrdinalIgnoreCase))
             {
-                return Parser.Default.ParseArguments<ScanNoteCliOptions>(args[2..])
+                if (string.Equals(args[1], "note", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Parser.Default.ParseArguments<ScanNoteCliOptions>(args[2..])
+                        .MapResult(
+                            options => ScanNoteCommandRunner.RunFromOptionsAsync(options),
+                            errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+                }
+
+                if (string.Equals(args[1], "dismiss", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Parser.Default.ParseArguments<ScanDismissCliOptions>(args[2..])
+                        .MapResult(
+                            options => ScanDismissCommandRunner.RunFromOptionsAsync(options),
+                            errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+                }
+
+                return Parser.Default.ParseArguments<ScanCliOptions>(args[1..])
                     .MapResult(
-                        (ScanNoteCliOptions options) => ScanNoteCommandRunner.RunFromOptionsAsync(options),
-                        (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+                        options => ScanCommandRunner.RunFromOptionsAsync(options),
+                        errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
             }
 
-            if (args.Length > 1 && string.Equals(args[1], "dismiss", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(args[0], "serve", StringComparison.OrdinalIgnoreCase))
             {
-                return Parser.Default.ParseArguments<ScanDismissCliOptions>(args[2..])
+                return Parser.Default.ParseArguments<ServeCliOptions>(args[1..])
                     .MapResult(
-                        (ScanDismissCliOptions options) => ScanDismissCommandRunner.RunFromOptionsAsync(options),
-                        (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+                        options => ServeCommandRunner.RunFromOptionsAsync(options),
+                        errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
             }
 
-            return Parser.Default.ParseArguments<ScanCliOptions>(args[1..])
-                .MapResult(
-                    (ScanCliOptions options) => ScanCommandRunner.RunFromOptionsAsync(options),
-                    (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+            if (string.Equals(args[0], "language-server", StringComparison.OrdinalIgnoreCase))
+            {
+                return Parser.Default.ParseArguments<LanguageServerCliOptions>(args[1..])
+                    .MapResult(
+                        options => LanguageServerCommandRunner.RunFromOptionsAsync(options),
+                        errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+            }
         }
-
-        if (args.Length > 0 && string.Equals(args[0], "serve", StringComparison.OrdinalIgnoreCase))
-        {
-            return Parser.Default.ParseArguments<ServeCliOptions>(args[1..])
-                .MapResult(
-                    (ServeCliOptions options) => ServeCommandRunner.RunFromOptionsAsync(options),
-                    (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
-        }
-
-        if (args.Length > 0 && string.Equals(args[0], "language-server", StringComparison.OrdinalIgnoreCase))
-        {
-            return Parser.Default.ParseArguments<LanguageServerCliOptions>(args[1..])
-                .MapResult(
-                    (LanguageServerCliOptions options) => LanguageServerCommandRunner.RunFromOptionsAsync(options),
-                    (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
-        }
+        
 
         return Parser.Default.ParseArguments<EfvibeCliOptions>(args)
             .MapResult(
-                (EfvibeCliOptions options) => RunEfvibeAsync(options),
-                (IEnumerable<Error> errors) => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+                options => RunEfvibeAsync(options),
+                errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
     }
 
     private static async Task<int> RunEfvibeAsync(EfvibeCliOptions options)
     {
         CliUi.Configure();
-
-        return await InvokeAsync(
-            CliPathHelper.ResolveWorkspace(options.Workspace),
-            CliPathHelper.ToFileInfo(options.Project),
-            CliPathHelper.ToFileInfo(options.StartupProject),
-            options.Context,
-            options.ConnectionString,
-            options.Provider,
-            options.Expression,
-            options.DbLog,
-            options.NoDbLog,
-            options.DbLogLevel,
-            options.DbLogVerbose,
-            options.AboutJson,
-            options.TablesJson,
-            options.DescribeJson,
-            options.DbInfoJson,
-            options.CompletionsJson,
-            options.Format,
-            options.NoBanner,
-            options.WithPlan,
-            options.Framework,
-            options.ExpressionParts);
+        return await InvokeAsync(options);
     }
 
-    private static async Task<int> InvokeAsync(
-        DirectoryInfo workspace,
-        FileInfo? projectPath,
-        FileInfo? startupProjectPath,
-        string? contextFullName,
-        string? connectionString,
-        string? providerRaw,
-        string? expressionOptionValue,
-        bool dbLogEnabled,
-        bool noDbLog,
-        string? dbLogLevelRaw,
-        bool dbLogVerbose,
-        bool aboutJson,
-        bool tablesJson,
-        string? describeJsonEntity,
-        bool dbInfoJson,
-        string? completionsPrefix,
-        string? formatRaw,
-        bool noBanner,
-        bool withPlan,
-        string? frameworkOrNull,
-        IEnumerable<string>? expressionParts)
+    private static async Task<int> InvokeAsync(EfvibeCliOptions options)        
     {
-        if (aboutJson)
+        if (options.AboutJson)
         {
             AboutJsonReporter.Write();
             return 0;
         }
 
-        if (!TryParseOutputFormat(formatRaw, out var outputFormat, out var formatError))
+        if (!TryParseOutputFormat(options.Format, out var outputFormat, out var formatError))
         {
             CliUi.WriteError(formatError!);
             return 1;
         }
 
-        var quietOutput = noBanner || outputFormat == CliOutputFormat.Json;
+        var quietOutput = options.NoBanner || outputFormat == CliOutputFormat.Json;
 
         var dbLogSettings = new DbLogSettings
         {
-            Enabled = noDbLog ? false : dbLogEnabled,
-            Verbose = dbLogVerbose,
+            Enabled = options.NoDbLog ? false : options.DbLog,
+            Verbose = options.DbLogVerbose,
         };
 
-        if (!string.IsNullOrWhiteSpace(dbLogLevelRaw)
-            && DbLogLevelParser.TryParse(dbLogLevelRaw, out var parsedLevel))
+        if (!string.IsNullOrWhiteSpace(options.DbLogLevel)
+            && DbLogLevelParser.TryParse(options.DbLogLevel, out var parsedLevel))
         {
             dbLogSettings.Level = parsedLevel;
         }
 
-        var parsedProvider = ProviderParser.ParseOrNull(providerRaw);
+        var parsedProvider = ProviderParser.ParseOrNull(options.Provider);
 
-        if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
+        if (!string.IsNullOrWhiteSpace(options.ConnectionString) && parsedProvider is null)
         {
             CliUi.WriteError("`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
             return 3;
         }
 
-        var oneShotExpression = CliPathHelper.ResolveOneShotExpression(expressionOptionValue, expressionParts);
+        var oneShotExpression = CliPathHelper.ResolveOneShotExpression(options.Expression, options.ExpressionParts);
 
+        var workspace = CliPathHelper.ResolveWorkspace(options.Workspace);
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
+
+        var project = CliPathHelper.ToFileInfo(options.Project);
+        var startup = CliPathHelper.ToFileInfo(options.StartupProject);
         var searchDirectory = ProjectPathResolver.ResolveSearchDirectory(
             workspaceRoot,
-            projectPath?.FullName,
-            startupProjectPath?.FullName);
+            project?.FullName,
+            startup?.FullName);
 
         FileInfo resolvedProject;
         FileInfo resolvedStartup;
@@ -154,12 +120,12 @@ internal static class Program
         {
             resolvedProject = WorkspaceProjectLocator.ResolveProject(
                 searchDirectory,
-                projectPath?.FullName);
+                project?.FullName);
 
             resolvedStartup = StartupProjectResolver.Resolve(
                 searchDirectory,
                 resolvedProject,
-                startupProjectPath?.FullName);
+                startup?.FullName);
         }
         catch (WorkspaceException workspaceFailure)
         {
@@ -185,7 +151,6 @@ internal static class Program
         }
 
         var pendingSessionDirectory = SessionPaths.EnsurePendingSessionDirectory(workspaceRoot);
-
         try
         {
             workspaceBuild = quietOutput
@@ -193,14 +158,14 @@ internal static class Program
                     pendingSessionDirectory,
                     resolvedProject,
                     resolvedStartup,
-                    frameworkOrNull)
+                    options.Framework)
                 : CliUi.RunWithStatus(
                     "Building EF project…",
                     () => WorkspaceBuilder.BuildResolvedProject(
                         pendingSessionDirectory,
                         resolvedProject,
                         resolvedStartup,
-                        frameworkOrNull));
+                        options.Framework));
         }
         catch (WorkspaceException workspaceFailure)
         {
@@ -217,10 +182,10 @@ internal static class Program
 
         using var host = WorkspaceHost.Load(workspaceBuild);
 
-        var headlessJsonOutput = tablesJson
-            || dbInfoJson
-            || completionsPrefix is not null
-            || !string.IsNullOrWhiteSpace(describeJsonEntity);
+        var headlessJsonOutput = options.TablesJson
+            || options.DbInfoJson
+            || options.CompletionsJson is not null
+            || !string.IsNullOrWhiteSpace(options.DescribeJson);
 
         var allowInteractiveSelection = string.IsNullOrWhiteSpace(oneShotExpression) && !headlessJsonOutput;
 
@@ -230,7 +195,7 @@ internal static class Program
         {
             dbContextType = DbContextActivator.ResolveContextType(
                 host,
-                contextFullName,
+                options.Context,
                 allowInteractiveSelection);
         }
         catch (InvalidOperationException resolutionFailure)
@@ -257,8 +222,8 @@ internal static class Program
         {
             dbContextInstance = DbContextActivator.ResolveInstance(
                 host,
-                contextFullName,
-                connectionString,
+                options.Context,
+                options.ConnectionString,
                 parsedProvider,
                 allowInteractiveSelection);
         }
@@ -274,27 +239,27 @@ internal static class Program
             workspaceBuild.ReferenceAssemblyPaths,
             host.AssemblyLoader);
 
-        if (tablesJson)
+        if (options.TablesJson)
         {
             TablesJsonReporter.Write(dbContextInstance);
             return 0;
         }
 
-        if (!string.IsNullOrWhiteSpace(describeJsonEntity))
+        if (!string.IsNullOrWhiteSpace(options.DescribeJson))
         {
-            DescribeJsonReporter.Write(dbContextInstance, describeJsonEntity);
+            DescribeJsonReporter.Write(dbContextInstance, options.DescribeJson);
             return 0;
         }
 
-        if (dbInfoJson)
+        if (options.DbInfoJson)
         {
             await DbInfoJsonReporter.WriteAsync(dbContextInstance, host);
             return 0;
         }
 
-        if (completionsPrefix is not null)
+        if (options.CompletionsJson is not null)
         {
-            CompletionsJsonReporter.Write(dbContextInstance, completionsPrefix);
+            CompletionsJsonReporter.Write(dbContextInstance, options.CompletionsJson);
             return 0;
         }
 
@@ -306,7 +271,7 @@ internal static class Program
                 dbLogSettings,
                 oneShotExpression,
                 outputFormat,
-                withPlan);
+                options.WithPlan);
 
         var repl = new QueryRepl(session, host, dbContextInstance, dbLogSettings, projectLabel);
 

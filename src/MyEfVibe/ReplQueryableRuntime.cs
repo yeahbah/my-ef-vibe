@@ -26,13 +26,13 @@ public static class ReplQueryableRuntime
         InvokeQueryable("SingleOrDefault", source);
 
     public static object First<T>(object source, Expression<Func<T, bool>> predicate) =>
-        Queryable.First((IQueryable<T>)source, predicate);
+        Queryable.First((IQueryable<T>)source, predicate)!;
 
     public static object? FirstOrDefault<T>(object source, Expression<Func<T, bool>> predicate) =>
         Queryable.FirstOrDefault((IQueryable<T>)source, predicate);
 
     public static object Single<T>(object source, Expression<Func<T, bool>> predicate) =>
-        Queryable.Single((IQueryable<T>)source, predicate);
+        Queryable.Single((IQueryable<T>)source, predicate)!;
 
     public static object? SingleOrDefault<T>(object source, Expression<Func<T, bool>> predicate) =>
         Queryable.SingleOrDefault((IQueryable<T>)source, predicate);
