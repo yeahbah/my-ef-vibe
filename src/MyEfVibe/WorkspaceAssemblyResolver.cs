@@ -85,6 +85,26 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         return OnResolving(AssemblyLoadContext.Default, new AssemblyName(assemblySimpleName));
     }
 
+    internal Assembly? ResolveAssembly(AssemblyName assemblyName)
+        => OnResolving(AssemblyLoadContext.Default, assemblyName);
+
+    internal bool TryResolveAssemblyPath(string assemblySimpleName, out string absolutePath)
+    {
+        absolutePath = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(assemblySimpleName))
+            return false;
+
+        return _depsManifest?.TryResolve(assemblySimpleName, out absolutePath) == true;
+    }
+
+    internal bool TryResolveAssemblyPath(AssemblyName assemblyName, out string absolutePath)
+    {
+        absolutePath = string.Empty;
+
+        return _depsManifest?.TryResolve(assemblyName, out absolutePath) == true;
+    }
+
     private Assembly? OnResolving(AssemblyLoadContext context, AssemblyName assemblyName)
     {
         var simpleName = assemblyName.Name;
@@ -97,6 +117,14 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         if (_resolvedAssemblies.TryGetValue(cacheKey, out var cached)
             && AssemblyResolutionHelpers.VersionMatches(assemblyName, cached))
             return cached;
+
+        var alreadyLoaded = AssemblyResolutionHelpers.FindLoadedAssembly(assemblyName);
+
+        if (alreadyLoaded is not null)
+        {
+            _resolvedAssemblies[cacheKey] = alreadyLoaded;
+            return alreadyLoaded;
+        }
 
         if (IsSystemTextJson(simpleName))
         {

@@ -10,11 +10,12 @@ internal static class WorkspaceDependencyLoader
         AssemblyLoadContext loadContext,
         WorkspaceDepsManifest depsManifest)
     {
+        PreloadRequiredAssembly(loadContext, depsManifest, "System.Configuration.ConfigurationManager");
+
         PreloadEfReferenceAssemblies(loadContext, depsManifest);
 
         foreach (var bootstrap in new[]
                  {
-                     "System.Configuration.ConfigurationManager",
                      "Microsoft.Data.SqlClient",
                      "Microsoft.Extensions.Caching.Abstractions",
                      "Microsoft.Extensions.Caching.Memory",
@@ -35,7 +36,7 @@ internal static class WorkspaceDependencyLoader
                      "MySql.EntityFrameworkCore",
                  })
         {
-            if (depsManifest.TryResolve(bootstrap, out var bootstrapPath))
+            if (depsManifest.TryResolve(bootstrap, allowProviderNuGetFallback: false, out var bootstrapPath))
                 TryLoad(loadContext, bootstrapPath);
         }
     }
@@ -155,6 +156,21 @@ internal static class WorkspaceDependencyLoader
         }
     }
 
+    private static void PreloadRequiredAssembly(
+        AssemblyLoadContext loadContext,
+        WorkspaceDepsManifest depsManifest,
+        string assemblySimpleName)
+    {
+        if (AppDomain.CurrentDomain.GetAssemblies().Any(assembly =>
+                string.Equals(assembly.GetName().Name, assemblySimpleName, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        if (!depsManifest.TryResolve(assemblySimpleName, allowProviderNuGetFallback: false, out var path))
+            return;
+
+        AssemblyResolutionHelpers.LoadFromPath(loadContext, path);
+    }
+
     private static void PreloadEfReferenceAssemblies(
         AssemblyLoadContext loadContext,
         WorkspaceDepsManifest depsManifest)
@@ -175,7 +191,7 @@ internal static class WorkspaceDependencyLoader
                      "MySql.EntityFrameworkCore",
                  })
         {
-            if (depsManifest.TryResolve(rootAssembly, out var rootPath))
+            if (depsManifest.TryResolve(rootAssembly, allowProviderNuGetFallback: false, out var rootPath))
             {
                 PreloadAssemblyReferenceClosure(
                     loadContext,
@@ -224,7 +240,7 @@ internal static class WorkspaceDependencyLoader
                 if (string.IsNullOrEmpty(reference.Name))
                     continue;
 
-                if (depsManifest.TryResolve(reference, out var referencePath))
+                if (depsManifest.TryResolve(reference, allowProviderNuGetFallback: false, out var referencePath))
                     Visit(referencePath);
             }
 

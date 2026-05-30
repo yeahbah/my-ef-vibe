@@ -54,62 +54,104 @@ internal static class ProviderOptionsConfigurator
         object dbContextOptionsBuilder,
         MyEfVibeProvider providerKey)
     {
-        if (providerKey != MyEfVibeProvider.Npgsql)
-            return;
-
-        TryRegisterNpgsqlModelCustomizer(host, dbContextOptionsBuilder);
-
-        foreach (var methodName in new[] { "UseSnakeCaseNamingConvention", "UseLowerCaseNamingConvention" })
+        switch (providerKey)
         {
-            if (TryInvokeDbContextOptionsBuilderExtension(
+            case MyEfVibeProvider.Npgsql:
+                TryRegisterEfVibeModelCustomizer(
                     host,
-                    "EFCore.NamingConventions",
-                    methodName,
-                    dbContextOptionsBuilder))
+                    dbContextOptionsBuilder,
+                    typeof(PostgreSqlRelationalNamingApplier).GetMethod(
+                        nameof(PostgreSqlRelationalNamingApplier.CustomizeAfterBase),
+                        BindingFlags.Static | BindingFlags.Public)!);
+
+                foreach (var methodName in new[] { "UseSnakeCaseNamingConvention", "UseLowerCaseNamingConvention" })
+                {
+                    if (TryInvokeDbContextOptionsBuilderExtension(
+                            host,
+                            "EFCore.NamingConventions",
+                            methodName,
+                            dbContextOptionsBuilder))
+                        return;
+                }
+
+                return;
+
+            case MyEfVibeProvider.Sqlite:
+                TryRegisterEfVibeModelCustomizer(
+                    host,
+                    dbContextOptionsBuilder,
+                    typeof(SqliteRelationalNamingApplier).GetMethod(
+                        nameof(SqliteRelationalNamingApplier.CustomizeAfterBase),
+                        BindingFlags.Static | BindingFlags.Public)!);
                 return;
         }
     }
 
-    private static void TryRegisterNpgsqlModelCustomizer(WorkspaceHost host, object dbContextOptionsBuilder)
+    private static void TryRegisterEfVibeModelCustomizer(
+        WorkspaceHost host,
+        object dbContextOptionsBuilder,
+        MethodInfo afterBaseMethod)
     {
         host.PreloadPackageByName("Microsoft.EntityFrameworkCore");
+        host.PreloadPackageByName("Microsoft.EntityFrameworkCore.Relational");
 
         var efAssembly = host.LoadAssembly("Microsoft.EntityFrameworkCore");
 
         if (efAssembly is null)
             return;
 
-        var modelCustomizerType = efAssembly.GetType(
-            "Microsoft.EntityFrameworkCore.Infrastructure.IModelCustomizer",
-            throwOnError: false);
+        var replacementType = EfVibeModelCustomizerEmitter.TryGetOrCreate(host, afterBaseMethod);
 
-        var replacementType = NpgsqlModelCustomizerEmitter.TryGetOrCreate(host);
-
-        if (modelCustomizerType is null || replacementType is null)
+        if (replacementType is null)
             return;
 
+        var serviceTypes = new[]
+        {
+            efAssembly.GetType(
+                "Microsoft.EntityFrameworkCore.Infrastructure.IModelCustomizer",
+                throwOnError: false),
+            efAssembly.GetType(
+                "Microsoft.EntityFrameworkCore.Infrastructure.ModelCustomizer",
+                throwOnError: false),
+        };
+
+        foreach (var serviceType in serviceTypes.Where(static type => type is not null))
+        {
+            if (TryReplaceService(dbContextOptionsBuilder, serviceType!, replacementType))
+                return;
+        }
+    }
+
+    private static bool TryReplaceService(
+        object dbContextOptionsBuilder,
+        Type serviceType,
+        Type replacementType)
+    {
         foreach (var replaceMethod in dbContextOptionsBuilder.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public))
         {
             if (!string.Equals(replaceMethod.Name, "ReplaceService", StringComparison.Ordinal)
                 || !replaceMethod.IsGenericMethodDefinition)
                 continue;
 
-            var parameters = replaceMethod.GetParameters();
+            if (replaceMethod.GetGenericArguments().Length != 2)
+                continue;
 
-            if (parameters.Length != 0)
+            if (replaceMethod.GetParameters().Any(static parameter => !parameter.IsOptional))
                 continue;
 
             try
             {
-                var closed = replaceMethod.MakeGenericMethod(modelCustomizerType, replacementType);
+                var closed = replaceMethod.MakeGenericMethod(serviceType, replacementType);
                 _ = closed.Invoke(dbContextOptionsBuilder, null);
-                return;
+                return true;
             }
             catch
             {
-                // Fall back to AdventureWorks OnModelCreating when ReplaceService is unavailable.
+                // Try the next ReplaceService overload or service contract type.
             }
         }
+
+        return false;
     }
 
     internal static bool TryInvokeUseProviderWithOptions(

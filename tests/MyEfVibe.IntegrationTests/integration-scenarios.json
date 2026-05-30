@@ -1,5 +1,5 @@
 {
-  "integrationRoot": "/Users/arnolddiaz/Projects",
+  "integrationRoot": "/home/adiaz/Projects",
   "scenarios": [
     {
       "id": "sqlserver",
@@ -8,21 +8,23 @@
       "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
-      "framework": "net10.0"
+      "framework": "net10.0",
+      "connectionString": "Server=localhost,1433;Database=AdventureWorks2022;User Id=sa;Password=Your_strong_Password123!;Encrypt=true;TrustServerCertificate=true;Application Name=AdventureWorks.API;"
     },
     {
       "id": "postgresql",
       "provider": "npgsql",
-      "repoRoot": "AdventureWorksPg/AdventureWorks",
+      "repoRoot": "AdventureWorks",
       "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
-      "framework": "net10.0"
+      "framework": "net10.0",
+      "connectionString": "Host=localhost;Port=5432;Database=adventureworks;Username=postgres;Password=Your_strong_Password123!;Include Error Detail=true"
     },
     {
       "id": "oracle",
       "provider": "oracle",
-      "repoRoot": "AdventureWorksOra/app/AdventureWorks",
+      "repoRoot": "AdventureWorks",
       "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
@@ -32,11 +34,12 @@
     {
       "id": "sqlite",
       "provider": "sqlite",
-      "repoRoot": "AdventureWorksSqlite/AdventureWorks",
+      "repoRoot": "AdventureWorks",
       "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
-      "framework": "net10.0"
+      "framework": "net10.0",
+      "connectionString": "Data Source=/home/adiaz/Projects/AdventureWorks/Source/AdventureWorksLT.db"
     }
   ]
 }

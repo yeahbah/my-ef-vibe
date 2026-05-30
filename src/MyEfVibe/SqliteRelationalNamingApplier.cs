@@ -1,10 +1,10 @@
 namespace MyEfVibe;
 
 /// <summary>
-/// Lowercases schema, table, and column names for PostgreSQL (matches AdventureWorks sample
-/// <c>PostgreSqlRelationalNaming</c>). Uses reflection so myefvibe does not compile against EF Core.
+/// Maps SQL Server-style schema/table pairs to SQLite <c>Schema.Table</c> physical names (see DuckDB conversion)
+/// and lowercases column names to match pgloader-derived SQLite files.
 /// </summary>
-public static class PostgreSqlRelationalNamingApplier
+public static class SqliteRelationalNamingApplier
 {
     public static void CustomizeAfterBase(object modelBuilder, object context)
     {
@@ -21,14 +21,13 @@ public static class PostgreSqlRelationalNamingApplier
         foreach (var entityType in RelationalMetadataReflection.EnumerateEntityTypes(modelBuilder))
         {
             var schema = relationalMetadata.GetSchema(entityType);
-
-            if (!string.IsNullOrEmpty(schema))
-                relationalMetadata.SetSchema(entityType, schema.ToLowerInvariant());
-
             var tableName = relationalMetadata.GetTableName(entityType);
 
-            if (!string.IsNullOrEmpty(tableName))
-                relationalMetadata.SetTableName(entityType, tableName.ToLowerInvariant());
+            if (!string.IsNullOrEmpty(schema) && !string.IsNullOrEmpty(tableName))
+            {
+                relationalMetadata.SetTableName(entityType, $"{schema}.{tableName}");
+                relationalMetadata.SetSchema(entityType, null);
+            }
 
             RelationalMetadataReflection.LowercaseColumnNames(relationalMetadata, entityType);
         }

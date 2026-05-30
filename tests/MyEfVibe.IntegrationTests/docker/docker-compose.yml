@@ -1,0 +1,38 @@
+# PostgreSQL and Oracle targets for integration tests.
+# SQL Server uses the adventureworks-sql container on localhost:1433
+# (see /home/adiaz/Projects/adventureworks or scripts/setup.sh).
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: efvibe-integration-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB:-postgres}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: efvibe-integration-oracle
+    ports:
+      - "${ORACLE_PORT:-1521}:1521"
+    environment:
+      ORACLE_PASSWORD: "${ORACLE_PASSWORD}"
+      APP_USER: AdvWorks
+      APP_USER_PASSWORD: "${ORACLE_APP_PASSWORD}"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+    shm_size: 1gb

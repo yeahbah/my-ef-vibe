@@ -375,6 +375,12 @@ internal sealed class WorkspaceDepsManifest
     }
 
     internal bool TryResolve(string? assemblySimpleName, out string absolutePath)
+        => TryResolve(assemblySimpleName, allowProviderNuGetFallback: true, out absolutePath);
+
+    internal bool TryResolve(
+        string? assemblySimpleName,
+        bool allowProviderNuGetFallback,
+        out string absolutePath)
     {
         if (string.IsNullOrEmpty(assemblySimpleName))
         {
@@ -382,10 +388,16 @@ internal sealed class WorkspaceDepsManifest
             return false;
         }
 
-        return TryResolve(new AssemblyName(assemblySimpleName), out absolutePath);
+        return TryResolve(new AssemblyName(assemblySimpleName), allowProviderNuGetFallback, out absolutePath);
     }
 
     internal bool TryResolve(AssemblyName requested, out string absolutePath)
+        => TryResolve(requested, allowProviderNuGetFallback: true, out absolutePath);
+
+    internal bool TryResolve(
+        AssemblyName requested,
+        bool allowProviderNuGetFallback,
+        out string absolutePath)
     {
         absolutePath = string.Empty;
 
@@ -405,6 +417,12 @@ internal sealed class WorkspaceDepsManifest
 
         if (TryResolveFromPackageLib(requested, out absolutePath))
             return true;
+
+        if (!allowProviderNuGetFallback)
+            return false;
+
+        if (requested.Version is null || AssemblyResolutionHelpers.IsZeroVersion(requested.Version))
+            return TryResolveLatestProviderFromNuGetPackageFolder(requested, out absolutePath);
 
         return TryResolveFromNuGetPackageFolder(requested, out absolutePath);
     }
@@ -479,7 +497,7 @@ internal sealed class WorkspaceDepsManifest
         {
             var packageFolder = Path.Combine(
                 _nuGetPackagesRoot,
-                requested.Name.ToLowerInvariant(),
+                ProviderAssemblyNames.GetNuGetPackageFolderName(requested.Name!),
                 versionFolder);
 
             var dllPath = FindAssemblyDllInPackage(packageFolder, requested.Name);
@@ -493,6 +511,83 @@ internal sealed class WorkspaceDepsManifest
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Resolves EF provider packages from the global NuGet cache when the workspace project does not
+    /// reference them (e.g. <c>--provider npgsql</c> against a SqlServer-only EF library).
+    /// </summary>
+    private bool TryResolveLatestProviderFromNuGetPackageFolder(AssemblyName requested, out string absolutePath)
+    {
+        absolutePath = string.Empty;
+
+        if (string.IsNullOrEmpty(requested.Name)
+            || !ProviderAssemblyNames.IsKnownProviderAssembly(requested.Name))
+            return false;
+
+        return TryResolveLatestFromNuGetPackageFolder(requested, out absolutePath);
+    }
+
+    private bool TryResolveLatestFromNuGetPackageFolder(AssemblyName requested, out string absolutePath)
+    {
+        absolutePath = string.Empty;
+
+        if (string.IsNullOrEmpty(requested.Name))
+            return false;
+
+        var packageRoot = Path.Combine(
+            _nuGetPackagesRoot,
+            ProviderAssemblyNames.GetNuGetPackageFolderName(requested.Name));
+
+        if (!Directory.Exists(packageRoot))
+            return false;
+
+        var preferredMajor = TryGetReferencedEntityFrameworkCoreMajor();
+
+        foreach (var versionFolder in EnumerateNuGetVersionFolders(packageRoot, preferredMajor))
+        {
+            var dllPath = FindAssemblyDllInPackage(
+                Path.Combine(packageRoot, versionFolder),
+                requested.Name);
+
+            if (dllPath is null)
+                continue;
+
+            absolutePath = dllPath;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private int? TryGetReferencedEntityFrameworkCoreMajor()
+    {
+        if (!_assetsBySimpleName.TryGetValue("Microsoft.EntityFrameworkCore", out var assets)
+            || assets.Count == 0)
+            return null;
+
+        var chosen = ChooseBestAsset(requestedVersion: null, assets);
+
+        return chosen?.Version?.Major;
+    }
+
+    private static IEnumerable<string> EnumerateNuGetVersionFolders(string packageRoot, int? preferredMajor)
+    {
+        var versionFolders = Directory.EnumerateDirectories(packageRoot)
+            .Select(static path => Path.GetFileName(path)!)
+            .Where(static folder => Version.TryParse(folder, out _))
+            .OrderByDescending(static folder => Version.Parse(folder))
+            .ToArray();
+
+        if (preferredMajor is null)
+            return versionFolders;
+
+        var matchingMajor = versionFolders
+            .Where(folder => Version.Parse(folder).Major == preferredMajor.Value)
+            .ToArray();
+
+        return matchingMajor.Length > 0 ? matchingMajor : versionFolders;
     }
 
     private static IEnumerable<string> EnumerateNuGetVersionFolderCandidates(Version requestedVersion)
@@ -513,8 +608,7 @@ internal sealed class WorkspaceDepsManifest
         if (!Directory.Exists(libRoot))
             return null;
 
-        foreach (var tfmDirectory in Directory.EnumerateDirectories(libRoot)
-                     .OrderByDescending(static path => path, StringComparer.OrdinalIgnoreCase))
+        foreach (var tfmDirectory in EnumeratePreferredLibDirectories(libRoot))
         {
             var candidate = Path.Combine(tfmDirectory, $"{assemblySimpleName}.dll");
 
@@ -523,6 +617,68 @@ internal sealed class WorkspaceDepsManifest
         }
 
         return null;
+    }
+
+    private static IEnumerable<string> EnumeratePreferredLibDirectories(string libRoot)
+    {
+        return Directory.EnumerateDirectories(libRoot)
+            .OrderBy(GetLibDirectoryRank)
+            .ThenByDescending(static path => path, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static int GetLibDirectoryRank(string tfmDirectory)
+    {
+        var tfm = Path.GetFileName(tfmDirectory);
+
+        if (IsMobileOrLegacyLibDirectory(tfm))
+            return 1_000;
+
+        if (TryGetNetCoreLibRank(tfm, out var netCoreRank))
+            return netCoreRank;
+
+        if (TryGetNetStandardLibRank(tfm, out var netStandardRank))
+            return netStandardRank;
+
+        return 500;
+    }
+
+    private static bool IsMobileOrLegacyLibDirectory(string tfm)
+        => tfm.Contains("android", StringComparison.OrdinalIgnoreCase)
+           || tfm.Contains("ios", StringComparison.OrdinalIgnoreCase)
+           || tfm.Contains("tvos", StringComparison.OrdinalIgnoreCase)
+           || tfm.StartsWith("xamarin", StringComparison.OrdinalIgnoreCase)
+           || tfm.StartsWith("monoandroid", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(tfm, "net461", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryGetNetCoreLibRank(string tfm, out int rank)
+    {
+        rank = 0;
+
+        if (!tfm.StartsWith("net", StringComparison.OrdinalIgnoreCase)
+            || tfm.Contains('-', StringComparison.Ordinal))
+            return false;
+
+        if (!Version.TryParse(tfm["net".Length..], out var version))
+            return false;
+
+        rank = 100 - (version.Major * 10 + version.Minor);
+
+        return true;
+    }
+
+    private static bool TryGetNetStandardLibRank(string tfm, out int rank)
+    {
+        rank = 0;
+
+        if (!tfm.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (!Version.TryParse(tfm["netstandard".Length..], out var version))
+            return false;
+
+        rank = 200 - (version.Major * 10 + version.Minor);
+
+        return true;
     }
 
     private static AssemblyAsset? ChooseBestAsset(Version? requestedVersion, List<AssemblyAsset> assets)

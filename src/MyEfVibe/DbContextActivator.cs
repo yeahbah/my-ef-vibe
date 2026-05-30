@@ -32,16 +32,71 @@ internal static class DbContextActivator
         MyEfVibeProvider? provider,
         bool allowInteractiveSelection = true)
     {
+        // SQLitePCL must be initialized before EF discovery or any Microsoft.Data.Sqlite load.
+        if (!string.IsNullOrWhiteSpace(connectionString)
+            && (provider == MyEfVibeProvider.Sqlite
+                || SqliteConnectionStringNormalizer.LooksLikeSqliteConnection(connectionString)))
+        {
+            connectionString = SqliteConnectionStringNormalizer.Normalize(
+                connectionString,
+                host.StartupProjectPath,
+                host.OutputDirectory);
+            provider ??= MyEfVibeProvider.Sqlite;
+        }
+
+        if (provider.HasValue)
+            host.EnsureProviderDependenciesLoaded(provider.Value);
+
         var selectedDbContextType = ResolveContextType(host, contextFullName, allowInteractiveSelection);
 
         List<string>? designTimeFactoryErrors = null;
 
+        // When the caller passes an explicit connection string and provider (integration tests,
+        // --connection-string/--provider), build DbContextOptions first so provider naming customizers
+        // are registered before any design-time factory or appsettings-based construction path.
+        if (!string.IsNullOrWhiteSpace(connectionString)
+            && provider.HasValue
+            && TryCreateUsingOptionsConstructor(
+                selectedDbContextType,
+                connectionString,
+                provider.Value,
+                host,
+                out var explicitOptionsInstance))
+        {
+            DbContextHostHints.TryApplyPostgreSqlNamingHint(
+                explicitOptionsInstance,
+                host.StartupProjectPath,
+                provider.Value);
+
+            return explicitOptionsInstance;
+        }
+
         if (TryCreateUsingDesignTimeFactory(selectedDbContextType, host, out var designTimeInstance,
                 ref designTimeFactoryErrors))
+        {
+            if (provider.HasValue)
+            {
+                DbContextHostHints.TryApplyPostgreSqlNamingHint(
+                    designTimeInstance,
+                    host.StartupProjectPath,
+                    provider.Value);
+            }
+
             return designTimeInstance;
+        }
 
         if (TryCreateUsingParameterlessConstructor(selectedDbContextType, out var parameterlessInstance))
+        {
+            if (provider.HasValue)
+            {
+                DbContextHostHints.TryApplyPostgreSqlNamingHint(
+                    parameterlessInstance,
+                    host.StartupProjectPath,
+                    provider.Value);
+            }
+
             return parameterlessInstance;
+        }
 
         var resolvedConnectionFromConfiguration = false;
 

@@ -6,23 +6,29 @@ namespace MyEfVibe;
 
 /// <summary>
 /// Emits an <c>IModelCustomizer</c> implementation against the workspace EF Core assembly so
-/// lowercase PostgreSQL identifiers apply after <c>OnModelCreating</c> (when sample <c>UsesPostgreSql()</c> is false).
+/// provider-specific relational naming applies after <c>OnModelCreating</c>.
 /// </summary>
-internal static class NpgsqlModelCustomizerEmitter
+internal static class EfVibeModelCustomizerEmitter
 {
-    private static readonly ConcurrentDictionary<Assembly, Type?> Cache = new();
+    private static readonly ConcurrentDictionary<(Assembly EfAssembly, string ApplierTypeName), Type?> Cache = new();
 
-    internal static Type? TryGetOrCreate(WorkspaceHost host)
+    internal static Type? TryGetOrCreate(WorkspaceHost host, MethodInfo afterBaseMethod)
     {
         var efAssembly = host.LoadAssembly("Microsoft.EntityFrameworkCore");
 
         if (efAssembly is null)
             return null;
 
-        return Cache.GetOrAdd(efAssembly, EmitCustomizer);
+        var applierTypeName = afterBaseMethod.DeclaringType?.FullName
+                              ?? afterBaseMethod.DeclaringType?.Name
+                              ?? afterBaseMethod.Name;
+
+        return Cache.GetOrAdd(
+            (efAssembly, applierTypeName),
+            key => EmitCustomizer(key.EfAssembly, afterBaseMethod));
     }
 
-    private static Type? EmitCustomizer(Assembly efAssembly)
+    private static Type? EmitCustomizer(Assembly efAssembly, MethodInfo afterBaseMethod)
     {
         var modelCustomizerType = efAssembly.GetType(
             "Microsoft.EntityFrameworkCore.Infrastructure.ModelCustomizer",
@@ -51,11 +57,12 @@ internal static class NpgsqlModelCustomizerEmitter
             || baseCtor is null)
             return null;
 
-        var assemblyName = new AssemblyName($"MyEfVibe.NpgsqlModelCustomizer_{efAssembly.GetName().Version}");
+        var assemblyName = new AssemblyName(
+            $"MyEfVibe.ModelCustomizer_{afterBaseMethod.DeclaringType!.Name}_{efAssembly.GetName().Version}");
         var asmBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
         var moduleBuilder = asmBuilder.DefineDynamicModule("MainModule");
         var typeBuilder = moduleBuilder.DefineType(
-            "MyEfVibe.EfvibeNpgsqlModelCustomizer",
+            $"MyEfVibe.{afterBaseMethod.DeclaringType.Name}Customizer",
             TypeAttributes.Public | TypeAttributes.Class,
             modelCustomizerType);
 
@@ -70,10 +77,6 @@ internal static class NpgsqlModelCustomizerEmitter
         ctorIl.Emit(OpCodes.Call, baseCtor);
         ctorIl.Emit(OpCodes.Ret);
 
-        var afterBase = typeof(PostgreSqlRelationalNamingApplier).GetMethod(
-            nameof(PostgreSqlRelationalNamingApplier.CustomizeAfterBase),
-            BindingFlags.Static | BindingFlags.Public)!;
-
         var overrideBuilder = typeBuilder.DefineMethod(
             "Customize",
             MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig,
@@ -87,7 +90,7 @@ internal static class NpgsqlModelCustomizerEmitter
         il.Emit(OpCodes.Call, baseCustomize);
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldarg_2);
-        il.Emit(OpCodes.Call, afterBase);
+        il.Emit(OpCodes.Call, afterBaseMethod);
         il.Emit(OpCodes.Ret);
 
         return typeBuilder.CreateType();

@@ -78,6 +78,8 @@ internal sealed class WorkspaceHost : IDisposable
 
         WorkspaceSystemTextJsonBootstrap.EnsureLoaded(assemblyResolver, sharedFrameworkCatalog);
 
+        EnsureWorkspaceConfigurationManagerLoaded(assemblyResolver);
+
         // Preload EF packages first, then the entry assembly, then startup-only references.
         // Preloading the startup copy of the EF project DLL before LoadEntryAssembly causes
         // "Assembly with the same name is already loaded" (different paths, same simple name).
@@ -163,6 +165,15 @@ internal sealed class WorkspaceHost : IDisposable
     internal Assembly? LoadAssembly(string assemblySimpleName)
         => _resolver.ResolveAssembly(assemblySimpleName);
 
+    internal Assembly? LoadAssembly(AssemblyName assemblyName)
+        => _resolver.ResolveAssembly(assemblyName);
+
+    internal bool TryResolveAssemblyPath(string assemblySimpleName, out string absolutePath)
+        => _resolver.TryResolveAssemblyPath(assemblySimpleName, out absolutePath);
+
+    internal bool TryResolveAssemblyPath(AssemblyName assemblyName, out string absolutePath)
+        => _resolver.TryResolveAssemblyPath(assemblyName, out absolutePath);
+
     internal void EnsureEntityFrameworkCoreLoaded()
     {
         if (AppDomain.CurrentDomain.GetAssemblies().Any(static assembly =>
@@ -218,7 +229,10 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal void EnsureProviderDependenciesLoaded(MyEfVibeProvider provider)
     {
-        EnsureEntityFrameworkRelationalLoaded();
+        if (provider == MyEfVibeProvider.Sqlite)
+            WorkspaceSqliteNativeBootstrap.EnsureBatteriesInitialized(this);
+        else
+            EnsureEntityFrameworkRelationalLoaded();
 
         foreach (var assemblySimpleName in ProviderAssemblyNames.For(provider))
             PreloadPackageByName(assemblySimpleName);
@@ -227,7 +241,12 @@ internal sealed class WorkspaceHost : IDisposable
     internal void PreloadPackageByName(string assemblySimpleName)
     {
         if (_resolver.DepsManifest?.TryResolve(assemblySimpleName, out var path) == true)
+        {
             PreloadPackageWithClosure(path);
+            return;
+        }
+
+        _ = LoadAssembly(assemblySimpleName);
     }
 
     private void PreloadPackageWithClosure(string assemblyPath)
