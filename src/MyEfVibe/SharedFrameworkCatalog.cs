@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace MyEfVibe;
@@ -43,16 +44,20 @@ internal sealed class SharedFrameworkCatalog
         if (!normalized.StartsWith("net", StringComparison.OrdinalIgnoreCase)
             || !decimal.TryParse(
                 normalized.AsSpan()[3..],
-                System.Globalization.NumberStyles.AllowDecimalPoint,
-                System.Globalization.CultureInfo.InvariantCulture,
+                NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture,
                 out var netMajor))
+        {
             return;
+        }
 
         var dotnetRoot = DotNetInstallRoot.Resolve();
         var sharedRoot = Path.Combine(dotnetRoot, "shared", "Microsoft.NETCore.App");
 
         if (!Directory.Exists(sharedRoot))
+        {
             return;
+        }
 
         string? bestDirectory = null;
         Version? bestVersion = null;
@@ -63,7 +68,9 @@ internal sealed class SharedFrameworkCatalog
 
             if (!Version.TryParse(folderName, out var frameworkVersion)
                 || frameworkVersion.Major != (int)netMajor)
+            {
                 continue;
+            }
 
             if (bestVersion is null || frameworkVersion > bestVersion)
             {
@@ -73,21 +80,29 @@ internal sealed class SharedFrameworkCatalog
         }
 
         if (bestDirectory is not null)
+        {
             IndexFrameworkDirectory(bestDirectory);
+        }
     }
 
     private void TryIndexFromRuntimeConfig(string runtimeConfigPath)
     {
         if (!File.Exists(runtimeConfigPath))
+        {
             return;
+        }
 
         using var document = JsonDocument.Parse(File.ReadAllText(runtimeConfigPath));
 
         if (!document.RootElement.TryGetProperty("runtimeOptions", out var runtimeOptions))
+        {
             return;
+        }
 
         if (!runtimeOptions.TryGetProperty("frameworks", out var frameworks))
+        {
             return;
+        }
 
         var dotnetRoot = DotNetInstallRoot.Resolve();
 
@@ -95,14 +110,18 @@ internal sealed class SharedFrameworkCatalog
         {
             if (!framework.TryGetProperty("name", out var nameProperty)
                 || !framework.TryGetProperty("version", out var versionProperty))
+            {
                 continue;
+            }
 
             var frameworkName = nameProperty.GetString();
 
             var frameworkVersion = versionProperty.GetString();
 
             if (string.IsNullOrWhiteSpace(frameworkName) || string.IsNullOrWhiteSpace(frameworkVersion))
+            {
                 continue;
+            }
 
             var frameworkDirectory = Path.Combine(dotnetRoot, "shared", frameworkName, frameworkVersion);
 
@@ -113,7 +132,9 @@ internal sealed class SharedFrameworkCatalog
     internal static string ResolveInstalledFrameworkDirectory(string requestedFrameworkDirectory)
     {
         if (Directory.Exists(requestedFrameworkDirectory))
+        {
             return requestedFrameworkDirectory;
+        }
 
         var parentDirectory = Path.GetDirectoryName(requestedFrameworkDirectory);
         var requestedVersionText = Path.GetFileName(requestedFrameworkDirectory);
@@ -121,7 +142,9 @@ internal sealed class SharedFrameworkCatalog
         if (parentDirectory is null
             || !Version.TryParse(requestedVersionText, out var requestedVersion)
             || !Directory.Exists(parentDirectory))
+        {
             return requestedFrameworkDirectory;
+        }
 
         string? bestDirectory = null;
         Version? bestVersion = null;
@@ -131,11 +154,15 @@ internal sealed class SharedFrameworkCatalog
             var candidateVersionText = Path.GetFileName(candidateDirectory);
 
             if (!Version.TryParse(candidateVersionText, out var candidateVersion))
+            {
                 continue;
+            }
 
             if (candidateVersion.Major != requestedVersion.Major
                 || candidateVersion.Minor < requestedVersion.Minor)
+            {
                 continue;
+            }
 
             if (bestVersion is null || candidateVersion > bestVersion)
             {
@@ -152,7 +179,9 @@ internal sealed class SharedFrameworkCatalog
         frameworkDirectory = ResolveInstalledFrameworkDirectory(frameworkDirectory);
 
         if (!Directory.Exists(frameworkDirectory))
+        {
             return;
+        }
 
         foreach (var dllPath in Directory.EnumerateFiles(frameworkDirectory, "*.dll"))
         {
@@ -163,5 +192,7 @@ internal sealed class SharedFrameworkCatalog
     }
 
     internal bool TryResolve(string assemblySimpleName, out string absolutePath)
-        => _assemblyNameToPath.TryGetValue(assemblySimpleName, out absolutePath!);
+    {
+        return _assemblyNameToPath.TryGetValue(assemblySimpleName, out absolutePath!);
+    }
 }

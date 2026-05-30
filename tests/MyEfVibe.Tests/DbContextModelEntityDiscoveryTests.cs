@@ -36,9 +36,13 @@ internal sealed class MappingProbeContext : DbContext
 {
     public DbSet<MappedProduct> Products => Set<MappedProduct>();
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
         optionsBuilder.UseInMemoryDatabase("mapping-probe");
+    }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
         modelBuilder.Ignore<UnmappedCurrency>();
+    }
 }

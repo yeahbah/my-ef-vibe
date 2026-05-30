@@ -7,10 +7,8 @@ namespace MyEfVibe;
 internal sealed class WorkspaceHost : IDisposable
 {
     private readonly WorkspaceAssemblyResolver _resolver;
-    private readonly string _targetFrameworkMoniker;
-    private ProjectBuildOutput? _startupBuildOutput;
-    private string? _startupOutputDirectory;
     private bool _startupBuildAttempted;
+    private ProjectBuildOutput? _startupBuildOutput;
 
     private WorkspaceHost(
         WorkspaceAssemblyResolver resolver,
@@ -30,14 +28,11 @@ internal sealed class WorkspaceHost : IDisposable
         ProjectPath = projectPath;
         StartupProjectPath = startupProjectPath;
         OutputDirectory = outputDirectory;
-        _targetFrameworkMoniker = targetFrameworkMoniker;
+        TargetFrameworkMoniker = targetFrameworkMoniker;
         _startupBuildOutput = startupBuildOutput;
-        _startupOutputDirectory = startupOutputDirectory;
+        StartupOutputDirectory = startupOutputDirectory;
         SessionDirectory = sessionDirectory;
     }
-
-    internal void SetSessionDirectory(string sessionDirectory) =>
-        SessionDirectory = SessionPaths.EnsureSessionDirectory(sessionDirectory);
 
     internal InteractiveAssemblyLoader AssemblyLoader { get; }
 
@@ -49,11 +44,22 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal string OutputDirectory { get; }
 
-    internal string TargetFrameworkMoniker => _targetFrameworkMoniker;
+    internal string TargetFrameworkMoniker { get; }
 
-    internal string? StartupOutputDirectory => _startupOutputDirectory;
+    internal string? StartupOutputDirectory { get; private set; }
 
     internal string SessionDirectory { get; private set; }
+
+    public void Dispose()
+    {
+        AssemblyLoader.Dispose();
+        _resolver.Dispose();
+    }
+
+    internal void SetSessionDirectory(string sessionDirectory)
+    {
+        SessionDirectory = SessionPaths.EnsureSessionDirectory(sessionDirectory);
+    }
 
     internal static WorkspaceHost Load(WorkspaceBuildResult workspaceBuild)
     {
@@ -107,7 +113,9 @@ internal sealed class WorkspaceHost : IDisposable
                      depsManifest))
         {
             if (!File.Exists(referencePath))
+            {
                 continue;
+            }
 
             try
             {
@@ -143,10 +151,14 @@ internal sealed class WorkspaceHost : IDisposable
                     assembly.GetName().Name,
                     "System.Configuration.ConfigurationManager",
                     StringComparison.OrdinalIgnoreCase)))
+        {
             return;
+        }
 
         if (resolver.DepsManifest?.TryResolve("System.Configuration.ConfigurationManager", out var path) != true)
+        {
             return;
+        }
 
         try
         {
@@ -163,25 +175,38 @@ internal sealed class WorkspaceHost : IDisposable
     }
 
     internal Assembly? LoadAssembly(string assemblySimpleName)
-        => _resolver.ResolveAssembly(assemblySimpleName);
+    {
+        return _resolver.ResolveAssembly(assemblySimpleName);
+    }
 
     internal Assembly? LoadAssembly(AssemblyName assemblyName)
-        => _resolver.ResolveAssembly(assemblyName);
+    {
+        return _resolver.ResolveAssembly(assemblyName);
+    }
 
     internal bool TryResolveAssemblyPath(string assemblySimpleName, out string absolutePath)
-        => _resolver.TryResolveAssemblyPath(assemblySimpleName, out absolutePath);
+    {
+        return _resolver.TryResolveAssemblyPath(assemblySimpleName, out absolutePath);
+    }
 
     internal bool TryResolveAssemblyPath(AssemblyName assemblyName, out string absolutePath)
-        => _resolver.TryResolveAssemblyPath(assemblyName, out absolutePath);
+    {
+        return _resolver.TryResolveAssemblyPath(assemblyName, out absolutePath);
+    }
 
     internal void EnsureEntityFrameworkCoreLoaded()
     {
         if (AppDomain.CurrentDomain.GetAssemblies().Any(static assembly =>
                 string.Equals(assembly.GetName().Name, "Microsoft.EntityFrameworkCore", StringComparison.Ordinal)))
+        {
             return;
+        }
 
-        if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore.Abstractions", out var abstractionsPath) == true)
+        if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore.Abstractions",
+                out var abstractionsPath) == true)
+        {
             LoadOrGetAssembly(abstractionsPath);
+        }
 
         if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore", out var corePath) == true)
         {
@@ -201,7 +226,7 @@ internal sealed class WorkspaceHost : IDisposable
         throw new InvalidOperationException(
             "Could not load `Microsoft.EntityFrameworkCore` for the built project."
             + $"{Environment.NewLine}Ensure the project references EF Core and was built successfully,"
-            + $" or use the API host project with `-p` so dependencies are available.");
+            + " or use the API host project with `-p` so dependencies are available.");
     }
 
     internal void EnsureEntityFrameworkRelationalLoaded()
@@ -213,9 +238,12 @@ internal sealed class WorkspaceHost : IDisposable
                     assembly.GetName().Name,
                     "Microsoft.EntityFrameworkCore.Relational",
                     StringComparison.Ordinal)))
+        {
             return;
+        }
 
-        if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore.Relational", out var relationalPath) == true)
+        if (_resolver.DepsManifest?.TryResolve("Microsoft.EntityFrameworkCore.Relational", out var relationalPath) ==
+            true)
         {
             PreloadPackageWithClosure(relationalPath);
             return;
@@ -224,18 +252,26 @@ internal sealed class WorkspaceHost : IDisposable
         var outputCandidate = Path.Combine(OutputDirectory, "Microsoft.EntityFrameworkCore.Relational.dll");
 
         if (File.Exists(outputCandidate))
+        {
             LoadOrGetAssembly(outputCandidate);
+        }
     }
 
     internal void EnsureProviderDependenciesLoaded(MyEfVibeProvider provider)
     {
         if (provider == MyEfVibeProvider.Sqlite)
+        {
             WorkspaceSqliteNativeBootstrap.EnsureBatteriesInitialized(this);
+        }
         else
+        {
             EnsureEntityFrameworkRelationalLoaded();
+        }
 
         foreach (var assemblySimpleName in ProviderAssemblyNames.For(provider))
+        {
             PreloadPackageByName(assemblySimpleName);
+        }
     }
 
     internal void PreloadPackageByName(string assemblySimpleName)
@@ -272,7 +308,7 @@ internal sealed class WorkspaceHost : IDisposable
                      "Microsoft.AspNetCore.Mvc.Core",
                      "Microsoft.AspNetCore.Routing",
                      "Microsoft.AspNetCore.Http.Abstractions",
-                     "Microsoft.AspNetCore.OpenApi",
+                     "Microsoft.AspNetCore.OpenApi"
                  })
         {
             _ = LoadAssembly(assemblySimpleName);
@@ -280,10 +316,14 @@ internal sealed class WorkspaceHost : IDisposable
     }
 
     internal IEnumerable<Assembly> EnumerateDiscoveryAssemblies()
-        => EnumerateAssembliesFromPaths(EnumerateEfDiscoveryAssemblyPaths());
+    {
+        return EnumerateAssembliesFromPaths(EnumerateEfDiscoveryAssemblyPaths());
+    }
 
     internal IEnumerable<Assembly> EnumerateDesignTimeDiscoveryAssemblies()
-        => EnumerateAssembliesFromPaths(EnumerateDesignTimeDiscoveryAssemblyPaths());
+    {
+        return EnumerateAssembliesFromPaths(EnumerateDesignTimeDiscoveryAssemblyPaths());
+    }
 
     private IEnumerable<Assembly> EnumerateAssembliesFromPaths(IEnumerable<string> assemblyPaths)
     {
@@ -309,59 +349,77 @@ internal sealed class WorkspaceHost : IDisposable
             var identity = assembly.FullName ?? assembly.GetName().Name ?? assemblyPath;
 
             if (!seen.Add(identity))
+            {
                 continue;
+            }
 
             if (IsToolingAssembly(assembly.GetName().Name))
+            {
                 continue;
+            }
 
             yield return assembly;
         }
     }
 
     private IEnumerable<string> EnumerateEfDiscoveryAssemblyPaths()
-        => EnumerateDiscoveryAssemblyPaths(OutputDirectory);
+    {
+        return EnumerateDiscoveryAssemblyPaths(OutputDirectory);
+    }
 
     private IEnumerable<string> EnumerateDesignTimeDiscoveryAssemblyPaths()
     {
         foreach (var path in EnumerateEfDiscoveryAssemblyPaths())
+        {
             yield return path;
+        }
 
         var startupOutputDirectory = EnsureStartupOutputDirectory();
 
         if (string.IsNullOrEmpty(startupOutputDirectory)
             || string.Equals(startupOutputDirectory, OutputDirectory, StringComparison.OrdinalIgnoreCase))
+        {
             yield break;
+        }
 
         foreach (var path in EnumerateDiscoveryAssemblyPaths(startupOutputDirectory))
+        {
             yield return path;
+        }
     }
 
     private string? EnsureStartupOutputDirectory()
     {
-        if (!string.IsNullOrEmpty(_startupOutputDirectory))
-            return _startupOutputDirectory;
+        if (!string.IsNullOrEmpty(StartupOutputDirectory))
+        {
+            return StartupOutputDirectory;
+        }
 
         if (string.Equals(ProjectPath, StartupProjectPath, StringComparison.OrdinalIgnoreCase))
-            return _startupOutputDirectory = OutputDirectory;
+        {
+            return StartupOutputDirectory = OutputDirectory;
+        }
 
         if (_startupBuildAttempted)
+        {
             return null;
+        }
 
         _startupBuildAttempted = true;
 
         _startupBuildOutput ??= WorkspaceBuilder.GetIsolatedBuildOutput(
             SessionDirectory,
             StartupProjectPath,
-            _targetFrameworkMoniker);
+            TargetFrameworkMoniker);
 
         if (WorkspaceBuildResult.TryLocateStartupOutput(
                 StartupProjectPath,
-                _targetFrameworkMoniker,
+                TargetFrameworkMoniker,
                 _startupBuildOutput,
                 out var startupOutputDirectory))
         {
-            _startupOutputDirectory = startupOutputDirectory;
-            return _startupOutputDirectory;
+            StartupOutputDirectory = startupOutputDirectory;
+            return StartupOutputDirectory;
         }
 
         var startupFramework = ProjectTargetFrameworkResolver.ResolveBuildFramework(StartupProjectPath, null);
@@ -376,9 +434,11 @@ internal sealed class WorkspaceHost : IDisposable
                 startupFramework,
                 _startupBuildOutput,
                 out startupOutputDirectory))
-            _startupOutputDirectory = startupOutputDirectory;
+        {
+            StartupOutputDirectory = startupOutputDirectory;
+        }
 
-        return _startupOutputDirectory;
+        return StartupOutputDirectory;
     }
 
     private IEnumerable<string> EnumerateDiscoveryAssemblyPaths(string outputDirectory)
@@ -386,30 +446,44 @@ internal sealed class WorkspaceHost : IDisposable
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         if (!Directory.Exists(outputDirectory))
+        {
             yield break;
+        }
 
         foreach (var dllPath in Directory.EnumerateFiles(outputDirectory, "*.dll", SearchOption.TopDirectoryOnly))
         {
             if (!WorkspaceAssemblyFilter.ShouldScanAssembly(dllPath))
+            {
                 continue;
+            }
 
             if (seen.Add(dllPath))
+            {
                 yield return dllPath;
+            }
         }
 
         if (_resolver.DepsManifest is null)
+        {
             yield break;
+        }
 
         foreach (var dllPath in _resolver.DepsManifest.EnumerateProjectAssemblyPaths())
         {
             if (!File.Exists(dllPath))
+            {
                 continue;
+            }
 
             if (!WorkspaceAssemblyFilter.ShouldScanAssembly(dllPath))
+            {
                 continue;
+            }
 
             if (seen.Add(dllPath))
+            {
                 yield return dllPath;
+            }
         }
     }
 
@@ -420,7 +494,9 @@ internal sealed class WorkspaceHost : IDisposable
                 workspaceBuild.OutputDirectory,
                 workspaceBuild.StartupOutputDirectory,
                 StringComparison.OrdinalIgnoreCase))
+        {
             return null;
+        }
 
         var startupAssemblyName = CsprojReader.ReadLogicalAssemblyName(workspaceBuild.StartupProjectPath);
         var startupDll = Path.Combine(workspaceBuild.StartupOutputDirectory, $"{startupAssemblyName}.dll");
@@ -437,12 +513,16 @@ internal sealed class WorkspaceHost : IDisposable
                 workspaceBuild.OutputDirectory,
                 workspaceBuild.StartupOutputDirectory,
                 StringComparison.OrdinalIgnoreCase))
+        {
             return depsManifest;
+        }
 
         var startupDll = ResolveStartupAssemblyDll(workspaceBuild);
 
         if (startupDll is null)
+        {
             return depsManifest;
+        }
 
         return WorkspaceDepsManifest.Merge(depsManifest, WorkspaceDepsManifest.TryLoad(startupDll));
     }
@@ -454,16 +534,20 @@ internal sealed class WorkspaceHost : IDisposable
         var paths = new List<string> { primaryAssemblyDll };
         var seenSimpleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            AssemblyName.GetAssemblyName(primaryAssemblyDll).Name ?? string.Empty,
+            AssemblyName.GetAssemblyName(primaryAssemblyDll).Name ?? string.Empty
         };
 
         if (depsManifest is null)
+        {
             return paths;
+        }
 
         foreach (var projectPath in depsManifest.EnumerateProjectAssemblyPaths())
         {
             if (!File.Exists(projectPath))
+            {
                 continue;
+            }
 
             string simpleName;
 
@@ -481,7 +565,9 @@ internal sealed class WorkspaceHost : IDisposable
             }
 
             if (!seenSimpleNames.Add(simpleName))
+            {
                 continue;
+            }
 
             paths.Add(projectPath);
         }
@@ -492,18 +578,26 @@ internal sealed class WorkspaceHost : IDisposable
     private void PreloadExactReferencesFromAssembly(string assemblyPath)
     {
         if (_resolver.DepsManifest is null)
+        {
             return;
+        }
 
         foreach (var reference in AssemblyReferenceReader.Read(assemblyPath))
         {
             if (string.IsNullOrEmpty(reference.Name))
+            {
                 continue;
+            }
 
             if (AssemblyResolutionHelpers.FindLoadedAssembly(reference) is not null)
+            {
                 continue;
+            }
 
             if (!_resolver.DepsManifest.TryResolve(reference, out var referencePath))
+            {
                 continue;
+            }
 
             try
             {
@@ -519,10 +613,14 @@ internal sealed class WorkspaceHost : IDisposable
     }
 
     private static Assembly LoadOrGetAssembly(string absolutePath)
-        => AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, absolutePath);
+    {
+        return AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, absolutePath);
+    }
 
     internal IEnumerable<Assembly> EnumerateLoadedAssemblies()
-        => AppDomain.CurrentDomain.GetAssemblies();
+    {
+        return AppDomain.CurrentDomain.GetAssemblies();
+    }
 
     internal IEnumerable<Assembly> EnumerateApplicationAssemblies()
     {
@@ -531,13 +629,19 @@ internal sealed class WorkspaceHost : IDisposable
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
             if (ReferenceEquals(assembly, PrimaryAssembly))
+            {
                 continue;
+            }
 
             if (!_resolver.IsOutputDirectoryAssembly(assembly))
+            {
                 continue;
+            }
 
             if (IsToolingAssembly(assembly.GetName().Name))
+            {
                 continue;
+            }
 
             yield return assembly;
         }
@@ -546,18 +650,14 @@ internal sealed class WorkspaceHost : IDisposable
     private static bool IsToolingAssembly(string? assemblyName)
     {
         if (string.IsNullOrEmpty(assemblyName))
+        {
             return true;
+        }
 
         return assemblyName.StartsWith("Microsoft.CodeAnalysis", StringComparison.OrdinalIgnoreCase)
                || assemblyName.StartsWith("Microsoft.Build", StringComparison.OrdinalIgnoreCase)
                || assemblyName.StartsWith("Microsoft.EntityFrameworkCore.Design", StringComparison.OrdinalIgnoreCase)
                || assemblyName.StartsWith("Humanizer", StringComparison.OrdinalIgnoreCase)
                || assemblyName.StartsWith("Mono.TextTemplating", StringComparison.OrdinalIgnoreCase);
-    }
-
-    public void Dispose()
-    {
-        AssemblyLoader.Dispose();
-        _resolver.Dispose();
     }
 }

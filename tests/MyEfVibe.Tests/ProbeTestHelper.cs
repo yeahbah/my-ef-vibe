@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.EntityFrameworkCore;
@@ -29,17 +30,17 @@ internal static class ProbeTestHelper
             : $"using {namespaceName};{Environment.NewLine}";
 
         var wrapper = $$"""
-            using System.Linq;
-            using System.Linq.Expressions;
-            using Microsoft.EntityFrameworkCore;
-            {{namespaceUsing}}public static class ProbeCompileHarness
-            {
-                public static void Run({{contextName}} db)
-                {
-                    _ = {{probeExpression}};
-                }
-            }
-            """;
+                        using System.Linq;
+                        using System.Linq.Expressions;
+                        using Microsoft.EntityFrameworkCore;
+                        {{namespaceUsing}}public static class ProbeCompileHarness
+                        {
+                            public static void Run({{contextName}} db)
+                            {
+                                _ = {{probeExpression}};
+                            }
+                        }
+                        """;
 
         var tree = CSharpSyntaxTree.ParseText(wrapper);
         var compilation = CSharpCompilation.Create(
@@ -56,6 +57,14 @@ internal static class ProbeTestHelper
         Assert.Empty(errors);
     }
 
+    internal static string CollapseWhitespace(string value)
+    {
+        return string.Join(
+            ' ',
+            value.ReplaceLineEndings(" ")
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
     private static class ReferenceAssemblies
     {
         internal static MetadataReference[] For(Type dbContextType)
@@ -64,10 +73,10 @@ internal static class ProbeTestHelper
             {
                 typeof(object).Assembly,
                 typeof(Enumerable).Assembly,
-                typeof(System.Linq.Expressions.Expression).Assembly,
+                typeof(Expression).Assembly,
                 typeof(DbContext).Assembly,
                 typeof(ReplQueryableRuntime).Assembly,
-                dbContextType.Assembly,
+                dbContextType.Assembly
             };
 
             return shared
@@ -75,10 +84,4 @@ internal static class ProbeTestHelper
                 .ToArray();
         }
     }
-
-    internal static string CollapseWhitespace(string value) =>
-        string.Join(
-            ' ',
-            value.ReplaceLineEndings(" ")
-                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }

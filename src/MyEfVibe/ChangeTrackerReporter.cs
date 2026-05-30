@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Reflection;
 using Spectre.Console;
 
@@ -43,7 +44,8 @@ internal static class ChangeTrackerReporter
             table.AddRow(
                 group.Key,
                 group.Count().ToString(),
-                string.Join(", ", types) + (group.Select(static e => e.EntityType).Distinct().Count() > 5 ? ", …" : ""));
+                string.Join(", ", types) +
+                (group.Select(static e => e.EntityType).Distinct().Count() > 5 ? ", …" : ""));
         }
 
         AnsiConsole.Write(table);
@@ -61,15 +63,21 @@ internal static class ChangeTrackerReporter
                 && method.GetParameters().Length == 0);
 
         if (entriesMethod is null)
+        {
             yield break;
+        }
 
-        if (entriesMethod.Invoke(changeTracker, null) is not System.Collections.IEnumerable entries)
+        if (entriesMethod.Invoke(changeTracker, null) is not IEnumerable entries)
+        {
             yield break;
+        }
 
         foreach (var entry in entries)
         {
             if (entry is null)
+            {
                 continue;
+            }
 
             var entryType = entry.GetType();
             var state = entryType.GetProperty("State")?.GetValue(entry)?.ToString() ?? "Unknown";

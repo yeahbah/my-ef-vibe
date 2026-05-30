@@ -5,47 +5,66 @@ using System.Text.Json;
 namespace MyEfVibe;
 
 /// <summary>
-/// Resolves runtime assembly paths from a built project's <c>.deps.json</c>, including NuGet packages
-/// that <see cref="AssemblyDependencyResolver"/> does not return for library outputs.
+///     Resolves runtime assembly paths from a built project's <c>.deps.json</c>, including NuGet packages
+///     that <see cref="AssemblyDependencyResolver" /> does not return for library outputs.
 /// </summary>
 internal sealed class WorkspaceDepsManifest
 {
     private readonly Dictionary<string, List<AssemblyAsset>> _assetsBySimpleName =
         new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly HashSet<string> _projectAssemblyPaths =
-        new(StringComparer.OrdinalIgnoreCase);
-
     private readonly Dictionary<string, List<NativeAsset>> _nativeAssetsByFileName =
         new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly List<PackageLibrary> _packageLibraries = [];
     private readonly string _nuGetPackagesRoot;
+
+    private readonly List<PackageLibrary> _packageLibraries = [];
+
+    private readonly HashSet<string> _projectAssemblyPaths =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private WorkspaceDepsManifest(string nuGetPackagesRoot)
     {
         _nuGetPackagesRoot = nuGetPackagesRoot;
     }
 
-    private sealed record AssemblyAsset(Version? Version, string Path, int Rank);
+    internal ImmutableArray<string> RuntimeAssemblyPaths
+    {
+        get
+        {
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-    private sealed record NativeAsset(string Path, int Rank);
+            foreach (var assets in _assetsBySimpleName.Values)
+            {
+                var preferred = ChooseBestAsset(null, assets);
 
-    private sealed record PackageLibrary(string PackageId, Version? Version, string PackageFolder);
+                if (preferred is not null)
+                {
+                    paths.Add(preferred.Path);
+                }
+            }
+
+            return paths.ToImmutableArray();
+        }
+    }
 
     internal static WorkspaceDepsManifest? TryLoad(string entryAssemblyPath)
     {
         var outputDirectory = Path.GetDirectoryName(entryAssemblyPath);
 
         if (string.IsNullOrEmpty(outputDirectory))
+        {
             return null;
+        }
 
         var depsPath = Path.Combine(
             outputDirectory,
             $"{Path.GetFileNameWithoutExtension(entryAssemblyPath)}.deps.json");
 
         if (!File.Exists(depsPath))
+        {
             return null;
+        }
 
         try
         {
@@ -54,16 +73,22 @@ internal sealed class WorkspaceDepsManifest
             if (!document.RootElement.TryGetProperty("runtimeTarget", out var runtimeTargetProperty)
                 || !document.RootElement.TryGetProperty("targets", out var targetsProperty)
                 || !document.RootElement.TryGetProperty("libraries", out var librariesProperty))
+            {
                 return null;
+            }
 
             if (!runtimeTargetProperty.TryGetProperty("name", out var runtimeTargetNameProperty))
+            {
                 return null;
+            }
 
             var runtimeTargetName = runtimeTargetNameProperty.GetString();
 
             if (string.IsNullOrWhiteSpace(runtimeTargetName)
                 || !targetsProperty.TryGetProperty(runtimeTargetName, out var targetNode))
+            {
                 return null;
+            }
 
             var nuGetPackagesRoot = ResolveNuGetPackagesRoot();
             var manifest = new WorkspaceDepsManifest(nuGetPackagesRoot);
@@ -73,16 +98,19 @@ internal sealed class WorkspaceDepsManifest
             foreach (var library in targetNode.EnumerateObject())
             {
                 if (library.Value.TryGetProperty("runtime", out var runtimeAssets))
+                {
                     manifest.AddRuntimeAssets(
                         runtimeAssets,
                         librariesProperty,
                         library.Name,
                         nuGetPackagesRoot,
                         outputDirectory,
-                        runtimeIdentifier: null,
+                        null,
                         runtimeFallbacks);
+                }
 
                 if (library.Value.TryGetProperty("runtimeTargets", out var runtimeTargetAssets))
+                {
                     manifest.AddRuntimeTargetAssets(
                         runtimeTargetAssets,
                         librariesProperty,
@@ -90,6 +118,7 @@ internal sealed class WorkspaceDepsManifest
                         nuGetPackagesRoot,
                         outputDirectory,
                         runtimeFallbacks);
+                }
             }
 
             return manifest;
@@ -123,7 +152,9 @@ internal sealed class WorkspaceDepsManifest
             var fileName = Path.GetFileName(normalizedRelativePath);
 
             if (!fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             TryAddAsset(
                 normalizedRelativePath,
@@ -151,17 +182,23 @@ internal sealed class WorkspaceDepsManifest
         foreach (var runtimeAsset in runtimeTargetAssets.EnumerateObject())
         {
             if (!runtimeAsset.Value.TryGetProperty("rid", out var ridProperty))
+            {
                 continue;
+            }
 
             var rid = ridProperty.GetString();
 
             if (string.IsNullOrWhiteSpace(rid))
+            {
                 continue;
+            }
 
             var rank = HostRuntimeIdentifier.GetFallbackRank(rid, runtimeFallbacks);
 
             if (rank == int.MaxValue)
+            {
                 continue;
+            }
 
             var normalizedRelativePath = runtimeAsset.Name.Replace('/', Path.DirectorySeparatorChar);
             var fileName = Path.GetFileName(normalizedRelativePath);
@@ -191,11 +228,15 @@ internal sealed class WorkspaceDepsManifest
         foreach (var candidateFileName in candidateFileNames)
         {
             if (string.IsNullOrWhiteSpace(candidateFileName))
+            {
                 continue;
+            }
 
             if (!_nativeAssetsByFileName.TryGetValue(candidateFileName, out var assets)
                 || assets.Count == 0)
+            {
                 continue;
+            }
 
             absolutePath = assets
                 .OrderByDescending(static asset => asset.Rank)
@@ -212,7 +253,9 @@ internal sealed class WorkspaceDepsManifest
     {
         if (fileName.EndsWith(".dylib", StringComparison.OrdinalIgnoreCase)
             || fileName.EndsWith(".so", StringComparison.OrdinalIgnoreCase))
+        {
             return true;
+        }
 
         return fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
                && fileName.Contains("e_sqlite3", StringComparison.OrdinalIgnoreCase);
@@ -230,7 +273,9 @@ internal sealed class WorkspaceDepsManifest
             : Path.Combine(packageFolder, normalizedRelativePath);
 
         if (!File.Exists(absolutePath))
+        {
             return;
+        }
 
         if (!_nativeAssetsByFileName.TryGetValue(fileName, out var assets))
         {
@@ -244,7 +289,9 @@ internal sealed class WorkspaceDepsManifest
         if (duplicatePath >= 0)
         {
             if (assets[duplicatePath].Rank <= rank)
+            {
                 return;
+            }
 
             assets.RemoveAt(duplicatePath);
         }
@@ -266,7 +313,9 @@ internal sealed class WorkspaceDepsManifest
             : Path.Combine(packageFolder, normalizedRelativePath);
 
         if (!File.Exists(absolutePath))
+        {
             return;
+        }
 
         var simpleName = Path.GetFileNameWithoutExtension(fileName);
         var assemblyVersion = TryReadAssemblyVersion(absolutePath) ?? libraryVersion;
@@ -285,7 +334,9 @@ internal sealed class WorkspaceDepsManifest
             var existing = assets[duplicatePath];
 
             if (existing.Rank <= rank)
+            {
                 return;
+            }
 
             assets.RemoveAt(duplicatePath);
         }
@@ -297,7 +348,9 @@ internal sealed class WorkspaceDepsManifest
             var existing = assets[sameVersionIndex];
 
             if (existing.Rank <= rank)
+            {
                 return;
+            }
 
             assets.RemoveAt(sameVersionIndex);
         }
@@ -305,18 +358,27 @@ internal sealed class WorkspaceDepsManifest
         assets.Add(new AssemblyAsset(assemblyVersion, absolutePath, rank));
 
         if (isProjectLibrary)
+        {
             _projectAssemblyPaths.Add(absolutePath);
+        }
     }
 
-    internal IEnumerable<string> EnumerateProjectAssemblyPaths() => _projectAssemblyPaths;
+    internal IEnumerable<string> EnumerateProjectAssemblyPaths()
+    {
+        return _projectAssemblyPaths;
+    }
 
     internal static WorkspaceDepsManifest? Merge(WorkspaceDepsManifest? primary, WorkspaceDepsManifest? secondary)
     {
         if (primary is null)
+        {
             return secondary;
+        }
 
         if (secondary is null)
+        {
             return primary;
+        }
 
         primary.ImportFrom(secondary);
 
@@ -337,7 +399,9 @@ internal sealed class WorkspaceDepsManifest
             {
                 if (assets.Any(existing =>
                         string.Equals(existing.Path, asset.Path, StringComparison.OrdinalIgnoreCase)))
+                {
                     continue;
+                }
 
                 assets.Add(asset);
             }
@@ -350,7 +414,9 @@ internal sealed class WorkspaceDepsManifest
             if (_packageLibraries.Any(existing =>
                     string.Equals(existing.PackageId, library.PackageId, StringComparison.OrdinalIgnoreCase)
                     && VersionsEqual(existing.Version, library.Version)))
+            {
                 continue;
+            }
 
             _packageLibraries.Add(library);
         }
@@ -367,7 +433,9 @@ internal sealed class WorkspaceDepsManifest
             {
                 if (assets.Any(existing =>
                         string.Equals(existing.Path, asset.Path, StringComparison.OrdinalIgnoreCase)))
+                {
                     continue;
+                }
 
                 assets.Add(asset);
             }
@@ -375,7 +443,9 @@ internal sealed class WorkspaceDepsManifest
     }
 
     internal bool TryResolve(string? assemblySimpleName, out string absolutePath)
-        => TryResolve(assemblySimpleName, allowProviderNuGetFallback: true, out absolutePath);
+    {
+        return TryResolve(assemblySimpleName, true, out absolutePath);
+    }
 
     internal bool TryResolve(
         string? assemblySimpleName,
@@ -392,7 +462,9 @@ internal sealed class WorkspaceDepsManifest
     }
 
     internal bool TryResolve(AssemblyName requested, out string absolutePath)
-        => TryResolve(requested, allowProviderNuGetFallback: true, out absolutePath);
+    {
+        return TryResolve(requested, true, out absolutePath);
+    }
 
     internal bool TryResolve(
         AssemblyName requested,
@@ -402,7 +474,9 @@ internal sealed class WorkspaceDepsManifest
         absolutePath = string.Empty;
 
         if (string.IsNullOrEmpty(requested.Name))
+        {
             return false;
+        }
 
         if (_assetsBySimpleName.TryGetValue(requested.Name, out var assets) && assets.Count > 0)
         {
@@ -416,13 +490,19 @@ internal sealed class WorkspaceDepsManifest
         }
 
         if (TryResolveFromPackageLib(requested, out absolutePath))
+        {
             return true;
+        }
 
         if (!allowProviderNuGetFallback)
+        {
             return false;
+        }
 
         if (requested.Version is null || AssemblyResolutionHelpers.IsZeroVersion(requested.Version))
+        {
             return TryResolveLatestProviderFromNuGetPackageFolder(requested, out absolutePath);
+        }
 
         return TryResolveFromNuGetPackageFolder(requested, out absolutePath);
     }
@@ -433,15 +513,21 @@ internal sealed class WorkspaceDepsManifest
         {
             if (!library.Value.TryGetProperty("type", out var typeProperty)
                 || !string.Equals(typeProperty.GetString(), "package", StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             if (!library.Value.TryGetProperty("path", out var packagePathProperty))
+            {
                 continue;
+            }
 
             var slashIndex = library.Name.LastIndexOf('/');
 
             if (slashIndex <= 0 || slashIndex >= library.Name.Length - 1)
+            {
                 continue;
+            }
 
             var packageId = library.Name[..slashIndex];
             var packageFolder = Path.Combine(nuGetPackagesRoot, packagePathProperty.GetString()!);
@@ -458,23 +544,31 @@ internal sealed class WorkspaceDepsManifest
         absolutePath = string.Empty;
 
         if (string.IsNullOrEmpty(requested.Name))
+        {
             return false;
+        }
 
         foreach (var library in _packageLibraries)
         {
             if (!string.Equals(library.PackageId, requested.Name, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             if (requested.Version is not null
                 && !AssemblyResolutionHelpers.IsZeroVersion(requested.Version)
                 && library.Version is not null
                 && !AssemblyResolutionHelpers.VersionsMatch(requested.Version, library.Version))
+            {
                 continue;
+            }
 
             var dllPath = FindAssemblyDllInPackage(library.PackageFolder, requested.Name);
 
             if (dllPath is null)
+            {
                 continue;
+            }
 
             absolutePath = dllPath;
 
@@ -491,7 +585,9 @@ internal sealed class WorkspaceDepsManifest
         if (string.IsNullOrEmpty(requested.Name)
             || requested.Version is null
             || AssemblyResolutionHelpers.IsZeroVersion(requested.Version))
+        {
             return false;
+        }
 
         foreach (var versionFolder in EnumerateNuGetVersionFolderCandidates(requested.Version))
         {
@@ -503,7 +599,9 @@ internal sealed class WorkspaceDepsManifest
             var dllPath = FindAssemblyDllInPackage(packageFolder, requested.Name);
 
             if (dllPath is null)
+            {
                 continue;
+            }
 
             absolutePath = dllPath;
 
@@ -514,8 +612,8 @@ internal sealed class WorkspaceDepsManifest
     }
 
     /// <summary>
-    /// Resolves EF provider packages from the global NuGet cache when the workspace project does not
-    /// reference them (e.g. <c>--provider npgsql</c> against a SqlServer-only EF library).
+    ///     Resolves EF provider packages from the global NuGet cache when the workspace project does not
+    ///     reference them (e.g. <c>--provider npgsql</c> against a SqlServer-only EF library).
     /// </summary>
     private bool TryResolveLatestProviderFromNuGetPackageFolder(AssemblyName requested, out string absolutePath)
     {
@@ -523,7 +621,9 @@ internal sealed class WorkspaceDepsManifest
 
         if (string.IsNullOrEmpty(requested.Name)
             || !ProviderAssemblyNames.IsKnownProviderAssembly(requested.Name))
+        {
             return false;
+        }
 
         return TryResolveLatestFromNuGetPackageFolder(requested, out absolutePath);
     }
@@ -533,14 +633,18 @@ internal sealed class WorkspaceDepsManifest
         absolutePath = string.Empty;
 
         if (string.IsNullOrEmpty(requested.Name))
+        {
             return false;
+        }
 
         var packageRoot = Path.Combine(
             _nuGetPackagesRoot,
             ProviderAssemblyNames.GetNuGetPackageFolderName(requested.Name));
 
         if (!Directory.Exists(packageRoot))
+        {
             return false;
+        }
 
         var preferredMajor = TryGetReferencedEntityFrameworkCoreMajor();
 
@@ -551,7 +655,9 @@ internal sealed class WorkspaceDepsManifest
                 requested.Name);
 
             if (dllPath is null)
+            {
                 continue;
+            }
 
             absolutePath = dllPath;
 
@@ -565,9 +671,11 @@ internal sealed class WorkspaceDepsManifest
     {
         if (!_assetsBySimpleName.TryGetValue("Microsoft.EntityFrameworkCore", out var assets)
             || assets.Count == 0)
+        {
             return null;
+        }
 
-        var chosen = ChooseBestAsset(requestedVersion: null, assets);
+        var chosen = ChooseBestAsset(null, assets);
 
         return chosen?.Version?.Major;
     }
@@ -581,7 +689,9 @@ internal sealed class WorkspaceDepsManifest
             .ToArray();
 
         if (preferredMajor is null)
+        {
             return versionFolders;
+        }
 
         var matchingMajor = versionFolders
             .Where(folder => Version.Parse(folder).Major == preferredMajor.Value)
@@ -598,7 +708,9 @@ internal sealed class WorkspaceDepsManifest
         yield return $"{requestedVersion.Major}.{requestedVersion.Minor}.{build}";
 
         if (revision > 0)
+        {
             yield return $"{requestedVersion.Major}.{requestedVersion.Minor}.{build}.{revision}";
+        }
     }
 
     private static string? FindAssemblyDllInPackage(string packageFolder, string assemblySimpleName)
@@ -606,14 +718,18 @@ internal sealed class WorkspaceDepsManifest
         var libRoot = Path.Combine(packageFolder, "lib");
 
         if (!Directory.Exists(libRoot))
+        {
             return null;
+        }
 
         foreach (var tfmDirectory in EnumeratePreferredLibDirectories(libRoot))
         {
             var candidate = Path.Combine(tfmDirectory, $"{assemblySimpleName}.dll");
 
             if (File.Exists(candidate))
+            {
                 return candidate;
+            }
         }
 
         return null;
@@ -631,24 +747,32 @@ internal sealed class WorkspaceDepsManifest
         var tfm = Path.GetFileName(tfmDirectory);
 
         if (IsMobileOrLegacyLibDirectory(tfm))
+        {
             return 1_000;
+        }
 
         if (TryGetNetCoreLibRank(tfm, out var netCoreRank))
+        {
             return netCoreRank;
+        }
 
         if (TryGetNetStandardLibRank(tfm, out var netStandardRank))
+        {
             return netStandardRank;
+        }
 
         return 500;
     }
 
     private static bool IsMobileOrLegacyLibDirectory(string tfm)
-        => tfm.Contains("android", StringComparison.OrdinalIgnoreCase)
-           || tfm.Contains("ios", StringComparison.OrdinalIgnoreCase)
-           || tfm.Contains("tvos", StringComparison.OrdinalIgnoreCase)
-           || tfm.StartsWith("xamarin", StringComparison.OrdinalIgnoreCase)
-           || tfm.StartsWith("monoandroid", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(tfm, "net461", StringComparison.OrdinalIgnoreCase);
+    {
+        return tfm.Contains("android", StringComparison.OrdinalIgnoreCase)
+               || tfm.Contains("ios", StringComparison.OrdinalIgnoreCase)
+               || tfm.Contains("tvos", StringComparison.OrdinalIgnoreCase)
+               || tfm.StartsWith("xamarin", StringComparison.OrdinalIgnoreCase)
+               || tfm.StartsWith("monoandroid", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(tfm, "net461", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool TryGetNetCoreLibRank(string tfm, out int rank)
     {
@@ -656,10 +780,14 @@ internal sealed class WorkspaceDepsManifest
 
         if (!tfm.StartsWith("net", StringComparison.OrdinalIgnoreCase)
             || tfm.Contains('-', StringComparison.Ordinal))
+        {
             return false;
+        }
 
         if (!Version.TryParse(tfm["net".Length..], out var version))
+        {
             return false;
+        }
 
         rank = 100 - (version.Major * 10 + version.Minor);
 
@@ -671,10 +799,14 @@ internal sealed class WorkspaceDepsManifest
         rank = 0;
 
         if (!tfm.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
         if (!Version.TryParse(tfm["netstandard".Length..], out var version))
+        {
             return false;
+        }
 
         rank = 200 - (version.Major * 10 + version.Minor);
 
@@ -688,10 +820,14 @@ internal sealed class WorkspaceDepsManifest
             var only = assets[0];
 
             if (requestedVersion is null || requestedVersion == new Version(0, 0, 0, 0))
+            {
                 return only;
+            }
 
             if (only.Version is null || AssemblyResolutionHelpers.VersionsMatch(requestedVersion, only.Version))
+            {
                 return only;
+            }
 
             return null;
         }
@@ -707,13 +843,17 @@ internal sealed class WorkspaceDepsManifest
         var withVersions = assets.Where(static asset => asset.Version is not null).ToArray();
 
         if (withVersions.Length == 0)
+        {
             return assets.OrderByDescending(static asset => asset.Rank).First();
+        }
 
         var exact = withVersions.FirstOrDefault(asset =>
             AssemblyResolutionHelpers.VersionsMatch(requestedVersion, asset.Version));
 
         if (exact is not null)
+        {
             return exact;
+        }
 
         var notHigherThanRequested = withVersions
             .Where(asset => asset.Version! <= requestedVersion)
@@ -722,37 +862,25 @@ internal sealed class WorkspaceDepsManifest
             .FirstOrDefault();
 
         if (notHigherThanRequested is not null)
+        {
             return notHigherThanRequested;
+        }
 
         // Never bind a higher assembly version to a lower reference (e.g. DiagnosticSource 10 for a 9.0.0.0 request).
         return null;
     }
 
-    internal ImmutableArray<string> RuntimeAssemblyPaths
-    {
-        get
-        {
-            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var assets in _assetsBySimpleName.Values)
-            {
-                var preferred = ChooseBestAsset(requestedVersion: null, assets);
-
-                if (preferred is not null)
-                    paths.Add(preferred.Path);
-            }
-
-            return paths.ToImmutableArray();
-        }
-    }
-
     private static bool VersionsEqual(Version? left, Version? right)
     {
         if (left is null && right is null)
+        {
             return true;
+        }
 
         if (left is null || right is null)
+        {
             return false;
+        }
 
         return left == right;
     }
@@ -762,7 +890,9 @@ internal sealed class WorkspaceDepsManifest
         var slashIndex = libraryName.LastIndexOf('/');
 
         if (slashIndex < 0 || slashIndex >= libraryName.Length - 1)
+        {
             return null;
+        }
 
         return Version.TryParse(libraryName[(slashIndex + 1)..], out var parsed)
             ? parsed
@@ -789,7 +919,9 @@ internal sealed class WorkspaceDepsManifest
     {
         if (!librariesProperty.TryGetProperty(libraryName, out var libraryMetadata)
             || !libraryMetadata.TryGetProperty("type", out var typeProperty))
+        {
             return false;
+        }
 
         return string.Equals(typeProperty.GetString(), "project", StringComparison.Ordinal);
     }
@@ -801,7 +933,9 @@ internal sealed class WorkspaceDepsManifest
     {
         if (!librariesProperty.TryGetProperty(libraryName, out var libraryMetadata)
             || !libraryMetadata.TryGetProperty("path", out var packagePathProperty))
+        {
             return null;
+        }
 
         return Path.Combine(nuGetPackagesRoot, packagePathProperty.GetString()!);
     }
@@ -811,11 +945,19 @@ internal sealed class WorkspaceDepsManifest
         var fromEnvironment = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
 
         if (!string.IsNullOrWhiteSpace(fromEnvironment))
+        {
             return fromEnvironment;
+        }
 
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget",
             "packages");
     }
+
+    private sealed record AssemblyAsset(Version? Version, string Path, int Rank);
+
+    private sealed record NativeAsset(string Path, int Rank);
+
+    private sealed record PackageLibrary(string PackageId, Version? Version, string PackageFolder);
 }

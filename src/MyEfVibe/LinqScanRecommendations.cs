@@ -2,8 +2,9 @@ namespace MyEfVibe;
 
 internal static class LinqScanRecommendations
 {
-    internal static string Get(string ruleId) =>
-        ruleId switch
+    internal static string Get(string ruleId)
+    {
+        return ruleId switch
         {
             "cartesian" =>
                 "Use AsSplitQuery() to fetch related rows in separate SQL statements instead of one wide join.\n"
@@ -60,6 +61,7 @@ internal static class LinqScanRecommendations
                 + "Fix lambda parameters so ThenInclude targets the previous navigation type (e.g. sp => sp.CountryRegion).",
 
             _ =>
-                "Run the query with database logging (:dblog on) or :plan to inspect the executed SQL and row counts.",
+                "Run the query with database logging (:dblog on) or :plan to inspect the executed SQL and row counts."
         };
+    }
 }

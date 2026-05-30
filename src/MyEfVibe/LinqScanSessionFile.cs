@@ -6,7 +6,7 @@ namespace MyEfVibe;
 internal enum LinqScanMode
 {
     Lite,
-    Deep,
+    Deep
 }
 
 internal static class LinqScanSessionFile
@@ -19,13 +19,15 @@ internal static class LinqScanSessionFile
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    internal static string GetPath(string sessionDirectory, LinqScanMode mode) =>
-        Path.Combine(
+    internal static string GetPath(string sessionDirectory, LinqScanMode mode)
+    {
+        return Path.Combine(
             SessionPaths.EnsureSessionDirectory(sessionDirectory),
             mode == LinqScanMode.Deep ? DeepFileName : LiteFileName);
+    }
 
     internal static string Save(
         string sessionDirectory,
@@ -61,8 +63,9 @@ internal sealed record LinqScanSessionDocument(
         LinqLiteScanResult result,
         string displayRootDirectory,
         LinqScanMode mode,
-        LinqDeepScanStats? deepStats) =>
-        new(
+        LinqDeepScanStats? deepStats)
+    {
+        return new LinqScanSessionDocument(
             LinqScanSessionFile.CurrentVersion,
             mode == LinqScanMode.Deep ? "deep" : "lite",
             DateTimeOffset.Now,
@@ -75,12 +78,15 @@ internal sealed record LinqScanSessionDocument(
             deepStats?.SqlFailedCount,
             deepStats?.QueryPlanCount,
             deepStats?.QueryPlanFailedCount);
+    }
 
-    internal LinqLiteScanResult ToResult() =>
-        new(
+    internal LinqLiteScanResult ToResult()
+    {
+        return new LinqLiteScanResult(
             FilesScanned,
             ProjectsScanned,
             Findings.Select(static dto => dto.ToFinding()).ToList());
+    }
 }
 
 internal sealed record LinqScanFindingDto(
@@ -97,8 +103,9 @@ internal sealed record LinqScanFindingDto(
     string? QueryPlanNote = null,
     string? SavedNote = null)
 {
-    internal static LinqScanFindingDto From(LinqScanFinding finding) =>
-        new(
+    internal static LinqScanFindingDto From(LinqScanFinding finding)
+    {
+        return new LinqScanFindingDto(
             finding.FilePath,
             finding.Line,
             finding.Code,
@@ -111,6 +118,7 @@ internal sealed record LinqScanFindingDto(
             finding.QueryPlan,
             finding.QueryPlanNote,
             finding.SavedNote);
+    }
 
     internal LinqScanFinding ToFinding()
     {

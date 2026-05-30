@@ -22,7 +22,9 @@ internal static class SchemaBrowser
         table.AddColumn("entity");
 
         foreach (var entry in sets)
+        {
             table.AddRow(entry.DbSet, entry.EntityType);
+        }
 
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
@@ -31,10 +33,12 @@ internal static class SchemaBrowser
     }
 
     internal static IReadOnlyList<(string DbSet, string EntityType, string? EntityTypeFullName)> GetDbSets(
-        object dbContext) =>
-        DiscoverDbSets(dbContext)
+        object dbContext)
+    {
+        return DiscoverDbSets(dbContext)
             .Select(set => (set.PropertyName, set.EntityTypeName, set.ElementType.FullName))
             .ToArray();
+    }
 
     internal static async Task<IReadOnlyList<(string DbSet, string EntityType, int? Count)>> GetDbSetCountsAsync(
         object dbContext,
@@ -56,15 +60,20 @@ internal static class SchemaBrowser
         return results;
     }
 
-    private static IEnumerable<(string PropertyName, string EntityTypeName, Type ElementType)> DiscoverDbSets(object dbContext)
+    private static IEnumerable<(string PropertyName, string EntityTypeName, Type ElementType)> DiscoverDbSets(
+        object dbContext)
     {
         foreach (var property in dbContext.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!property.PropertyType.IsGenericType)
+            {
                 continue;
+            }
 
-            if (!typeof(System.Linq.IQueryable).IsAssignableFrom(property.PropertyType))
+            if (!typeof(IQueryable).IsAssignableFrom(property.PropertyType))
+            {
                 continue;
+            }
 
             var elementType = property.PropertyType.GetGenericArguments()[0];
 
@@ -82,7 +91,9 @@ internal static class SchemaBrowser
             var dbSet = dbContext.GetType().GetProperty(set.PropertyName)?.GetValue(dbContext);
 
             if (dbSet is null)
+            {
                 return null;
+            }
 
             var count = await Task.Run(() => InvokeCount(dbSet, set.ElementType), cancellationToken);
 

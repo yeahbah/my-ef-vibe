@@ -9,7 +9,9 @@ internal static class IntegrationScenarioCatalog
         var manifestPath = Path.Combine(AppContext.BaseDirectory, "integration-scenarios.json");
 
         if (!File.Exists(manifestPath))
+        {
             throw new FileNotFoundException($"Integration manifest not found: {manifestPath}");
+        }
 
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
 
@@ -22,14 +24,16 @@ internal static class IntegrationScenarioCatalog
 
         if (!root.TryGetProperty("scenarios", out var scenariosProperty)
             || scenariosProperty.ValueKind != JsonValueKind.Array)
+        {
             throw new InvalidOperationException("integration-scenarios.json must contain a scenarios array.");
+        }
 
         var scenarios = new List<IntegrationScenario>();
 
         foreach (var entry in scenariosProperty.EnumerateArray())
         {
             var id = entry.GetProperty("id").GetString()
-                       ?? throw new InvalidOperationException("Scenario id is required.");
+                     ?? throw new InvalidOperationException("Scenario id is required.");
 
             var provider = entry.GetProperty("provider").GetString()
                            ?? throw new InvalidOperationException($"Scenario {id} requires provider.");
@@ -68,19 +72,25 @@ internal static class IntegrationScenarioCatalog
         return scenarios;
     }
 
-    internal static IntegrationScenario Require(string id) =>
-        Load().FirstOrDefault(scenario => string.Equals(scenario.Id, id, StringComparison.OrdinalIgnoreCase))
-        ?? throw new InvalidOperationException($"Unknown integration scenario `{id}`.");
+    internal static IntegrationScenario Require(string id)
+    {
+        return Load().FirstOrDefault(scenario => string.Equals(scenario.Id, id, StringComparison.OrdinalIgnoreCase))
+               ?? throw new InvalidOperationException($"Unknown integration scenario `{id}`.");
+    }
 
     private static string ResolveIntegrationRoot(string? manifestRoot)
     {
         var fromEnvironment = Environment.GetEnvironmentVariable("EFVIBE_INTEGRATION_ROOT");
 
         if (!string.IsNullOrWhiteSpace(fromEnvironment))
+        {
             return Path.GetFullPath(fromEnvironment.Trim());
+        }
 
         if (!string.IsNullOrWhiteSpace(manifestRoot))
+        {
             return Path.GetFullPath(manifestRoot.Trim());
+        }
 
         throw new InvalidOperationException(
             "Set EFVIBE_INTEGRATION_ROOT to the directory containing AdventureWorks sample repos.");

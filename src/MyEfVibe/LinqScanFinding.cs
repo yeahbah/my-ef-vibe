@@ -14,6 +14,11 @@ internal sealed record LinqScanFinding(
     string? QueryPlanNote = null,
     string? SavedNote = null)
 {
+    internal string ResolvedRecommendation =>
+        string.IsNullOrWhiteSpace(Recommendation)
+            ? LinqScanRecommendations.Get(RuleId)
+            : Recommendation;
+
     internal static LinqScanFinding Create(
         string filePath,
         int line,
@@ -25,8 +30,9 @@ internal sealed record LinqScanFinding(
         string? sqlTranslationNote = null,
         string? queryPlan = null,
         string? queryPlanNote = null,
-        string? savedNote = null) =>
-        new(
+        string? savedNote = null)
+    {
+        return new LinqScanFinding(
             filePath,
             line,
             code,
@@ -39,11 +45,7 @@ internal sealed record LinqScanFinding(
             queryPlan,
             queryPlanNote,
             savedNote);
-
-    internal string ResolvedRecommendation =>
-        string.IsNullOrWhiteSpace(Recommendation)
-            ? LinqScanRecommendations.Get(RuleId)
-            : Recommendation;
+    }
 
     internal string GetDismissalKey()
     {

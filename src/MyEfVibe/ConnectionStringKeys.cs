@@ -11,8 +11,11 @@ internal static class ConnectionStringKeys
         "MySql",
         "MariaDb",
         "Oracle",
-        "Database",
+        "Database"
     ];
 
-    internal static string FlatKey(string name) => $"ConnectionStrings:{name}";
+    internal static string FlatKey(string name)
+    {
+        return $"ConnectionStrings:{name}";
+    }
 }

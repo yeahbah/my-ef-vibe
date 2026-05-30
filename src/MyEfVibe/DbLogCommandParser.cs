@@ -34,11 +34,15 @@ internal static class DbLogCommandParser
         return true;
     }
 
-    internal static string FormatMode(DbLogSettings settings) =>
-        settings.Verbose ? "verbose" : "sql-only";
+    internal static string FormatMode(DbLogSettings settings)
+    {
+        return settings.Verbose ? "verbose" : "sql-only";
+    }
 
-    internal static string FormatStatus(DbLogSettings settings) =>
-        settings.Enabled
+    internal static string FormatStatus(DbLogSettings settings)
+    {
+        return settings.Enabled
             ? $"on ({DbLogLevelParser.Format(settings.Level)} · {FormatMode(settings)})"
             : "off";
+    }
 }

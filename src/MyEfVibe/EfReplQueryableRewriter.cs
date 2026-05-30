@@ -4,12 +4,24 @@ using System.Text.RegularExpressions;
 namespace MyEfVibe;
 
 /// <summary>
-/// Rewrites REPL <c>db.*</c> queries so LINQ operators bind to <see cref="Queryable"/> / EF extensions
-/// (not <see cref="Enumerable"/>), so EF translates them to SQL.
+///     Rewrites REPL <c>db.*</c> queries so LINQ operators bind to <see cref="Queryable" /> / EF extensions
+///     (not <see cref="Enumerable" />), so EF translates them to SQL.
 /// </summary>
 internal static partial class EfReplQueryableRewriter
 {
     private const string Runtime = "global::MyEfVibe.ReplQueryableRuntime";
+
+    private static readonly string[] QueryablePipelineMethods =
+    [
+        "OrderByDescending",
+        "OrderBy",
+        "ThenByDescending",
+        "ThenBy",
+        "Take",
+        "Skip",
+        "Where",
+        "Select"
+    ];
 
     [GeneratedRegex(
         @"^db\.(\w+)(.*)\.(First|FirstOrDefault|FirstAsync|FirstOrDefaultAsync)\(\)$",
@@ -27,14 +39,18 @@ internal static partial class EfReplQueryableRewriter
     internal static string? TryRewriteToEfStaticCalls(string snippet, Type? dbContextType)
     {
         if (dbContextType is null)
+        {
             return null;
+        }
 
         var trimmed = snippet.Trim().TrimEnd(';').Trim();
 
         if (string.IsNullOrWhiteSpace(trimmed)
             || !LinqEfQueryHeuristics.LooksLikeEfQuery(trimmed)
             || trimmed.Contains(Runtime, StringComparison.Ordinal))
+        {
             return null;
+        }
 
         var simple = SimpleTerminalRegex().Match(trimmed);
 
@@ -44,42 +60,54 @@ internal static partial class EfReplQueryableRewriter
             var middle = simple.Groups[2].Value;
             var terminal = simple.Groups[3].Value;
 
-            var terminalRewrite = TryBuildTerminalCall(dbContextType, propertyName, middle, terminal, predicate: null);
+            var terminalRewrite = TryBuildTerminalCall(dbContextType, propertyName, middle, terminal, null);
 
             if (terminalRewrite is not null)
+            {
                 return terminalRewrite;
+            }
         }
 
         var terminalWithArgs = TryRewriteTerminalCallWithArguments(trimmed, dbContextType);
 
         if (terminalWithArgs is not null)
+        {
             return terminalWithArgs;
+        }
 
         var materializerOrAggregate = TryRewriteMaterializerOrAggregate(trimmed, dbContextType);
 
         if (materializerOrAggregate is not null)
+        {
             return materializerOrAggregate;
+        }
 
         var takeMaterialize = TryRewriteTakeThenMaterialize(trimmed, dbContextType);
 
         if (takeMaterialize is not null)
+        {
             return takeMaterialize;
+        }
 
         var deferred = TryRewriteQueryableSource(trimmed, dbContextType);
 
         if (deferred is not null)
+        {
             return deferred;
+        }
 
         return TryRewriteSimpleTake(trimmed);
     }
 
-    internal static string? TryCastDbSetRoots(string snippet, Type dbContextType) =>
-        TryRewriteQueryableSource(snippet, dbContextType)
-        ?? TryRewriteTakeThenMaterialize(snippet, dbContextType)
-        ?? TryRewriteSimpleTake(snippet);
+    internal static string? TryCastDbSetRoots(string snippet, Type dbContextType)
+    {
+        return TryRewriteQueryableSource(snippet, dbContextType)
+               ?? TryRewriteTakeThenMaterialize(snippet, dbContextType)
+               ?? TryRewriteSimpleTake(snippet);
+    }
 
     /// <summary>
-    /// Rewrites <c>.Where(...).Take(n)</c> on a <c>db.Set</c> root to runtime <see cref="Queryable"/> calls.
+    ///     Rewrites <c>.Where(...).Take(n)</c> on a <c>db.Set</c> root to runtime <see cref="Queryable" /> calls.
     /// </summary>
     internal static string? TryRewriteWhereTakePipeline(string snippet, Type? dbContextType = null)
     {
@@ -98,18 +126,26 @@ internal static partial class EfReplQueryableRewriter
         }
 
         if (!TryParseTrailingCall(working, "Take", out var takeArgument, out var beforeTake))
+        {
             return null;
+        }
 
         string? selectArgument = null;
 
         if (TryParseTrailingCall(beforeTake, "Select", out selectArgument, out var beforeSelect))
+        {
             beforeTake = beforeSelect;
+        }
 
         if (!TryParseTrailingCall(beforeTake, "Where", out var predicate, out var source))
+        {
             return null;
+        }
 
         if (!source.StartsWith("db.", StringComparison.Ordinal))
+        {
             return null;
+        }
 
         if (SourceContainsProjection(source))
         {
@@ -125,7 +161,9 @@ internal static partial class EfReplQueryableRewriter
         var rewritten = FormatWhereCall(source, predicate, dbContextType);
 
         if (!string.IsNullOrWhiteSpace(selectArgument))
+        {
             rewritten = FormatSelectCall(rewritten, selectArgument, dbContextType, entityType);
+        }
 
         rewritten = $"{Runtime}.Take({rewritten}, {takeArgument})";
 
@@ -135,8 +173,8 @@ internal static partial class EfReplQueryableRewriter
     }
 
     /// <summary>
-    /// Rewrites deferred <c>db.Set.Where(...)</c> probes (no terminal) so Roslyn binds <see cref="Queryable.Where"/>
-    /// instead of <see cref="Enumerable.Where"/>.
+    ///     Rewrites deferred <c>db.Set.Where(...)</c> probes (no terminal) so Roslyn binds <see cref="Queryable.Where" />
+    ///     instead of <see cref="Enumerable.Where" />.
     /// </summary>
     internal static string? TryRewriteBareWhere(string snippet, Type? dbContextType = null)
     {
@@ -145,13 +183,19 @@ internal static partial class EfReplQueryableRewriter
         if (string.IsNullOrWhiteSpace(working)
             || !LinqEfQueryHeuristics.LooksLikeEfQuery(working)
             || working.Contains(Runtime, StringComparison.Ordinal))
+        {
             return null;
+        }
 
         if (!TryParseTrailingCall(working, "Where", out var predicate, out var source))
+        {
             return null;
+        }
 
         if (!source.StartsWith("db.", StringComparison.Ordinal))
+        {
             return null;
+        }
 
         return FormatWhereCall(source, predicate, dbContextType);
     }
@@ -174,12 +218,15 @@ internal static partial class EfReplQueryableRewriter
     {
         if (entityType is null
             && TryResolveEntityTypeForDbRoot(source, dbContextType, out var resolvedFromSource))
+        {
             entityType = resolvedFromSource;
+        }
 
         if (entityType is not null
             && TryGetSimpleSelectorResultType(entityType, selector, out var resultType))
         {
-            return $"{Runtime}.Select<{FormatTypeNameForScript(entityType)}, {FormatTypeNameForScript(resultType)}>({source}, {selector})";
+            return
+                $"{Runtime}.Select<{FormatTypeNameForScript(entityType)}, {FormatTypeNameForScript(resultType)}>({source}, {selector})";
         }
 
         if (source.StartsWith("db.", StringComparison.Ordinal))
@@ -188,7 +235,8 @@ internal static partial class EfReplQueryableRewriter
             // even when projecting to anonymous types (whose TResult can't be named).
             if (entityType is not null)
             {
-                return $"((global::System.Linq.IQueryable<{FormatTypeNameForScript(entityType)}>)({source})).Select({selector})";
+                return
+                    $"((global::System.Linq.IQueryable<{FormatTypeNameForScript(entityType)}>)({source})).Select({selector})";
             }
 
             return $"{source}.Select({selector})";
@@ -204,12 +252,16 @@ internal static partial class EfReplQueryableRewriter
         var arrowIndex = selector.IndexOf("=>", StringComparison.Ordinal);
 
         if (arrowIndex < 0)
+        {
             return false;
+        }
 
         var body = selector[(arrowIndex + 2)..].Trim().TrimEnd(')');
 
         if (!body.Contains('.', StringComparison.Ordinal))
+        {
             return false;
+        }
 
         var memberName = body[(body.LastIndexOf('.') + 1)..];
 
@@ -218,7 +270,9 @@ internal static partial class EfReplQueryableRewriter
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
         if (property is null)
+        {
             return false;
+        }
 
         resultType = property.PropertyType;
 
@@ -243,7 +297,9 @@ internal static partial class EfReplQueryableRewriter
     private static string? ExtractTerminalPredicate(string? arguments)
     {
         if (string.IsNullOrWhiteSpace(arguments))
+        {
             return null;
+        }
 
         return SqlTranslationProbe.TryExtractPredicateArgument(arguments) is { } predicate
             ? predicate.Trim()
@@ -253,13 +309,17 @@ internal static partial class EfReplQueryableRewriter
     private static bool TryResolveEntityTypeForDbSetProperty(
         Type? dbContextType,
         string propertyName,
-        out Type entityType) =>
-        TryResolveEntityTypeForDbRoot($"db.{propertyName}", dbContextType, out entityType);
+        out Type entityType)
+    {
+        return TryResolveEntityTypeForDbRoot($"db.{propertyName}", dbContextType, out entityType);
+    }
 
     private static string FormatTypeNameForScript(Type type)
     {
         if (string.IsNullOrEmpty(type.Namespace))
+        {
             return type.Name;
+        }
 
         return $"global::{type.FullName?.Replace('+', '.')}";
     }
@@ -269,7 +329,9 @@ internal static partial class EfReplQueryableRewriter
         entityType = null!;
 
         if (dbContextType is null || !source.StartsWith("db.", StringComparison.Ordinal))
+        {
             return false;
+        }
 
         var afterDb = source["db.".Length..];
         var dotIndex = afterDb.IndexOf('.');
@@ -277,21 +339,29 @@ internal static partial class EfReplQueryableRewriter
         var propertyName = (dotIndex < 0 ? afterDb : afterDb[..dotIndex]).Trim();
 
         if (string.IsNullOrWhiteSpace(propertyName))
+        {
             return false;
+        }
 
         if (!TryResolveDbSetProperty(dbContextType, propertyName))
+        {
             return false;
+        }
 
         var property = dbContextType.GetProperty(
             propertyName,
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
         if (property?.PropertyType is not { IsGenericType: true } propertyType)
+        {
             return false;
+        }
 
         if (propertyType.GetGenericTypeDefinition().FullName?
                 .StartsWith("Microsoft.EntityFrameworkCore.DbSet`1", StringComparison.Ordinal) != true)
+        {
             return false;
+        }
 
         entityType = propertyType.GetGenericArguments()[0];
 
@@ -303,12 +373,16 @@ internal static partial class EfReplQueryableRewriter
         var match = TakeThenMaterializeRegex().Match(snippet.Trim().TrimEnd(';').Trim());
 
         if (!match.Success)
+        {
             return null;
+        }
 
         var propertyName = match.Groups[1].Value;
 
         if (!TryResolveDbSetProperty(dbContextType, propertyName))
+        {
             return null;
+        }
 
         var takeArgument = match.Groups[2].Value.Trim();
         var materializeMethod = match.Groups[3].Value;
@@ -323,7 +397,9 @@ internal static partial class EfReplQueryableRewriter
         var match = SimpleTakeRegex().Match(snippet.Trim().TrimEnd(';').Trim());
 
         if (!match.Success)
+        {
             return null;
+        }
 
         return $"{Runtime}.Take(db.{match.Groups[1].Value}, {match.Groups[2].Value.Trim()})";
     }
@@ -341,14 +417,18 @@ internal static partial class EfReplQueryableRewriter
         var callIndex = snippet.LastIndexOf(suffix, StringComparison.Ordinal);
 
         if (callIndex < 0)
+        {
             return false;
+        }
 
         var openParenIndex = callIndex + suffix.Length - 1;
 
         if (!SqlTranslationProbe.TryExtractParenthesizedContent(snippet, openParenIndex, out argument)
             || !SqlTranslationProbe.TryFindClosingParenthesis(snippet, openParenIndex, out var closeParenIndex)
             || !SqlTranslationProbe.IsEndOfExpression(snippet, closeParenIndex + 1))
+        {
             return false;
+        }
 
         source = snippet[..callIndex].TrimEnd();
 
@@ -357,31 +437,45 @@ internal static partial class EfReplQueryableRewriter
 
     private static string? TryRewriteTerminalCallWithArguments(string expression, Type dbContextType)
     {
-        foreach (var terminal in new[] { "FirstOrDefaultAsync", "FirstAsync", "FirstOrDefault", "First", "SingleOrDefaultAsync", "SingleAsync", "SingleOrDefault", "Single", "CountAsync", "Count" })
+        foreach (var terminal in new[]
+                 {
+                     "FirstOrDefaultAsync", "FirstAsync", "FirstOrDefault", "First", "SingleOrDefaultAsync",
+                     "SingleAsync", "SingleOrDefault", "Single", "CountAsync", "Count"
+                 })
         {
             var needle = $".{terminal}(";
             var index = expression.LastIndexOf(needle, StringComparison.Ordinal);
 
             if (index < 0)
+            {
                 continue;
+            }
 
             var openParenIndex = index + needle.Length - 1;
 
             if (!SqlTranslationProbe.TryExtractParenthesizedContent(expression, openParenIndex, out var arguments))
+            {
                 continue;
+            }
 
             if (!SqlTranslationProbe.IsEndOfExpression(expression, openParenIndex + arguments.Length + 2))
+            {
                 continue;
+            }
 
             var source = expression[..index].TrimEnd();
 
             if (!source.StartsWith("db.", StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var propertyName = source["db.".Length..].Split('.')[0];
 
             if (string.IsNullOrWhiteSpace(propertyName))
+            {
                 continue;
+            }
 
             var middle = source.Length > $"db.{propertyName}".Length
                 ? source[$"db.{propertyName}".Length..]
@@ -401,7 +495,9 @@ internal static partial class EfReplQueryableRewriter
         string? predicate)
     {
         if (!TryResolveDbSetProperty(dbContextType, propertyName))
+        {
             return null;
+        }
 
         var source = string.IsNullOrEmpty(middle)
             ? $"db.{propertyName}"
@@ -410,34 +506,45 @@ internal static partial class EfReplQueryableRewriter
         var terminalPredicate = ExtractTerminalPredicate(predicate);
 
         if (SourceContainsProjection(source))
+        {
             return null;
+        }
 
         source = TryRewriteQueryableSource(source, dbContextType) ?? source;
 
-        if (terminal is "FirstAsync" or "FirstOrDefaultAsync" or "SingleAsync" or "SingleOrDefaultAsync" or "CountAsync")
+        if (terminal is "FirstAsync" or "FirstOrDefaultAsync" or "SingleAsync" or "SingleOrDefaultAsync"
+            or "CountAsync")
+        {
             return BuildAsyncRuntimeCall(terminal, source, terminalPredicate, dbContextType, propertyName);
+        }
 
         var runtimeMethod = MapToRuntimeMethod(terminal);
 
         if (runtimeMethod is null)
+        {
             return null;
+        }
 
         if (string.IsNullOrWhiteSpace(terminalPredicate))
+        {
             return $"{Runtime}.{runtimeMethod}({source})";
+        }
 
         return FormatPredicateTerminalCall(runtimeMethod, source, terminalPredicate, dbContextType, propertyName);
     }
 
-    private static string? MapToRuntimeMethod(string terminal) =>
-        terminal switch
+    private static string? MapToRuntimeMethod(string terminal)
+    {
+        return terminal switch
         {
             "First" => nameof(ReplQueryableRuntime.First),
             "FirstOrDefault" => nameof(ReplQueryableRuntime.FirstOrDefault),
             "Single" => nameof(ReplQueryableRuntime.Single),
             "SingleOrDefault" => nameof(ReplQueryableRuntime.SingleOrDefault),
             "Count" => nameof(ReplQueryableRuntime.Count),
-            _ => null,
+            _ => null
         };
+    }
 
     private static string BuildAsyncRuntimeCall(
         string terminal,
@@ -453,11 +560,13 @@ internal static partial class EfReplQueryableRewriter
             "SingleAsync" => nameof(ReplQueryableRuntime.SingleAsync),
             "SingleOrDefaultAsync" => nameof(ReplQueryableRuntime.SingleOrDefaultAsync),
             "CountAsync" => nameof(ReplQueryableRuntime.CountAsync),
-            _ => null,
+            _ => null
         };
 
         if (asyncMethod is null)
+        {
             return string.Empty;
+        }
 
         return string.IsNullOrWhiteSpace(predicate)
             ? $"{Runtime}.{asyncMethod}({source})"
@@ -471,7 +580,9 @@ internal static partial class EfReplQueryableRewriter
             if (!TryParseTrailingCall(expression, terminal, out var arguments, out var source)
                 || !string.IsNullOrWhiteSpace(arguments)
                 || !source.StartsWith("db.", StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var rewrittenSource = TryRewriteQueryableSource(source, dbContextType) ?? source;
             var runtimeMethod = terminal switch
@@ -479,11 +590,13 @@ internal static partial class EfReplQueryableRewriter
                 "ToArray" => nameof(ReplQueryableRuntime.ToArray),
                 "ToList" => nameof(ReplQueryableRuntime.ToList),
                 "Count" => nameof(ReplQueryableRuntime.Count),
-                _ => null,
+                _ => null
             };
 
             if (runtimeMethod is null)
+            {
                 continue;
+            }
 
             return $"{Runtime}.{runtimeMethod}({rewrittenSource})";
         }
@@ -491,30 +604,22 @@ internal static partial class EfReplQueryableRewriter
         return null;
     }
 
-    private static readonly string[] QueryablePipelineMethods =
-    [
-        "OrderByDescending",
-        "OrderBy",
-        "ThenByDescending",
-        "ThenBy",
-        "Take",
-        "Skip",
-        "Where",
-        "Select",
-    ];
-
     private static string? TryRewriteQueryableSource(string source, Type? dbContextType)
     {
         var working = EfProbeExpressionSanitizer.RemoveTranslationNeutralOperators(source.Trim());
 
         if (!working.StartsWith("db.", StringComparison.Ordinal))
+        {
             return null;
+        }
 
         // If the user already materialized (ToList/ToArray/etc), any subsequent operators are in-memory
         // IEnumerable LINQ. Rewriting those operators to Queryable/runtime calls will cause type failures
         // (e.g. OrderBy after ToList()).
         if (ContainsMaterializerCall(working))
+        {
             return null;
+        }
 
         var pipeline = new List<(string Method, string Argument)>();
 
@@ -525,7 +630,9 @@ internal static partial class EfReplQueryableRewriter
         }
 
         if (pipeline.Count == 0)
+        {
             return null;
+        }
 
         Type? entityType = null;
         string? rewritten = null;
@@ -549,7 +656,9 @@ internal static partial class EfReplQueryableRewriter
         }
 
         if (rewritten is null)
+        {
             return null;
+        }
 
         var currentElementType = entityType;
 
@@ -564,22 +673,24 @@ internal static partial class EfReplQueryableRewriter
                 "Select" => ApplySelect(rewritten, argument, dbContextType, ref currentElementType),
                 "Take" => $"{Runtime}.Take({rewritten}, {argument})",
                 "Skip" => $"{Runtime}.Skip({rewritten}, {argument})",
-                "OrderBy" => FormatOrderByCall(rewritten, argument, currentElementType, descending: false),
-                "OrderByDescending" => FormatOrderByCall(rewritten, argument, currentElementType, descending: true),
-                "ThenBy" => FormatThenByCall(rewritten, argument, dbContextType, currentElementType, descending: false),
-                "ThenByDescending" => FormatThenByCall(rewritten, argument, dbContextType, currentElementType, descending: true),
-                _ => rewritten,
+                "OrderBy" => FormatOrderByCall(rewritten, argument, currentElementType, false),
+                "OrderByDescending" => FormatOrderByCall(rewritten, argument, currentElementType, true),
+                "ThenBy" => FormatThenByCall(rewritten, argument, dbContextType, currentElementType, false),
+                "ThenByDescending" => FormatThenByCall(rewritten, argument, dbContextType, currentElementType, true),
+                _ => rewritten
             };
         }
 
         return rewritten;
     }
 
-    private static bool ContainsMaterializerCall(string expression) =>
-        expression.Contains(".ToList(", StringComparison.Ordinal)
-        || expression.Contains(".ToArray(", StringComparison.Ordinal)
-        || expression.Contains(".AsEnumerable(", StringComparison.Ordinal)
-        || expression.Contains(".AsAsyncEnumerable(", StringComparison.Ordinal);
+    private static bool ContainsMaterializerCall(string expression)
+    {
+        return expression.Contains(".ToList(", StringComparison.Ordinal)
+               || expression.Contains(".ToArray(", StringComparison.Ordinal)
+               || expression.Contains(".AsEnumerable(", StringComparison.Ordinal)
+               || expression.Contains(".AsAsyncEnumerable(", StringComparison.Ordinal);
+    }
 
     private static string ApplySelect(
         string source,
@@ -592,7 +703,9 @@ internal static partial class EfReplQueryableRewriter
 
         if (inputElementType is not null
             && TryGetSimpleSelectorResultType(inputElementType, selector, out var projectedType))
+        {
             currentElementType = projectedType;
+        }
 
         return rewritten;
     }
@@ -643,7 +756,8 @@ internal static partial class EfReplQueryableRewriter
         if (elementType is not null
             && TryInferOrderByKeyType(elementType, keySelector, out var keyType))
         {
-            return $"{Runtime}.{runtimeMethod}<{FormatTypeNameForScript(elementType)}, {FormatTypeNameForScript(keyType)}>({source}, {keySelector})";
+            return
+                $"{Runtime}.{runtimeMethod}<{FormatTypeNameForScript(elementType)}, {FormatTypeNameForScript(keyType)}>({source}, {keySelector})";
         }
 
         return $"{Runtime}.{runtimeMethod}({source}, {keySelector})";
@@ -654,12 +768,16 @@ internal static partial class EfReplQueryableRewriter
         keyType = null!;
 
         if (!TryGetLambdaParameterName(keySelector, out var parameterName))
+        {
             return false;
+        }
 
         var arrowIndex = keySelector.IndexOf("=>", StringComparison.Ordinal);
 
         if (arrowIndex < 0)
+        {
             return false;
+        }
 
         var body = keySelector[(arrowIndex + 2)..].Trim().TrimEnd(')');
 
@@ -671,7 +789,9 @@ internal static partial class EfReplQueryableRewriter
         }
 
         if (!body.Contains('.', StringComparison.Ordinal))
+        {
             return false;
+        }
 
         var memberName = body[(body.LastIndexOf('.') + 1)..];
 
@@ -680,7 +800,9 @@ internal static partial class EfReplQueryableRewriter
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
         if (property is null)
+        {
             return false;
+        }
 
         keyType = property.PropertyType;
 
@@ -694,12 +816,16 @@ internal static partial class EfReplQueryableRewriter
         var arrowIndex = selector.IndexOf("=>", StringComparison.Ordinal);
 
         if (arrowIndex <= 0)
+        {
             return false;
+        }
 
         var left = selector[..arrowIndex].Trim();
 
         if (left.StartsWith('(') && left.EndsWith(')'))
+        {
             left = left[1..^1].Trim();
+        }
 
         parameterName = left;
 
@@ -718,21 +844,27 @@ internal static partial class EfReplQueryableRewriter
         return $"{source}.{runtimeMethod}({keySelector})";
     }
 
-    private static bool SourceContainsProjection(string source) =>
-        source.Contains(".Select(", StringComparison.Ordinal);
+    private static bool SourceContainsProjection(string source)
+    {
+        return source.Contains(".Select(", StringComparison.Ordinal);
+    }
 
     private static bool IsDbRootOrDbRootChain(string source, Type? dbContextType, out Type? entityType)
     {
         entityType = null;
 
         if (!source.StartsWith("db.", StringComparison.Ordinal))
+        {
             return false;
+        }
 
         var dbSetPropertyName = source["db.".Length..].Split('.')[0];
 
         if (string.IsNullOrWhiteSpace(dbSetPropertyName)
             || !TryResolveEntityTypeForDbSetProperty(dbContextType, dbSetPropertyName, out var resolvedEntityType))
+        {
             return false;
+        }
 
         entityType = resolvedEntityType;
         return true;
@@ -745,7 +877,9 @@ internal static partial class EfReplQueryableRewriter
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
         if (property is null || !property.PropertyType.IsGenericType)
+        {
             return false;
+        }
 
         return property.PropertyType.GetGenericTypeDefinition().FullName?
             .StartsWith("Microsoft.EntityFrameworkCore.DbSet`1", StringComparison.Ordinal) == true;

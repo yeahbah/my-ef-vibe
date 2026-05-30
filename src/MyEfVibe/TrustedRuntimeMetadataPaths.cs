@@ -7,7 +7,9 @@ internal static class TrustedRuntimeMetadataPaths
     internal static ImmutableArray<string> Discover()
     {
         if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is not string payload)
+        {
             return ImmutableArray<string>.Empty;
+        }
 
         var builder = ImmutableArray.CreateBuilder<string>();
 
@@ -16,7 +18,9 @@ internal static class TrustedRuntimeMetadataPaths
             var trimmed = token.Trim();
 
             if (File.Exists(trimmed))
+            {
                 builder.Add(trimmed);
+            }
         }
 
         return builder.ToImmutable();

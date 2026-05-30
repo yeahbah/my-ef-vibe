@@ -11,23 +11,33 @@ internal static class SqliteConnectionStringNormalizer
     {
         if (string.IsNullOrWhiteSpace(connectionString)
             || !LooksLikeSqliteConnection(connectionString))
+        {
             return connectionString;
+        }
 
         if (!TryParseDataSource(connectionString, out var dataSource, out var usesPrefix))
+        {
             return connectionString;
+        }
 
         if (IsLiteralDataSource(dataSource))
+        {
             return connectionString;
+        }
 
         if (Path.IsPathRooted(dataSource))
+        {
             return FormatDataSource(dataSource, usesPrefix);
+        }
 
         foreach (var searchRoot in EnumerateSearchRoots(startupProjectPath, efOutputDirectory))
         {
             var candidate = Path.GetFullPath(Path.Combine(searchRoot, dataSource));
 
             if (File.Exists(candidate))
+            {
                 return FormatDataSource(candidate, usesPrefix);
+            }
         }
 
         var fallbackRoot = Path.GetDirectoryName(startupProjectPath)!;
@@ -39,11 +49,15 @@ internal static class SqliteConnectionStringNormalizer
     internal static bool LooksLikeSqliteConnection(string connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
+        {
             return false;
+        }
 
         // SQL Server and other server-based providers also use "Data Source=" — do not treat as SQLite.
         if (LooksLikeServerBasedConnection(connectionString))
+        {
             return false;
+        }
 
         if (connectionString.Contains(DataSourcePrefix, StringComparison.OrdinalIgnoreCase)
             && TryParseDataSource(connectionString, out var dataSource, out _))
@@ -51,23 +65,27 @@ internal static class SqliteConnectionStringNormalizer
             if (dataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase)
                 || dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
                 || dataSource.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+            {
                 return true;
+            }
         }
 
         return connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase)
-            && !connectionString.Contains(';', StringComparison.Ordinal);
+               && !connectionString.Contains(';', StringComparison.Ordinal);
     }
 
-    private static bool LooksLikeServerBasedConnection(string connectionString) =>
-        connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase)
-        || connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase)
-        || connectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase)
-        || connectionString.Contains("Integrated Security=", StringComparison.OrdinalIgnoreCase)
-        || connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
-        || connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase)
-        || (connectionString.Contains(DataSourcePrefix, StringComparison.OrdinalIgnoreCase)
-            && TryParseDataSource(connectionString, out var dataSource, out _)
-            && dataSource.Contains(',', StringComparison.Ordinal));
+    private static bool LooksLikeServerBasedConnection(string connectionString)
+    {
+        return connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase)
+               || connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase)
+               || connectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase)
+               || connectionString.Contains("Integrated Security=", StringComparison.OrdinalIgnoreCase)
+               || connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
+               || connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase)
+               || (connectionString.Contains(DataSourcePrefix, StringComparison.OrdinalIgnoreCase)
+                   && TryParseDataSource(connectionString, out var dataSource, out _)
+                   && dataSource.Contains(',', StringComparison.Ordinal));
+    }
 
     private static bool TryParseDataSource(
         string connectionString,
@@ -87,7 +105,9 @@ internal static class SqliteConnectionStringNormalizer
         }
 
         if (connectionString.Contains(';', StringComparison.Ordinal))
+        {
             return false;
+        }
 
         dataSource = connectionString.Trim().Trim('"');
 
@@ -99,20 +119,26 @@ internal static class SqliteConnectionStringNormalizer
         var separatorIndex = dataSource.IndexOf(';', StringComparison.Ordinal);
 
         if (separatorIndex < 0)
+        {
             return;
+        }
 
         dataSource = dataSource[..separatorIndex].Trim();
     }
 
-    private static bool IsLiteralDataSource(string dataSource) =>
-        dataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase)
-        || dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
-        || dataSource.Contains("mode=memory", StringComparison.OrdinalIgnoreCase);
+    private static bool IsLiteralDataSource(string dataSource)
+    {
+        return dataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase)
+               || dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
+               || dataSource.Contains("mode=memory", StringComparison.OrdinalIgnoreCase);
+    }
 
-    private static string FormatDataSource(string absoluteOrRootedPath, bool usesPrefix) =>
-        usesPrefix
+    private static string FormatDataSource(string absoluteOrRootedPath, bool usesPrefix)
+    {
+        return usesPrefix
             ? $"{DataSourcePrefix}{absoluteOrRootedPath}"
             : absoluteOrRootedPath;
+    }
 
     private static IEnumerable<string> EnumerateSearchRoots(
         string startupProjectPath,
@@ -123,7 +149,9 @@ internal static class SqliteConnectionStringNormalizer
         foreach (var root in EnumerateDirectoryChain(Path.GetDirectoryName(startupProjectPath)))
         {
             if (seen.Add(root))
+            {
                 yield return root;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(efOutputDirectory))
@@ -131,21 +159,27 @@ internal static class SqliteConnectionStringNormalizer
             foreach (var root in EnumerateDirectoryChain(efOutputDirectory))
             {
                 if (seen.Add(root))
+                {
                     yield return root;
+                }
             }
         }
 
         foreach (var root in EnumerateDirectoryChain(Directory.GetCurrentDirectory()))
         {
             if (seen.Add(root))
+            {
                 yield return root;
+            }
         }
     }
 
     private static IEnumerable<string> EnumerateDirectoryChain(string? startDirectory)
     {
         if (string.IsNullOrWhiteSpace(startDirectory))
+        {
             yield break;
+        }
 
         var current = new DirectoryInfo(startDirectory);
 

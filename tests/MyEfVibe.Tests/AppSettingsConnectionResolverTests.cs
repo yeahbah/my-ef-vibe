@@ -228,7 +228,7 @@ public sealed class AppSettingsConnectionResolverTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch
             {

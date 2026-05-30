@@ -20,7 +20,9 @@ public sealed class SharedFrameworkCatalogTests
         finally
         {
             if (Directory.Exists(root))
-                Directory.Delete(root, recursive: true);
+            {
+                Directory.Delete(root, true);
+            }
         }
     }
 }

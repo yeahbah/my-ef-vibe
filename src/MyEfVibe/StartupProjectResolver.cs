@@ -4,15 +4,15 @@ internal static class StartupProjectResolver
 {
     private const int AutoPickScoreGap = 12;
 
-    internal sealed record RankedStartup(string CsprojPath, int Score, string Label);
-
     internal static FileInfo Resolve(
         string searchDirectory,
         FileInfo efProject,
         string? explicitStartupPathOrNull)
     {
         if (!string.IsNullOrWhiteSpace(explicitStartupPathOrNull))
+        {
             return ProjectPathResolver.ResolveCsproj(explicitStartupPathOrNull, searchDirectory);
+        }
 
         var inferred = TryInfer(searchDirectory, efProject.FullName);
 
@@ -24,7 +24,9 @@ internal static class StartupProjectResolver
         var normalizedSearch = Path.GetFullPath(searchDirectory.TrimEnd(Path.DirectorySeparatorChar));
 
         if (!Directory.Exists(normalizedSearch))
+        {
             return null;
+        }
 
         var referencers = ProjectReferenceWalker
             .EnumerateCsprojFiles(normalizedSearch)
@@ -38,12 +40,16 @@ internal static class StartupProjectResolver
             .ToArray();
 
         if (referencers.Length == 0)
+        {
             return null;
+        }
 
         if (referencers.Length == 1
             || referencers[0].Score - referencers[1].Score >= AutoPickScoreGap
             || !InteractiveSelection.CanPrompt)
+        {
             return new FileInfo(referencers[0].CsprojPath);
+        }
 
         var choice = InteractiveSelection.Choose(
             "[bold]Multiple startup projects reference the EF project. Which has configuration (user secrets / appsettings)?[/]",
@@ -60,19 +66,29 @@ internal static class StartupProjectResolver
         var projectDirectory = Path.GetDirectoryName(csprojPath)!;
 
         if (CsprojInspector.TryGetUserSecretsId(csprojPath, out _))
+        {
             score += 50;
+        }
 
         if (File.Exists(Path.Combine(projectDirectory, "appsettings.json")))
+        {
             score += 30;
+        }
 
         if (File.Exists(Path.Combine(projectDirectory, "appsettings.Development.json")))
+        {
             score += 10;
+        }
 
         if (CsprojInspector.IsExecutableOutput(csprojPath))
+        {
             score += 25;
+        }
 
         if (CsprojInspector.UsesWebSdk(csprojPath))
+        {
             score += 30;
+        }
 
         return score;
     }
@@ -83,16 +99,24 @@ internal static class StartupProjectResolver
         var projectDirectory = Path.GetDirectoryName(csprojPath)!;
 
         if (CsprojInspector.TryGetUserSecretsId(csprojPath, out _))
+        {
             traits.Add("user secrets");
+        }
 
         if (File.Exists(Path.Combine(projectDirectory, "appsettings.json")))
+        {
             traits.Add("appsettings");
+        }
 
         if (CsprojInspector.IsExecutableOutput(csprojPath))
+        {
             traits.Add("executable");
+        }
 
         if (CsprojInspector.UsesWebSdk(csprojPath))
+        {
             traits.Add("web");
+        }
 
         var name = Path.GetFileName(csprojPath);
 
@@ -101,4 +125,5 @@ internal static class StartupProjectResolver
             : $"{name} [grey]({string.Join(", ", traits)})[/]";
     }
 
+    internal sealed record RankedStartup(string CsprojPath, int Score, string Label);
 }

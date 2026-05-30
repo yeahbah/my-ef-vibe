@@ -28,6 +28,8 @@ public sealed class OpenGenericProbeBinderTests
     [InlineData("TEntity", true)]
     [InlineData("Product", false)]
     [InlineData("Table", false)]
-    public void IsOpenTypeParameterName_ClassifiesNames(string name, bool expected) =>
+    public void IsOpenTypeParameterName_ClassifiesNames(string name, bool expected)
+    {
         Assert.Equal(expected, OpenGenericProbeBinder.IsOpenTypeParameterName(name));
+    }
 }

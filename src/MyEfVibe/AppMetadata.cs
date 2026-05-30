@@ -14,13 +14,17 @@ internal static class AppMetadata
 
     private static readonly Assembly Assembly = typeof(AppMetadata).Assembly;
 
-    internal static string GetDescription() =>
-        Assembly.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description
-        ?? "Interactive EF Core LINQ REPL for external projects.";
+    internal static string GetDescription()
+    {
+        return Assembly.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description
+               ?? "Interactive EF Core LINQ REPL for external projects.";
+    }
 
-    internal static string GetAuthor() =>
-        Assembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company
-        ?? "Arnold Diaz";
+    internal static string GetAuthor()
+    {
+        return Assembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company
+               ?? "Arnold Diaz";
+    }
 
     internal static string GetRuntimeDescription()
     {

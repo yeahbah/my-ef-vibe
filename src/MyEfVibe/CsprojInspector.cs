@@ -11,7 +11,7 @@ internal static class CsprojInspector
         "Pomelo.EntityFrameworkCore",
         "MySql.EntityFrameworkCore",
         "MariaDB.EntityFrameworkCore",
-        "Oracle.EntityFrameworkCore",
+        "Oracle.EntityFrameworkCore"
     ];
 
     internal static bool HasEfCorePackageReference(string csprojAbsolutePath)
@@ -20,7 +20,9 @@ internal static class CsprojInspector
         {
             if (EfCorePackagePrefixes.Any(prefix =>
                     packageId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -60,11 +62,15 @@ internal static class CsprojInspector
             || fileName.EndsWith(".Test", StringComparison.OrdinalIgnoreCase)
             || fileName.Contains(".Test.", StringComparison.OrdinalIgnoreCase)
             || fileName.EndsWith(".UnitTests", StringComparison.OrdinalIgnoreCase))
+        {
             return true;
+        }
 
         if (ReadProperty(csprojAbsolutePath, "IsTestProject")
                 ?.Equals("true", StringComparison.OrdinalIgnoreCase) == true)
+        {
             return true;
+        }
 
         return fullPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             .Any(static segment =>
@@ -84,20 +90,26 @@ internal static class CsprojInspector
             var include = reference.Attribute("Include")?.Value;
 
             if (string.IsNullOrWhiteSpace(include))
+            {
                 continue;
+            }
 
             var normalized = Path.GetFullPath(Path.Combine(projectDirectory, NormalizeProjectReferencePath(include)));
 
             if (File.Exists(normalized))
+            {
                 references.Add(normalized);
+            }
         }
 
         return references;
     }
 
-    internal static string NormalizeProjectReferencePath(string include) =>
-        include.Replace('\\', Path.DirectorySeparatorChar)
+    internal static string NormalizeProjectReferencePath(string include)
+    {
+        return include.Replace('\\', Path.DirectorySeparatorChar)
             .Replace('/', Path.DirectorySeparatorChar);
+    }
 
     private static IEnumerable<string> EnumeratePackageReferenceIds(string csprojAbsolutePath)
     {
@@ -109,7 +121,9 @@ internal static class CsprojInspector
             var include = package.Attribute("Include")?.Value;
 
             if (!string.IsNullOrWhiteSpace(include))
+            {
                 yield return include;
+            }
         }
     }
 
@@ -124,11 +138,16 @@ internal static class CsprojInspector
             var value = property.Value.Trim();
 
             if (!string.IsNullOrEmpty(value))
+            {
                 return value;
+            }
         }
 
         return null;
     }
 
-    private static XDocument Load(string csprojAbsolutePath) => XDocument.Load(csprojAbsolutePath);
+    private static XDocument Load(string csprojAbsolutePath)
+    {
+        return XDocument.Load(csprojAbsolutePath);
+    }
 }

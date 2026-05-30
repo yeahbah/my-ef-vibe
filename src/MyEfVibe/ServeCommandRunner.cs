@@ -41,7 +41,9 @@ internal static class ServeCommandRunner
                 var line = await Console.In.ReadLineAsync(cancellationToken);
 
                 if (line is null)
+                {
                     break;
+                }
 
                 var request = ServeProtocol.TryParseRequest(line);
 

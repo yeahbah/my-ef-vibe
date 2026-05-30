@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace MyEfVibe;
 
 internal static class SessionPaths
@@ -34,8 +36,10 @@ internal static class SessionPaths
         return SanitizeFolderName(string.IsNullOrWhiteSpace(name) ? "project" : name);
     }
 
-    internal static string GetDbContextSessionFolderName(string dbContextName) =>
-        SanitizeFolderName(string.IsNullOrWhiteSpace(dbContextName) ? "DbContext" : dbContextName);
+    internal static string GetDbContextSessionFolderName(string dbContextName)
+    {
+        return SanitizeFolderName(string.IsNullOrWhiteSpace(dbContextName) ? "DbContext" : dbContextName);
+    }
 
     internal static string EnsureDbContextSessionDirectory(
         string workspaceRoot,
@@ -48,20 +52,26 @@ internal static class SessionPaths
         return EnsureSessionDirectory(Path.Combine(workspaceRoot, projectFolder, contextFolder));
     }
 
-    internal static string EnsurePendingSessionDirectory(string workspaceRoot) =>
-        EnsureSessionDirectory(Path.Combine(workspaceRoot, ".pending"));
+    internal static string EnsurePendingSessionDirectory(string workspaceRoot)
+    {
+        return EnsureSessionDirectory(Path.Combine(workspaceRoot, ".pending"));
+    }
 
-    internal static string EnsureProjectScanDirectory(string workspaceRoot, string projectCsprojPath) =>
-        EnsureSessionDirectory(
+    internal static string EnsureProjectScanDirectory(string workspaceRoot, string projectCsprojPath)
+    {
+        return EnsureSessionDirectory(
             Path.Combine(workspaceRoot, GetProjectSessionFolderName(projectCsprojPath), "scan"));
+    }
 
     private static string SanitizeFolderName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
-        var builder = new System.Text.StringBuilder(name.Length);
+        var builder = new StringBuilder(name.Length);
 
         foreach (var character in name)
+        {
             builder.Append(invalid.Contains(character) ? '_' : character);
+        }
 
         var sanitized = builder.ToString().Trim();
 
@@ -73,7 +83,9 @@ internal static class SessionPaths
         var extension = format.Equals("json", StringComparison.OrdinalIgnoreCase) ? "json" : "csv";
 
         if (string.IsNullOrWhiteSpace(pathOrNull))
+        {
             return Path.Combine(sessionDirectory, $"myefvibe-export-{DateTime.Now:yyyyMMdd-HHmmss}.{extension}");
+        }
 
         return Path.IsPathRooted(pathOrNull)
             ? pathOrNull

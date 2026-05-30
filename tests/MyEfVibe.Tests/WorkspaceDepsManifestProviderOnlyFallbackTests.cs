@@ -1,6 +1,3 @@
-using System.Reflection;
-using System.Runtime.Loader;
-
 namespace MyEfVibe.Tests;
 
 public sealed class WorkspaceDepsManifestProviderOnlyFallbackTests
@@ -15,7 +12,9 @@ public sealed class WorkspaceDepsManifestProviderOnlyFallbackTests
             "system.configuration.configurationmanager");
 
         if (!Directory.Exists(packageRoot))
+        {
             return;
+        }
 
         using var tempDirectory = new TempDirectory();
         var entryDll = Path.Combine(tempDirectory.Path, "Test.Workspace.dll");
@@ -69,7 +68,7 @@ public sealed class WorkspaceDepsManifestProviderOnlyFallbackTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

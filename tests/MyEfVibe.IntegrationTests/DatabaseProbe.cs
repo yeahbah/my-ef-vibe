@@ -1,5 +1,4 @@
 using System.Data;
-using System.Reflection;
 
 namespace MyEfVibe.IntegrationTests;
 
@@ -39,7 +38,9 @@ internal static class DatabaseProbe
         var database = dbContext.GetType().GetProperty("Database")?.GetValue(dbContext);
 
         if (database is null)
+        {
             return false;
+        }
 
         if (RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
@@ -52,7 +53,9 @@ internal static class DatabaseProbe
             try
             {
                 if (openedHere)
+                {
                     await connection.OpenAsync(cancellationToken);
+                }
 
                 return connection.State == ConnectionState.Open;
             }
@@ -63,7 +66,9 @@ internal static class DatabaseProbe
             finally
             {
                 if (openedHere && connection.State != ConnectionState.Closed)
+                {
                     await connection.CloseAsync();
+                }
             }
         }
 
@@ -102,13 +107,15 @@ internal static class DatabaseProbe
                ?? string.Empty;
     }
 
-    internal static bool ProviderMatches(IntegrationScenario scenario, string providerName) =>
-        scenario.Provider switch
+    internal static bool ProviderMatches(IntegrationScenario scenario, string providerName)
+    {
+        return scenario.Provider switch
         {
             "sqlserver" => providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase),
             "npgsql" => providerName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase),
             "oracle" => providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase),
             "sqlite" => providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase),
-            _ => false,
+            _ => false
         };
+    }
 }

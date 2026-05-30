@@ -33,11 +33,13 @@ internal static class WorkspaceDependencyLoader
                      "Microsoft.EntityFrameworkCore.Sqlite",
                      "Oracle.EntityFrameworkCore",
                      "Pomelo.EntityFrameworkCore.MySql",
-                     "MySql.EntityFrameworkCore",
+                     "MySql.EntityFrameworkCore"
                  })
         {
-            if (depsManifest.TryResolve(bootstrap, allowProviderNuGetFallback: false, out var bootstrapPath))
+            if (depsManifest.TryResolve(bootstrap, false, out var bootstrapPath))
+            {
                 TryLoad(loadContext, bootstrapPath);
+            }
         }
     }
 
@@ -49,7 +51,9 @@ internal static class WorkspaceDependencyLoader
     {
         if (!File.Exists(startupAssemblyPath)
             || string.Equals(startupAssemblyPath, entryAssemblyPath, StringComparison.OrdinalIgnoreCase))
+        {
             return;
+        }
 
         var entrySimpleName = Path.GetFileNameWithoutExtension(entryAssemblyPath);
 
@@ -101,37 +105,53 @@ internal static class WorkspaceDependencyLoader
             $"{Path.GetFileNameWithoutExtension(entryAssemblyPath)}.deps.json");
 
         if (!File.Exists(depsPath))
+        {
             return;
+        }
 
         using var document = JsonDocument.Parse(File.ReadAllText(depsPath));
 
         if (!document.RootElement.TryGetProperty("runtimeTarget", out var runtimeTargetProperty))
+        {
             return;
+        }
 
         if (!document.RootElement.TryGetProperty("targets", out var targets))
+        {
             return;
+        }
 
         if (!runtimeTargetProperty.TryGetProperty("name", out var runtimeTargetNameProperty))
+        {
             return;
+        }
 
         var runtimeTargetName = runtimeTargetNameProperty.GetString();
 
         if (string.IsNullOrWhiteSpace(runtimeTargetName)
             || !targets.TryGetProperty(runtimeTargetName, out var targetNode))
+        {
             return;
+        }
 
         foreach (var assemblySimpleName in EnumerateRuntimeAssemblySimpleNames(targetNode))
         {
             if (!seen.Add(assemblySimpleName))
+            {
                 continue;
+            }
 
             if (IsDesignTimeOrToolingAssembly(assemblySimpleName))
+            {
                 continue;
+            }
 
             var resolvedPath = resolver.ResolveAssemblyToPath(new AssemblyName(assemblySimpleName));
 
             if (resolvedPath is null)
+            {
                 continue;
+            }
 
             TryLoad(loadContext, resolvedPath);
         }
@@ -142,14 +162,18 @@ internal static class WorkspaceDependencyLoader
         foreach (var library in targetNode.EnumerateObject())
         {
             if (!library.Value.TryGetProperty("runtime", out var runtimeAssets))
+            {
                 continue;
+            }
 
             foreach (var runtimeAsset in runtimeAssets.EnumerateObject())
             {
                 var fileName = Path.GetFileName(runtimeAsset.Name);
 
                 if (!fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                {
                     continue;
+                }
 
                 yield return Path.GetFileNameWithoutExtension(fileName);
             }
@@ -163,10 +187,14 @@ internal static class WorkspaceDependencyLoader
     {
         if (AppDomain.CurrentDomain.GetAssemblies().Any(assembly =>
                 string.Equals(assembly.GetName().Name, assemblySimpleName, StringComparison.OrdinalIgnoreCase)))
+        {
             return;
+        }
 
-        if (!depsManifest.TryResolve(assemblySimpleName, allowProviderNuGetFallback: false, out var path))
+        if (!depsManifest.TryResolve(assemblySimpleName, false, out var path))
+        {
             return;
+        }
 
         AssemblyResolutionHelpers.LoadFromPath(loadContext, path);
     }
@@ -188,10 +216,10 @@ internal static class WorkspaceDependencyLoader
                      "Microsoft.EntityFrameworkCore.Sqlite",
                      "Oracle.EntityFrameworkCore",
                      "Pomelo.EntityFrameworkCore.MySql",
-                     "MySql.EntityFrameworkCore",
+                     "MySql.EntityFrameworkCore"
                  })
         {
-            if (depsManifest.TryResolve(rootAssembly, allowProviderNuGetFallback: false, out var rootPath))
+            if (depsManifest.TryResolve(rootAssembly, false, out var rootPath))
             {
                 PreloadAssemblyReferenceClosure(
                     loadContext,
@@ -204,8 +232,8 @@ internal static class WorkspaceDependencyLoader
     }
 
     /// <summary>
-    /// Loads an assembly and its reference closure in dependency-first order so transitive
-    /// packages (e.g. Microsoft.Extensions.Caching.Abstractions) are available with correct versions.
+    ///     Loads an assembly and its reference closure in dependency-first order so transitive
+    ///     packages (e.g. Microsoft.Extensions.Caching.Abstractions) are available with correct versions.
     /// </summary>
     internal static void PreloadAssemblyReferenceClosure(
         AssemblyLoadContext loadContext,
@@ -227,21 +255,31 @@ internal static class WorkspaceDependencyLoader
                     Path.GetFileNameWithoutExtension(assemblyPath),
                     excludedSimpleName,
                     StringComparison.OrdinalIgnoreCase))
+            {
                 return;
+            }
 
             if (visited.Contains(assemblyPath))
+            {
                 return;
+            }
 
             if (!visiting.Add(assemblyPath))
+            {
                 return;
+            }
 
             foreach (var reference in AssemblyReferenceReader.Read(assemblyPath))
             {
                 if (string.IsNullOrEmpty(reference.Name))
+                {
                     continue;
+                }
 
-                if (depsManifest.TryResolve(reference, allowProviderNuGetFallback: false, out var referencePath))
+                if (depsManifest.TryResolve(reference, false, out var referencePath))
+                {
                     Visit(referencePath);
+                }
             }
 
             visiting.Remove(assemblyPath);
@@ -251,12 +289,14 @@ internal static class WorkspaceDependencyLoader
     }
 
     private static bool IsDesignTimeOrToolingAssembly(string assemblySimpleName)
-        =>
-            assemblySimpleName.StartsWith("Microsoft.Build", StringComparison.OrdinalIgnoreCase)
-            || assemblySimpleName.StartsWith("Microsoft.CodeAnalysis", StringComparison.OrdinalIgnoreCase)
-            || assemblySimpleName.StartsWith("Microsoft.EntityFrameworkCore.Design", StringComparison.OrdinalIgnoreCase)
-            || assemblySimpleName.StartsWith("Humanizer", StringComparison.OrdinalIgnoreCase)
-            || assemblySimpleName.StartsWith("Mono.TextTemplating", StringComparison.OrdinalIgnoreCase);
+    {
+        return assemblySimpleName.StartsWith("Microsoft.Build", StringComparison.OrdinalIgnoreCase)
+               || assemblySimpleName.StartsWith("Microsoft.CodeAnalysis", StringComparison.OrdinalIgnoreCase)
+               || assemblySimpleName.StartsWith("Microsoft.EntityFrameworkCore.Design",
+                   StringComparison.OrdinalIgnoreCase)
+               || assemblySimpleName.StartsWith("Humanizer", StringComparison.OrdinalIgnoreCase)
+               || assemblySimpleName.StartsWith("Mono.TextTemplating", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static void TryLoad(AssemblyLoadContext loadContext, string absolutePath)
     {

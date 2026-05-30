@@ -6,11 +6,11 @@ public sealed class StoreIdStubTests
     public void Stub_StoreIdComparedToBusinessEntityId_UsesNumericZero()
     {
         const string statement = """
-            return await DbContext.Stores
-                .AsNoTracking()
-                .Where(x => x.BusinessEntityId == storeId)
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                                 return await DbContext.Stores
+                                     .AsNoTracking()
+                                     .Where(x => x.BusinessEntityId == storeId)
+                                     .FirstOrDefaultAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statement);
 
@@ -24,17 +24,17 @@ public sealed class StoreIdStubTests
     public void Stub_StoreIdWithObjectInitializerSelect_StubsStoreId()
     {
         const string statement = """
-            return await DbContext.Stores
-                .AsNoTracking()
-                .Where(x => x.BusinessEntityId == storeId)
-                .Select(x => new StoreDemographicsProjection
-                {
-                    BusinessEntityId = x.BusinessEntityId,
-                    Name = x.Name,
-                    Demographics = x.Demographics
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                                 return await DbContext.Stores
+                                     .AsNoTracking()
+                                     .Where(x => x.BusinessEntityId == storeId)
+                                     .Select(x => new StoreDemographicsProjection
+                                     {
+                                         BusinessEntityId = x.BusinessEntityId,
+                                         Name = x.Name,
+                                         Demographics = x.Demographics
+                                     })
+                                     .FirstOrDefaultAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statement);
 
@@ -49,10 +49,10 @@ public sealed class StoreIdStubTests
     public void TryCreateProbe_VarStoreAssignment_FirstOrDefaultAsyncWithPredicate()
     {
         const string statement = """
-            var store = await DbContext.Stores
-                .FirstOrDefaultAsync(x => x.BusinessEntityId == storeId, cancellationToken)
-                ?? throw new KeyNotFoundException($"Store with ID {storeId} was not found.");
-            """;
+                                 var store = await DbContext.Stores
+                                     .FirstOrDefaultAsync(x => x.BusinessEntityId == storeId, cancellationToken)
+                                     ?? throw new KeyNotFoundException($"Store with ID {storeId} was not found.");
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statement);
 

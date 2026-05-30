@@ -6,8 +6,9 @@ internal static class ScanCommandRunner
 {
     internal static Task<int> RunFromOptionsAsync(
         ScanCliOptions options,
-        CancellationToken cancellationToken = default) =>
-        RunAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return RunAsync(
             options.Mode,
             CliPathHelper.ResolveWorkspace(options.Workspace),
             CliPathHelper.ToFileInfo(options.Project),
@@ -22,6 +23,7 @@ internal static class ScanCommandRunner
             options.ConnectionString,
             options.Provider,
             cancellationToken);
+    }
 
     internal static async Task<int> RunAsync(
         string? modeRaw,
@@ -65,7 +67,8 @@ internal static class ScanCommandRunner
 
         if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
         {
-            CliUi.WriteError("`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
+            CliUi.WriteError(
+                "`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
             return 3;
         }
 
@@ -154,7 +157,7 @@ internal static class ScanCommandRunner
                 dbContextType = DbContextActivator.ResolveContextType(
                     host,
                     contextFullName,
-                    allowInteractiveSelection: false);
+                    false);
             }
             catch (InvalidOperationException resolutionFailure)
             {
@@ -180,7 +183,7 @@ internal static class ScanCommandRunner
                     contextFullName,
                     connectionString,
                     parsedProvider,
-                    allowInteractiveSelection: false);
+                    false);
             }
             catch (InvalidOperationException resolutionFailure)
             {
@@ -195,7 +198,9 @@ internal static class ScanCommandRunner
                 host.AssemblyLoader);
 
             if (!quietOutput)
+            {
                 AnsiConsole.MarkupLine("[dim]Scanning project sources and translating SQL (deep)…[/]");
+            }
 
             (scanResult, deepStats) = await LinqDeepScanner.ScanAsync(
                 resolvedProject.FullName,
@@ -203,7 +208,7 @@ internal static class ScanCommandRunner
                 session,
                 host,
                 dbContextType,
-                progress: null,
+                null,
                 cancellationToken);
         }
 
@@ -239,24 +244,34 @@ internal static class ScanCommandRunner
         var summary = LinqScanCiGate.Summarize(findings, failOn);
 
         if (jsonOutput)
-            LinqScanCiReporter.WriteJsonSummary(filteredResult, summary, scanMode == LinqScanMode.Deep ? "deep" : "lite", savedPath, deepStats);
+        {
+            LinqScanCiReporter.WriteJsonSummary(filteredResult, summary,
+                scanMode == LinqScanMode.Deep ? "deep" : "lite", savedPath, deepStats);
+        }
         else
-            LinqScanCiReporter.WriteTextSummary(summary, scanMode == LinqScanMode.Deep ? "deep" : "lite", savedPath, reportMinSeverity);
+        {
+            LinqScanCiReporter.WriteTextSummary(summary, scanMode == LinqScanMode.Deep ? "deep" : "lite", savedPath,
+                reportMinSeverity);
+        }
 
         return LinqScanCiGate.GetExitCode(summary);
     }
 
     internal static LinqScanSeverity? ResolveReportMinSeverity(
         LinqScanSeverity? minSeverity,
-        LinqScanSeverity? failOn) =>
-        minSeverity ?? failOn;
+        LinqScanSeverity? failOn)
+    {
+        return minSeverity ?? failOn;
+    }
 
     internal static bool TryParseMode(string? raw, out LinqScanMode mode)
     {
         mode = LinqScanMode.Lite;
 
         if (string.IsNullOrWhiteSpace(raw))
+        {
             return false;
+        }
 
         if (string.Equals(raw, "lite", StringComparison.OrdinalIgnoreCase))
         {
@@ -282,7 +297,9 @@ internal static class ScanCommandRunner
         error = null;
 
         if (string.IsNullOrWhiteSpace(raw))
+        {
             return true;
+        }
 
         if (LinqScanRuleCatalog.TryParseSeverity(raw, out var parsed))
         {

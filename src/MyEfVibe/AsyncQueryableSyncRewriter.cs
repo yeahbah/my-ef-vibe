@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace MyEfVibe;
 
 /// <summary>
-/// Rewrites EF async query terminals to synchronous equivalents for Roslyn script evaluation.
+///     Rewrites EF async query terminals to synchronous equivalents for Roslyn script evaluation.
 /// </summary>
 internal static class AsyncQueryableSyncRewriter
 {
@@ -22,17 +22,20 @@ internal static class AsyncQueryableSyncRewriter
         ["MaxAsync"] = "Max",
         ["MinAsync"] = "Min",
         ["AverageAsync"] = "Average",
-        ["SumAsync"] = "Sum",
+        ["SumAsync"] = "Sum"
     };
 
     internal static string Rewrite(string expression)
     {
         if (string.IsNullOrWhiteSpace(expression) || !expression.Contains("Async", StringComparison.Ordinal))
+        {
             return expression;
+        }
 
         try
         {
-            var tree = CSharpSyntaxTree.ParseText(expression, CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
+            var tree = CSharpSyntaxTree.ParseText(expression,
+                CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
             var rewritten = new AsyncInvocationRewriter().Visit(tree.GetRoot());
 
             return rewritten.ToFullString();
@@ -50,12 +53,16 @@ internal static class AsyncQueryableSyncRewriter
             var rewritten = (InvocationExpressionSyntax)base.VisitInvocationExpression(node)!;
 
             if (rewritten.Expression is not MemberAccessExpressionSyntax memberAccess)
+            {
                 return rewritten;
+            }
 
             var methodName = memberAccess.Name.Identifier.Text;
 
             if (!AsyncToSync.TryGetValue(methodName, out var syncName))
+            {
                 return rewritten;
+            }
 
             var syncMember = memberAccess.WithName(SyntaxFactory.IdentifierName(syncName));
             return rewritten.WithExpression(syncMember);

@@ -9,7 +9,8 @@ internal static class AboutReporter
         var tool = new Grid();
         tool.AddColumn();
         tool.AddColumn();
-        tool.AddRow("[bold]Command[/]", $"[cyan]{AppMetadata.CommandName}[/] [grey]({Markup.Escape(AppMetadata.ProductName)})[/]");
+        tool.AddRow("[bold]Command[/]",
+            $"[cyan]{AppMetadata.CommandName}[/] [grey]({Markup.Escape(AppMetadata.ProductName)})[/]");
         tool.AddRow("[grey]Version[/]", Markup.Escape(ToolInfo.GetVersion()));
         tool.AddRow("[grey]Description[/]", Markup.Escape(AppMetadata.GetDescription()));
         tool.AddRow("[grey]Author[/]", Markup.Escape(AppMetadata.GetAuthor()));
@@ -25,7 +26,7 @@ internal static class AboutReporter
                 Header = new PanelHeader("[bold]About[/]"),
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(Color.Grey),
-                Padding = new Padding(1, 0, 1, 0),
+                Padding = new Padding(1, 0, 1, 0)
             });
 
         AnsiConsole.WriteLine();

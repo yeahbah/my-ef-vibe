@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace MyEfVibe.Tests;
 
 public sealed class WorkspaceDepsManifestSqliteFallbackTests
@@ -13,7 +11,7 @@ public sealed class WorkspaceDepsManifestSqliteFallbackTests
                      "Microsoft.Data.Sqlite",
                      "SQLitePCLRaw.core",
                      "SQLitePCLRaw.provider.e_sqlite3",
-                     "SQLitePCLRaw.batteries_v2",
+                     "SQLitePCLRaw.batteries_v2"
                  })
         {
             var packageFolder = ProviderAssemblyNames.GetNuGetPackageFolderName(assemblyName);
@@ -24,7 +22,9 @@ public sealed class WorkspaceDepsManifestSqliteFallbackTests
                 packageFolder);
 
             if (!Directory.Exists(packageRoot))
+            {
                 return;
+            }
         }
 
         using var tempDirectory = new TempDirectory();
@@ -43,7 +43,7 @@ public sealed class WorkspaceDepsManifestSqliteFallbackTests
                      "Microsoft.EntityFrameworkCore.Sqlite",
                      "SQLitePCLRaw.core",
                      "SQLitePCLRaw.provider.e_sqlite3",
-                     "SQLitePCLRaw.batteries_v2",
+                     "SQLitePCLRaw.batteries_v2"
                  })
         {
             Assert.True(
@@ -66,7 +66,8 @@ public sealed class WorkspaceDepsManifestSqliteFallbackTests
         Assert.True(
             manifest.TryResolve("SQLitePCLRaw.batteries_v2", out var batteriesPath),
             "Expected NuGet fallback for SQLitePCLRaw.batteries_v2");
-        Assert.Contains($"{Path.DirectorySeparatorChar}netstandard2.0{Path.DirectorySeparatorChar}", batteriesPath, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Path.DirectorySeparatorChar}netstandard2.0{Path.DirectorySeparatorChar}", batteriesPath,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildSqlServerOnlyDepsJson()
@@ -107,7 +108,7 @@ public sealed class WorkspaceDepsManifestSqliteFallbackTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

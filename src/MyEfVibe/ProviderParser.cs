@@ -5,10 +5,14 @@ internal static class ProviderParser
     internal static MyEfVibeProvider? ParseOrNull(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
+        {
             return null;
+        }
 
-        if (Enum.TryParse(raw, ignoreCase: true, out MyEfVibeProvider direct))
+        if (Enum.TryParse(raw, true, out MyEfVibeProvider direct))
+        {
             return direct;
+        }
 
         return raw.Trim().ToLowerInvariant() switch
         {
@@ -24,8 +28,7 @@ internal static class ProviderParser
 
             "mariadb" or "maria" => MyEfVibeProvider.MariaDb,
 
-            _ => null,
-
+            _ => null
         };
     }
 }

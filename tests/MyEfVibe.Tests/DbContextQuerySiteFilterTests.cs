@@ -2,17 +2,19 @@ namespace MyEfVibe.Tests;
 
 public sealed class DbContextQuerySiteFilterTests
 {
-    private static DbContextScanScope CreateScope(string selected, params string[] others) =>
-        new(selected, others.ToHashSet(StringComparer.Ordinal));
+    private static DbContextScanScope CreateScope(string selected, params string[] others)
+    {
+        return new DbContextScanScope(selected, others.ToHashSet(StringComparer.Ordinal));
+    }
 
     [Fact]
     public void BelongsToSelectedContext_NullScope_IncludesAll()
     {
         Assert.True(DbContextQuerySiteFilter.BelongsToSelectedContext(
             "await db.Products.ToListAsync();",
-            scope: null,
-            containingTypeName: null,
-            containingTypeIndex: null));
+            null,
+            null,
+            null));
     }
 
     [Fact]
@@ -24,13 +26,13 @@ public sealed class DbContextQuerySiteFilterTests
         Assert.False(DbContextQuerySiteFilter.BelongsToSelectedContext(
             "await AdventureWorksUserSetupContext.Users.ToListAsync();",
             scope,
-            containingTypeName: null,
+            null,
             index));
 
         Assert.True(DbContextQuerySiteFilter.BelongsToSelectedContext(
             "await AdventureWorksDbContext.Products.ToListAsync();",
             scope,
-            containingTypeName: null,
+            null,
             index));
     }
 
@@ -43,7 +45,7 @@ public sealed class DbContextQuerySiteFilterTests
         Assert.False(DbContextQuerySiteFilter.BelongsToSelectedContext(
             "await AdventureWorksUserSetupContext.Users.ToListAsync();",
             scope,
-            containingTypeName: null,
+            null,
             index));
     }
 
@@ -51,11 +53,11 @@ public sealed class DbContextQuerySiteFilterTests
     public void BelongsToSelectedContext_RepositoryBoundToOtherContext_ExcludesEvenWithDbAlias()
     {
         const string source = """
-            public sealed class UserSetupRepository(AdventureWorksUserSetupContext dbContext)
-                : EfRepository<UserEntity>(dbContext)
-            {
-            }
-            """;
+                              public sealed class UserSetupRepository(AdventureWorksUserSetupContext dbContext)
+                                  : EfRepository<UserEntity>(dbContext)
+                              {
+                              }
+                              """;
 
         var scope = CreateScope("AdventureWorksDbContext", "AdventureWorksUserSetupContext");
         var index = DbContextContainingTypeIndex.Build(source, scope);
@@ -63,7 +65,7 @@ public sealed class DbContextQuerySiteFilterTests
         Assert.False(DbContextQuerySiteFilter.BelongsToSelectedContext(
             "await db.Users.ToListAsync();",
             scope,
-            containingTypeName: "UserSetupRepository",
+            "UserSetupRepository",
             index));
     }
 
@@ -75,24 +77,24 @@ public sealed class DbContextQuerySiteFilterTests
         Assert.True(DbContextQuerySiteFilter.BelongsToSelectedContext(
             "var entity = _context.Cities.Where(x => x.CityId == key);",
             scope,
-            containingTypeName: "EntitiesController",
-            containingTypeIndex: null));
+            "EntitiesController",
+            null));
     }
 
     [Fact]
     public void BelongsToSelectedContext_IncludesMediatrHandlerBoundToSelectedContextInterface()
     {
         const string source = """
-            public class GetProductsListQueryHandler : IRequestHandler<GetProductsListQuery, ProductsListVm>
-            {
-                private readonly INorthwindDbContext _context;
+                              public class GetProductsListQueryHandler : IRequestHandler<GetProductsListQuery, ProductsListVm>
+                              {
+                                  private readonly INorthwindDbContext _context;
 
-                public GetProductsListQueryHandler(INorthwindDbContext context)
-                {
-                    _context = context;
-                }
-            }
-            """;
+                                  public GetProductsListQueryHandler(INorthwindDbContext context)
+                                  {
+                                      _context = context;
+                                  }
+                              }
+                              """;
 
         var scope = new DbContextScanScope(
             "NorthwindDbContext",
@@ -103,7 +105,7 @@ public sealed class DbContextQuerySiteFilterTests
         Assert.True(DbContextQuerySiteFilter.BelongsToSelectedContext(
             "var products = await _context.Products.OrderBy(p => p.ProductName).ToListAsync(cancellationToken);",
             scope,
-            containingTypeName: "GetProductsListQueryHandler",
+            "GetProductsListQueryHandler",
             index));
     }
 
@@ -111,11 +113,11 @@ public sealed class DbContextQuerySiteFilterTests
     public void BelongsToSelectedContext_ExcludesHandlerBoundToOtherContextInterface()
     {
         const string source = """
-            public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, UsersVm>
-            {
-                private readonly IUserSetupDbContext _context;
-            }
-            """;
+                              public class GetUsersQueryHandler : IRequestHandler<GetUsersQuery, UsersVm>
+                              {
+                                  private readonly IUserSetupDbContext _context;
+                              }
+                              """;
 
         var scope = new DbContextScanScope(
             "NorthwindDbContext",
@@ -126,7 +128,7 @@ public sealed class DbContextQuerySiteFilterTests
         Assert.False(DbContextQuerySiteFilter.BelongsToSelectedContext(
             "var users = await _context.Users.ToListAsync(cancellationToken);",
             scope,
-            containingTypeName: "GetUsersQueryHandler",
+            "GetUsersQueryHandler",
             index));
     }
 
@@ -134,11 +136,11 @@ public sealed class DbContextQuerySiteFilterTests
     public void BelongsToSelectedContext_RepositoryBoundToSelected_IncludesDbContextAlias()
     {
         const string source = """
-            public sealed class EmployeeRepository(AdventureWorksDbContext dbContext)
-                : EfRepository<EmployeeEntity>(dbContext)
-            {
-            }
-            """;
+                              public sealed class EmployeeRepository(AdventureWorksDbContext dbContext)
+                                  : EfRepository<EmployeeEntity>(dbContext)
+                              {
+                              }
+                              """;
 
         var scope = CreateScope("AdventureWorksDbContext", "AdventureWorksUserSetupContext");
         var index = DbContextContainingTypeIndex.Build(source, scope);
@@ -150,7 +152,7 @@ public sealed class DbContextQuerySiteFilterTests
                 .ToListAsync(cancellationToken);
             """,
             scope,
-            containingTypeName: "EmployeeRepository",
+            "EmployeeRepository",
             index));
     }
 }

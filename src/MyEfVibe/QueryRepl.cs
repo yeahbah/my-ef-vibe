@@ -4,17 +4,17 @@ namespace MyEfVibe;
 
 internal sealed class QueryRepl
 {
-    private readonly ScriptSession _session;
-    private readonly WorkspaceHost _host;
-    private readonly object _dbContext;
-    private readonly string _contextTypeName;
-    private readonly string _projectLabel;
-    private readonly DbLogSettings _dbLogSettings;
     private readonly SessionAnalytics _analytics = new();
-    private readonly InputHistory _history = new();
-    private readonly LinqScanReviewSession _scanReview = new();
-    private readonly ReplLineReader _lineReader;
     private readonly ReplCommandHandler _commands;
+    private readonly string _contextTypeName;
+    private readonly object _dbContext;
+    private readonly DbLogSettings _dbLogSettings;
+    private readonly InputHistory _history = new();
+    private readonly WorkspaceHost _host;
+    private readonly ReplLineReader _lineReader;
+    private readonly string _projectLabel;
+    private readonly LinqScanReviewSession _scanReview = new();
+    private readonly ScriptSession _session;
 
     internal QueryRepl(
         ScriptSession session,
@@ -52,10 +52,14 @@ internal sealed class QueryRepl
             }
 
             if (snippet is null)
+            {
                 break;
+            }
 
             if (string.IsNullOrWhiteSpace(snippet))
+            {
                 continue;
+            }
 
             var trimmedSnippet = snippet.Trim();
 
@@ -64,7 +68,9 @@ internal sealed class QueryRepl
             if (handled)
             {
                 if (shouldExit)
+                {
                     break;
+                }
 
                 continue;
             }
@@ -81,28 +87,29 @@ internal sealed class QueryRepl
 
         string? firstLine;
 
-        try
-        {
-            firstLine = _lineReader.ReadLine(_scanReview.GetActivePrompt() ?? CliUi.PrimaryPrompt);
-        }
-        catch (EndOfStreamException)
-        {
-            throw;
-        }
+        firstLine = _lineReader.ReadLine(_scanReview.GetActivePrompt() ?? CliUi.PrimaryPrompt);
 
         if (firstLine is null)
+        {
             return null;
+        }
 
         if (string.IsNullOrWhiteSpace(firstLine) && !_lineReader.HasPendingRecalledLines)
+        {
             return string.Empty;
+        }
 
         var trimmedFirst = firstLine.Trim();
 
         if (trimmedFirst.StartsWith(':'))
+        {
             return trimmedFirst;
+        }
 
         if (EndsWithSubmitSemicolon(firstLine))
+        {
             return JoinSnippetLines(SplitInputLines(firstLine));
+        }
 
         // Enter adds a line; `;` ends input and runs.
         var buffer = SplitInputLines(firstLine)
@@ -111,7 +118,9 @@ internal sealed class QueryRepl
             .ToList();
 
         if (_lineReader.HasPendingRecalledLines)
+        {
             buffer.AddRange(_lineReader.DequeueAllPendingRecalledLines());
+        }
 
         var submitSeen = false;
 
@@ -137,7 +146,9 @@ internal sealed class QueryRepl
             }
 
             if (continuation is null)
+            {
                 break;
+            }
 
             if (SnippetInputClassifier.IsSubmitOnlyLine(continuation))
             {
@@ -155,13 +166,17 @@ internal sealed class QueryRepl
             }
 
             if (!string.IsNullOrWhiteSpace(continuation))
+            {
                 buffer.Add(NormalizeInputLine(continuation));
+            }
         }
 
         if (!submitSeen)
         {
             if (buffer.Count > 0)
+            {
                 CliUi.WriteWarning("Input incomplete — end with `;` to run.");
+            }
 
             return string.Empty;
         }
@@ -169,17 +184,25 @@ internal sealed class QueryRepl
         return JoinSnippetLines(buffer);
     }
 
-    private static bool EndsWithSubmitSemicolon(string line) =>
-        InputLineUtilities.TrimLineEnd(line).EndsWith(';');
+    private static bool EndsWithSubmitSemicolon(string line)
+    {
+        return InputLineUtilities.TrimLineEnd(line).EndsWith(';');
+    }
 
-    private static string[] SplitInputLines(string input) =>
-        InputLineUtilities.SplitLines(input);
+    private static string[] SplitInputLines(string input)
+    {
+        return InputLineUtilities.SplitLines(input);
+    }
 
-    private static string JoinSnippetLines(IEnumerable<string> lines) =>
-        InputLineUtilities.JoinLines(lines);
+    private static string JoinSnippetLines(IEnumerable<string> lines)
+    {
+        return InputLineUtilities.JoinLines(lines);
+    }
 
-    private static string NormalizeInputLine(string line) =>
-        InputLineUtilities.TrimLineEnd(line);
+    private static string NormalizeInputLine(string line)
+    {
+        return InputLineUtilities.TrimLineEnd(line);
+    }
 
     private void WriteBanner()
     {
@@ -188,10 +211,13 @@ internal sealed class QueryRepl
         CliUi.WriteRule("repl");
     }
 
-    private async Task<(bool Handled, bool Exit)> TryHandleReplCommandAsync(string line, CancellationToken cancellationToken)
+    private async Task<(bool Handled, bool Exit)> TryHandleReplCommandAsync(string line,
+        CancellationToken cancellationToken)
     {
         if (!line.StartsWith(':'))
+        {
             return (false, false);
+        }
 
         var command = line[1..].Trim();
 
@@ -223,7 +249,9 @@ internal sealed class QueryRepl
 
             default:
                 if (await _commands.TryHandleAsync(command, cancellationToken))
+                {
                     return (true, false);
+                }
 
                 CliUi.WriteWarning($"Unknown command `:{command}`. Type :help.");
                 return (true, false);

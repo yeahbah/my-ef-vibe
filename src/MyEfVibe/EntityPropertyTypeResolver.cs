@@ -13,14 +13,18 @@ internal static class EntityPropertyTypeResolver
         propertyType = null;
 
         if (!TryResolveEntityType(dbContextType, entityTypeName, out var entityType))
+        {
             return false;
+        }
 
         var property = entityType.GetProperty(
             propertyName,
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
         if (property is null)
+        {
             return false;
+        }
 
         propertyType = property.PropertyType;
 
@@ -31,8 +35,8 @@ internal static class EntityPropertyTypeResolver
     {
         entityType = null!;
 
-        var resolved = dbContextType.Assembly.GetType(entityTypeName, throwOnError: false)
-            ?? Type.GetType(entityTypeName, throwOnError: false);
+        var resolved = dbContextType.Assembly.GetType(entityTypeName, false)
+                       ?? Type.GetType(entityTypeName, false);
 
         if (resolved is not null)
         {
@@ -47,10 +51,12 @@ internal static class EntityPropertyTypeResolver
             {
                 var assembly = Assembly.Load(reference);
 
-                resolved = assembly.GetType(entityTypeName, throwOnError: false);
+                resolved = assembly.GetType(entityTypeName, false);
 
                 if (resolved is null)
+                {
                     continue;
+                }
 
                 entityType = resolved;
 

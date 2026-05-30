@@ -1,15 +1,17 @@
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using Spectre.Console;
 
 namespace MyEfVibe;
 
 internal static partial class QueryPlanRunner
 {
     internal static string SanitizeSqlForExplain(string sql, MyEfVibeProvider? provider)
-        => SanitizeTranslatedSql(sql, provider);
+    {
+        return SanitizeTranslatedSql(sql, provider);
+    }
 
     internal static async Task<QueryPlanResult> TryExplainAsync(
         object dbContext,
@@ -18,12 +20,16 @@ internal static partial class QueryPlanRunner
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sql))
+        {
             return QueryPlanResult.Failed("No SQL available for EXPLAIN.");
+        }
 
         var provider = ResolveProvider(dbContext);
 
         if (provider is null)
+        {
             return QueryPlanResult.Failed("EXPLAIN is not supported for this provider.");
+        }
 
         try
         {
@@ -45,11 +51,13 @@ internal static partial class QueryPlanRunner
                     dbContext,
                     BuildExplainSql(provider.Value, executableSql),
                     inspectionAssemblies,
-                    cancellationToken),
+                    cancellationToken)
             };
 
             if (rows.Count == 0)
+            {
                 return QueryPlanResult.Failed("EXPLAIN returned no rows.");
+            }
 
             return QueryPlanResult.Succeeded(rows);
         }
@@ -85,7 +93,7 @@ internal static partial class QueryPlanRunner
     }
 
     /// <summary>
-    /// Strips parameter/duration comment lines from captured or translated SQL and inlines parameter values.
+    ///     Strips parameter/duration comment lines from captured or translated SQL and inlines parameter values.
     /// </summary>
     private static string SanitizeTranslatedSql(string sql, MyEfVibeProvider? provider)
     {
@@ -99,13 +107,17 @@ internal static partial class QueryPlanRunner
             var oracleSql = OracleSqlExtractor.TryExtractExplainableSql(executable);
 
             if (!string.IsNullOrWhiteSpace(oracleSql))
+            {
                 executable = oracleSql;
+            }
         }
 
         var body = executable;
 
         foreach (var name in parameters.Keys.OrderByDescending(static n => n.Length))
+        {
             body = InlineParameter(body, name, parameters[name]);
+        }
 
         return body;
     }
@@ -117,24 +129,32 @@ internal static partial class QueryPlanRunner
             var trimmed = line.Trim();
 
             if (TryParseToQueryStringParameterComment(trimmed, parameters))
+            {
                 continue;
+            }
 
             TryParseDbLogParametersComment(trimmed, parameters);
         }
     }
 
     private static string InlineParameter(string sql, string name, string value)
-        => sql.Replace($"@{name}", FormatParameterLiteral(CleanParameterValue(value)), StringComparison.Ordinal);
+    {
+        return sql.Replace($"@{name}", FormatParameterLiteral(CleanParameterValue(value)), StringComparison.Ordinal);
+    }
 
     private static bool TryParseToQueryStringParameterComment(string trimmed, Dictionary<string, string> parameters)
     {
         if (!trimmed.StartsWith("-- @", StringComparison.Ordinal))
+        {
             return false;
+        }
 
         var match = ParameterCommentRegex().Match(trimmed);
 
         if (!match.Success)
+        {
             return false;
+        }
 
         parameters[match.Groups["name"].Value] = CleanParameterValue(match.Groups["value"].Value);
         return true;
@@ -145,7 +165,9 @@ internal static partial class QueryPlanRunner
         const string prefix = "-- parameters:";
 
         if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
         var assignments = trimmed[prefix.Length..];
 
@@ -154,7 +176,9 @@ internal static partial class QueryPlanRunner
             var parameterName = match.Groups["name"].Value.Trim();
 
             if (parameterName.Length == 0)
+            {
                 continue;
+            }
 
             parameters[parameterName] = CleanParameterValue(match.Groups["value"].Value);
         }
@@ -168,7 +192,9 @@ internal static partial class QueryPlanRunner
         var typeSuffixIndex = trimmed.IndexOf(" (", StringComparison.Ordinal);
 
         if (typeSuffixIndex > 0)
+        {
             trimmed = trimmed[..typeSuffixIndex].TrimEnd();
+        }
 
         return trimmed;
     }
@@ -176,20 +202,30 @@ internal static partial class QueryPlanRunner
     private static string FormatParameterLiteral(string value)
     {
         if (string.Equals(value, "NULL", StringComparison.OrdinalIgnoreCase))
+        {
             return "NULL";
+        }
 
         if (long.TryParse(value, out _))
+        {
             return value;
+        }
 
-        if (double.TryParse(value, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out _))
+        if (double.TryParse(value, NumberStyles.Float,
+                CultureInfo.InvariantCulture, out _))
+        {
             return value;
+        }
 
         if (bool.TryParse(value, out var boolean))
+        {
             return boolean ? "1" : "0";
+        }
 
         if (value.StartsWith('\'') && value.EndsWith('\'') && value.Length >= 2)
+        {
             return value;
+        }
 
         return $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
     }
@@ -210,7 +246,7 @@ internal static partial class QueryPlanRunner
             MyEfVibeProvider.Sqlite => $"EXPLAIN QUERY PLAN {trimmed}",
             MyEfVibeProvider.MySql or MyEfVibeProvider.MariaDb => $"EXPLAIN {trimmed}",
             MyEfVibeProvider.Oracle => $"EXPLAIN PLAN FOR {trimmed}",
-            _ => $"EXPLAIN {trimmed}",
+            _ => $"EXPLAIN {trimmed}"
         };
     }
 
@@ -255,32 +291,48 @@ internal static partial class QueryPlanRunner
         var database = dbContext.GetType().GetProperty("Database")?.GetValue(dbContext);
 
         if (database is null)
+        {
             return null;
+        }
 
         var providerName = database.GetType().GetProperty("ProviderName")?.GetValue(database) as string;
 
         if (string.IsNullOrWhiteSpace(providerName))
+        {
             return null;
+        }
 
         if (providerName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+        {
             return MyEfVibeProvider.Npgsql;
+        }
 
         if (providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
             return MyEfVibeProvider.Sqlite;
+        }
 
         if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
             return MyEfVibeProvider.SqlServer;
+        }
 
         if (providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase))
+        {
             return MyEfVibeProvider.Oracle;
+        }
 
         if (providerName.Contains("MariaDb", StringComparison.OrdinalIgnoreCase)
             || providerName.Contains("MariaDB", StringComparison.Ordinal))
+        {
             return MyEfVibeProvider.MariaDb;
+        }
 
         if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
             || providerName.Contains("MySQL", StringComparison.Ordinal))
+        {
             return MyEfVibeProvider.MySql;
+        }
 
         return null;
     }
@@ -301,7 +353,7 @@ internal static partial class QueryPlanRunner
         CancellationToken cancellationToken)
     {
         var database = dbContext.GetType().GetProperty("Database")?.GetValue(dbContext)
-            ?? throw new InvalidOperationException("Database facade not found.");
+                       ?? throw new InvalidOperationException("Database facade not found.");
 
         if (!RelationalDatabaseFacadeInvoker.TryGetDbConnection(database, inspectionAssemblies, out var connection)
             || connection is not DbConnection dbConnection)
@@ -313,7 +365,9 @@ internal static partial class QueryPlanRunner
         var openedHere = dbConnection.State != ConnectionState.Open;
 
         if (openedHere)
+        {
             await dbConnection.OpenAsync(cancellationToken);
+        }
 
         return new ConnectionScope(dbConnection, openedHere);
     }
@@ -334,7 +388,9 @@ internal static partial class QueryPlanRunner
             var values = new string[reader.FieldCount];
 
             for (var column = 0; column < reader.FieldCount; column++)
+            {
                 values[column] = reader.GetValue(column)?.ToString() ?? string.Empty;
+            }
 
             rows.Add(string.Join(" | ", values));
         }
@@ -354,6 +410,8 @@ internal static partial class QueryPlanRunner
 
     private sealed class ConnectionScope : IAsyncDisposable
     {
+        private readonly bool _openedHere;
+
         internal ConnectionScope(DbConnection connection, bool openedHere)
         {
             Connection = connection;
@@ -362,12 +420,12 @@ internal static partial class QueryPlanRunner
 
         internal DbConnection Connection { get; }
 
-        private readonly bool _openedHere;
-
         public async ValueTask DisposeAsync()
         {
             if (_openedHere && Connection.State != ConnectionState.Closed)
+            {
                 await Connection.CloseAsync();
+            }
         }
     }
 }

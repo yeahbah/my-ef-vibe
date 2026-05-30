@@ -3,8 +3,8 @@ namespace MyEfVibe;
 internal static class SqlTranslationProbe
 {
     /// <summary>
-    /// Terminal operators removed before <c>ToQueryString()</c>. For operators that EF translates with
-    /// <c>LIMIT</c>/<c>TOP</c>, the probe keeps an equivalent <c>Take(n)</c> (and <c>Where</c> when needed).
+    ///     Terminal operators removed before <c>ToQueryString()</c>. For operators that EF translates with
+    ///     <c>LIMIT</c>/<c>TOP</c>, the probe keeps an equivalent <c>Take(n)</c> (and <c>Where</c> when needed).
     /// </summary>
     private static readonly (string Suffix, int? TakeLimit)[] TerminalMaterializationSuffixes =
     [
@@ -34,7 +34,7 @@ internal static class SqlTranslationProbe
         (".Min()", null),
         (".Average()", null),
         (".Sum()", null),
-        (".AsEnumerable()", null),
+        (".AsEnumerable()", null)
     ];
 
     private static readonly string[] TerminalMethodNames =
@@ -65,12 +65,12 @@ internal static class SqlTranslationProbe
         "Min",
         "Average",
         "Sum",
-        "AsEnumerable",
+        "AsEnumerable"
     ];
 
     /// <summary>
-    /// Rewrites terminal <c>First</c>/<c>Single</c> operators on EF queries to include <c>Take(n)</c> before execution
-    /// so providers emit <c>LIMIT</c>/<c>TOP</c> instead of materializing the full result set client-side.
+    ///     Rewrites terminal <c>First</c>/<c>Single</c> operators on EF queries to include <c>Take(n)</c> before execution
+    ///     so providers emit <c>LIMIT</c>/<c>TOP</c> instead of materializing the full result set client-side.
     /// </summary>
     internal static string? TryRewriteBoundedTerminalQuery(string snippet)
     {
@@ -80,17 +80,23 @@ internal static class SqlTranslationProbe
             || !LinqEfQueryHeuristics.LooksLikeEfQuery(trimmed)
             || trimmed.Contains(".Take(", StringComparison.Ordinal)
             || trimmed.Contains(".TakeAsync(", StringComparison.Ordinal))
+        {
             return null;
+        }
 
         foreach (var (suffix, takeLimit) in TerminalMaterializationSuffixes)
         {
             if (takeLimit is null || !trimmed.EndsWith(suffix, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var queryable = trimmed[..^suffix.Length].TrimEnd();
 
             if (string.IsNullOrWhiteSpace(queryable))
+            {
                 return null;
+            }
 
             var bounded = TryFinalizeProbe(queryable, takeLimit);
 
@@ -111,30 +117,42 @@ internal static class SqlTranslationProbe
             var takeLimit = TryGetTakeLimitForMethod(methodName);
 
             if (takeLimit is null)
+            {
                 continue;
+            }
 
             var needle = $".{methodName}(";
             var index = expression.LastIndexOf(needle, StringComparison.Ordinal);
 
             if (index < 0)
+            {
                 continue;
+            }
 
             var openParenIndex = index + needle.Length - 1;
 
             if (!TryFindClosingParenthesis(expression, openParenIndex, out var closeParenIndex))
+            {
                 continue;
+            }
 
             if (!IsEndOfExpression(expression, closeParenIndex + 1))
+            {
                 continue;
+            }
 
             var queryable = expression[..index].TrimEnd();
             var suffix = expression[index..];
 
             if (string.IsNullOrWhiteSpace(queryable) || !LinqEfQueryHeuristics.LooksLikeEfQuery(expression))
+            {
                 continue;
+            }
 
             if (!TryExtractParenthesizedContent(expression, openParenIndex, out var arguments))
+            {
                 continue;
+            }
 
             var bounded = TryFinalizeProbe(queryable, takeLimit, arguments);
 
@@ -146,17 +164,21 @@ internal static class SqlTranslationProbe
         return null;
     }
 
-    private static string RemapTerminalSuffixForExecution(string suffix) =>
-        suffix switch
+    private static string RemapTerminalSuffixForExecution(string suffix)
+    {
+        return suffix switch
         {
             ".First()" => ".FirstOrDefault()",
             ".FirstAsync()" => ".FirstOrDefaultAsync()",
-            _ => suffix,
+            _ => suffix
         };
+    }
 
-    internal static bool ContainsEagerLoad(string expression) =>
-        expression.Contains(".Include(", StringComparison.Ordinal)
-        || expression.Contains(".ThenInclude(", StringComparison.Ordinal);
+    internal static bool ContainsEagerLoad(string expression)
+    {
+        return expression.Contains(".Include(", StringComparison.Ordinal)
+               || expression.Contains(".ThenInclude(", StringComparison.Ordinal);
+    }
 
     internal static string? TryCreateProbeExpression(string snippet)
     {
@@ -165,7 +187,9 @@ internal static class SqlTranslationProbe
         foreach (var (suffix, takeLimit) in TerminalMaterializationSuffixes)
         {
             if (!trimmed.EndsWith(suffix, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var probe = trimmed[..^suffix.Length].TrimEnd();
 
@@ -175,13 +199,15 @@ internal static class SqlTranslationProbe
         var terminalProbe = TryStripTrailingTerminalCall(trimmed);
 
         if (terminalProbe is not null)
+        {
             return terminalProbe;
+        }
 
         return TryAsBareQueryableProbe(trimmed);
     }
 
     /// <summary>
-    /// Accepts deferred query expressions (e.g. assigned to a local) that have no terminal operator.
+    ///     Accepts deferred query expressions (e.g. assigned to a local) that have no terminal operator.
     /// </summary>
     private static string? TryAsBareQueryableProbe(string expression)
     {
@@ -204,7 +230,9 @@ internal static class SqlTranslationProbe
         content = string.Empty;
 
         if (!TryFindClosingParenthesis(text, openParenIndex, out var closeParenIndex))
+        {
             return false;
+        }
 
         content = text[(openParenIndex + 1)..closeParenIndex];
 
@@ -219,23 +247,33 @@ internal static class SqlTranslationProbe
             var index = expression.LastIndexOf(needle, StringComparison.Ordinal);
 
             if (index < 0)
+            {
                 continue;
+            }
 
             var openParenIndex = index + needle.Length - 1;
 
             if (!TryFindClosingParenthesis(expression, openParenIndex, out var closeParenIndex))
+            {
                 continue;
+            }
 
             if (!IsEndOfExpression(expression, closeParenIndex + 1))
+            {
                 continue;
+            }
 
             var queryable = expression[..index].TrimEnd();
 
             if (string.IsNullOrWhiteSpace(queryable))
+            {
                 return null;
+            }
 
             if (!TryExtractParenthesizedContent(expression, openParenIndex, out var arguments))
+            {
                 return null;
+            }
 
             var takeLimit = TryGetTakeLimitForMethod(methodName);
 
@@ -248,15 +286,21 @@ internal static class SqlTranslationProbe
     private static string? TryFinalizeProbe(string queryable, int? takeLimit, string? terminalArguments = null)
     {
         if (string.IsNullOrWhiteSpace(queryable))
+        {
             return null;
+        }
 
         if (takeLimit is null || ContainsEagerLoad(queryable))
+        {
             return queryable;
+        }
 
         var predicate = TryExtractPredicateArgument(terminalArguments);
 
         if (!string.IsNullOrWhiteSpace(predicate))
+        {
             return $"{queryable}.Where({predicate}).Take({takeLimit.Value})";
+        }
 
         return $"{queryable}.Take({takeLimit.Value})";
     }
@@ -264,21 +308,27 @@ internal static class SqlTranslationProbe
     internal static string? TryExtractPredicateArgument(string? arguments)
     {
         if (string.IsNullOrWhiteSpace(arguments))
+        {
             return null;
+        }
 
         foreach (var part in SplitTopLevelCommaSeparated(arguments))
         {
             var trimmed = part.Trim();
 
             if (LooksLikePredicate(trimmed))
+            {
                 return trimmed;
+            }
         }
 
         return LooksLikePredicate(arguments) ? arguments.Trim() : null;
     }
 
-    private static bool LooksLikePredicate(string arguments) =>
-        arguments.Contains("=>", StringComparison.Ordinal);
+    private static bool LooksLikePredicate(string arguments)
+    {
+        return arguments.Contains("=>", StringComparison.Ordinal);
+    }
 
     private static IEnumerable<string> SplitTopLevelCommaSeparated(string arguments)
     {
@@ -317,16 +367,20 @@ internal static class SqlTranslationProbe
         }
 
         if (start < arguments.Length)
+        {
             yield return arguments[start..];
+        }
     }
 
-    private static int? TryGetTakeLimitForMethod(string methodName) =>
-        methodName switch
+    private static int? TryGetTakeLimitForMethod(string methodName)
+    {
+        return methodName switch
         {
             "First" or "FirstAsync" or "FirstOrDefault" or "FirstOrDefaultAsync" => 1,
             "Single" or "SingleAsync" or "SingleOrDefault" or "SingleOrDefaultAsync" => 2,
-            _ => null,
+            _ => null
         };
+    }
 
     internal static bool IsEndOfExpression(string expression, int startIndex)
     {
@@ -335,7 +389,9 @@ internal static class SqlTranslationProbe
             var character = expression[index];
 
             if (character is ' ' or '\t' or '\r' or '\n')
+            {
                 continue;
+            }
 
             return false;
         }
@@ -348,7 +404,9 @@ internal static class SqlTranslationProbe
         closeParenIndex = -1;
 
         if (openParenIndex < 0 || openParenIndex >= text.Length || text[openParenIndex] != '(')
+        {
             return false;
+        }
 
         var depth = 0;
 
@@ -399,7 +457,9 @@ internal static class SqlTranslationProbe
             }
 
             if (text[index] == '"')
+            {
                 return index;
+            }
 
             index++;
         }
@@ -420,7 +480,9 @@ internal static class SqlTranslationProbe
             }
 
             if (text[index] == '\'')
+            {
                 return index;
+            }
 
             index++;
         }

@@ -2,8 +2,10 @@ namespace MyEfVibe.Tests;
 
 public sealed class LinqScanCiGateTests
 {
-    private static LinqScanFinding Finding(LinqScanSeverity severity) =>
-        new("a.cs", 1, "code", "test-rule", "message", severity);
+    private static LinqScanFinding Finding(LinqScanSeverity severity)
+    {
+        return new LinqScanFinding("a.cs", 1, "code", "test-rule", "message", severity);
+    }
 
     [Fact]
     public void Filter_MinSeverityWarning_ExcludesInfo()
@@ -12,7 +14,7 @@ public sealed class LinqScanCiGateTests
         {
             Finding(LinqScanSeverity.Info),
             Finding(LinqScanSeverity.Warning),
-            Finding(LinqScanSeverity.Error),
+            Finding(LinqScanSeverity.Error)
         };
 
         var filtered = LinqScanCiGate.Filter(findings, LinqScanSeverity.Warning);
@@ -68,7 +70,7 @@ public sealed class LinqScanCiGateTests
         {
             Finding(LinqScanSeverity.Info),
             Finding(LinqScanSeverity.Warning),
-            Finding(LinqScanSeverity.Critical),
+            Finding(LinqScanSeverity.Critical)
         };
 
         var reportMin = ScanCommandRunner.ResolveReportMinSeverity(null, LinqScanSeverity.Critical);
@@ -83,7 +85,7 @@ public sealed class LinqScanCiGateTests
     {
         var findings = new[]
         {
-            LinqScanFinding.Create("a.cs", 1, "code", "unbounded-materialize", "no take"),
+            LinqScanFinding.Create("a.cs", 1, "code", "unbounded-materialize", "no take")
         };
 
         var summary = LinqScanCiGate.Summarize(findings, LinqScanSeverity.Critical);

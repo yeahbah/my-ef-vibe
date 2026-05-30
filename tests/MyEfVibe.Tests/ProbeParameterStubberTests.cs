@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace MyEfVibe.Tests;
 
 public sealed class ProbeParameterStubberTests
@@ -149,20 +151,20 @@ public sealed class ProbeParameterStubberTests
     }
 }
 
-public sealed class FakeGuidNoteDbContext : Microsoft.EntityFrameworkCore.DbContext
+public sealed class FakeGuidNoteDbContext : DbContext
 {
     public FakeGuidNoteDbContext()
     {
     }
 
-    public FakeGuidNoteDbContext(Microsoft.EntityFrameworkCore.DbContextOptions<FakeGuidNoteDbContext> options)
+    public FakeGuidNoteDbContext(DbContextOptions<FakeGuidNoteDbContext> options)
         : base(options)
     {
     }
 
-    public Microsoft.EntityFrameworkCore.DbSet<FakeGuidUser> Users => Set<FakeGuidUser>();
+    public DbSet<FakeGuidUser> Users => Set<FakeGuidUser>();
 
-    public Microsoft.EntityFrameworkCore.DbSet<FakeGuidNote> Notes => Set<FakeGuidNote>();
+    public DbSet<FakeGuidNote> Notes => Set<FakeGuidNote>();
 }
 
 public sealed class FakeGuidUser

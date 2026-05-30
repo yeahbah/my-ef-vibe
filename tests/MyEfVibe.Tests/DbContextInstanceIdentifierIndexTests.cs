@@ -36,13 +36,13 @@ public sealed class DbContextInstanceIdentifierIndexTests
     {
         using var temp = new TempDirectory();
         var source = """
-            using Microsoft.EntityFrameworkCore;
-            public sealed class OrderService
-            {
-                private readonly NorthwindDbContext _store;
-                public void Run() => _store.Products.Count();
-            }
-            """;
+                     using Microsoft.EntityFrameworkCore;
+                     public sealed class OrderService
+                     {
+                         private readonly NorthwindDbContext _store;
+                         public void Run() => _store.Products.Count();
+                     }
+                     """;
 
         File.WriteAllText(Path.Combine(temp.Path, "OrderService.cs"), source);
 
@@ -74,7 +74,7 @@ public sealed class DbContextInstanceIdentifierIndexTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

@@ -11,7 +11,9 @@ internal static class SetEntityTypeExtractor
         entityTypeName = string.Empty;
 
         if (string.IsNullOrWhiteSpace(code))
+        {
             return false;
+        }
 
         try
         {
@@ -22,13 +24,19 @@ internal static class SetEntityTypeExtractor
             foreach (var genericName in tree.GetRoot().DescendantNodes().OfType<GenericNameSyntax>())
             {
                 if (!string.Equals(genericName.Identifier.Text, "Set", StringComparison.Ordinal))
+                {
                     continue;
+                }
 
                 if (genericName.TypeArgumentList.Arguments.Count != 1)
+                {
                     continue;
+                }
 
                 if (!TryGetConcreteTypeName(genericName.TypeArgumentList.Arguments[0], out var typeName))
+                {
                     continue;
+                }
 
                 entityTypeName = typeName;
                 return true;

@@ -9,13 +9,15 @@ internal static class ServeProtocol
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        PropertyNameCaseInsensitive = true,
+        PropertyNameCaseInsensitive = true
     };
 
     internal static ServeRequest? TryParseRequest(string line)
     {
         if (string.IsNullOrWhiteSpace(line))
+        {
             return null;
+        }
 
         try
         {
@@ -34,20 +36,26 @@ internal static class ServeProtocol
             Type = "ready",
             DbContext = runtime.DbContextName,
             WorkspaceRoot = runtime.WorkspaceRoot,
-            SessionDirectory = runtime.SessionDirectory,
+            SessionDirectory = runtime.SessionDirectory
         };
 
         WriteLine(payload);
     }
 
-    internal static void WriteError(string message) =>
+    internal static void WriteError(string message)
+    {
         WriteLine(new ServeErrorResponse { Type = "error", Message = message });
+    }
 
-    internal static void WritePong() =>
+    internal static void WritePong()
+    {
         WriteLine(new ServePongResponse { Type = "pong" });
+    }
 
-    private static void WriteLine<T>(T payload) =>
+    private static void WriteLine<T>(T payload)
+    {
         Console.Out.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
+    }
 
     internal sealed class ServeRequest
     {

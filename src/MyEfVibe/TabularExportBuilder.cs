@@ -13,14 +13,18 @@ internal static class TabularExportBuilder
     internal static string ToCsv(IReadOnlyList<object?> rows)
     {
         if (rows.Count == 0)
+        {
             return string.Empty;
+        }
 
         var table = BuildTable(rows);
         var builder = new StringBuilder();
         builder.AppendLine(string.Join(",", table.Columns.Select(EscapeCsv)));
 
         foreach (var row in table.Rows)
+        {
             builder.AppendLine(string.Join(",", row.Select(EscapeCsv)));
+        }
 
         return builder.ToString();
     }
@@ -28,7 +32,9 @@ internal static class TabularExportBuilder
     internal static string ToJson(IReadOnlyList<object?> rows)
     {
         if (rows.Count == 0)
+        {
             return "[]";
+        }
 
         var table = BuildTable(rows);
         var records = new List<Dictionary<string, string>>(table.Rows.Count);
@@ -38,7 +44,9 @@ internal static class TabularExportBuilder
             var record = new Dictionary<string, string>(table.Columns.Count, StringComparer.Ordinal);
 
             for (var columnIndex = 0; columnIndex < table.Columns.Count; columnIndex++)
+            {
                 record[table.Columns[columnIndex]] = table.Rows[rowIndex][columnIndex];
+            }
 
             records.Add(record);
         }
@@ -55,10 +63,13 @@ internal static class TabularExportBuilder
         {
             var properties = GetReadableProperties(row);
 
-            propertyMaps.Add(properties.ToDictionary(static pair => pair.Name, static pair => pair.Property, StringComparer.Ordinal));
+            propertyMaps.Add(properties.ToDictionary(static pair => pair.Name, static pair => pair.Property,
+                StringComparer.Ordinal));
 
             foreach (var name in properties.Select(static pair => pair.Name))
+            {
                 columnSet.Add(name);
+            }
         }
 
         if (columnSet.Count == 0)
@@ -97,12 +108,16 @@ internal static class TabularExportBuilder
     private static IEnumerable<(string Name, PropertyInfo Property)> GetReadableProperties(object? row)
     {
         if (row is null)
+        {
             return Array.Empty<(string, PropertyInfo)>();
+        }
 
         var type = row.GetType();
 
         if (IsScalarType(type))
+        {
             return Array.Empty<(string, PropertyInfo)>();
+        }
 
         return type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -114,7 +129,9 @@ internal static class TabularExportBuilder
     private static object? ReadProperty(object? row, PropertyInfo property)
     {
         if (row is null)
+        {
             return null;
+        }
 
         try
         {
@@ -131,19 +148,21 @@ internal static class TabularExportBuilder
         type = Nullable.GetUnderlyingType(type) ?? type;
 
         return type.IsPrimitive
-            || type.IsEnum
-            || type == typeof(string)
-            || type == typeof(decimal)
-            || type == typeof(DateTime)
-            || type == typeof(DateTimeOffset)
-            || type == typeof(TimeSpan)
-            || type == typeof(Guid);
+               || type.IsEnum
+               || type == typeof(string)
+               || type == typeof(decimal)
+               || type == typeof(DateTime)
+               || type == typeof(DateTimeOffset)
+               || type == typeof(TimeSpan)
+               || type == typeof(Guid);
     }
 
     internal static string FormatScalar(object? value)
     {
         if (value is null)
+        {
             return string.Empty;
+        }
 
         return value switch
         {
@@ -154,22 +173,26 @@ internal static class TabularExportBuilder
             byte[] bytes => Convert.ToBase64String(bytes),
             IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
             IEnumerable enumerable and not string => JsonSerializer.Serialize(enumerable, JsonOptions),
-            _ => value.ToString() ?? string.Empty,
+            _ => value.ToString() ?? string.Empty
         };
     }
 
     private static string EscapeCsv(string value)
     {
         if (value.Length == 0)
+        {
             return value;
+        }
 
         var mustQuote = value.Contains(',')
-            || value.Contains('"')
-            || value.Contains('\n')
-            || value.Contains('\r');
+                        || value.Contains('"')
+                        || value.Contains('\n')
+                        || value.Contains('\r');
 
         if (!mustQuote)
+        {
             return value;
+        }
 
         return $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }

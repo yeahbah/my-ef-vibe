@@ -10,7 +10,7 @@ internal static class LinqScanCiReporter
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     internal static void WriteTextSummary(
@@ -32,9 +32,15 @@ internal static class LinqScanCiReporter
             var threshold = LinqScanRuleCatalog.ToDisplayString(summary.FailOnThreshold.Value);
 
             if (summary.ShouldFail)
-                AnsiConsole.MarkupLine($"[red]CI gate failed[/] — finding(s) at or above [bold]{threshold}[/] severity.");
+            {
+                AnsiConsole.MarkupLine(
+                    $"[red]CI gate failed[/] — finding(s) at or above [bold]{threshold}[/] severity.");
+            }
             else
-                AnsiConsole.MarkupLine($"[green]CI gate passed[/] — no findings at or above [bold]{threshold}[/] severity.");
+            {
+                AnsiConsole.MarkupLine(
+                    $"[green]CI gate passed[/] — no findings at or above [bold]{threshold}[/] severity.");
+            }
         }
     }
 
@@ -74,16 +80,24 @@ internal static class LinqScanCiReporter
         var parts = new List<string>();
 
         if (reportMinSeverity is null || reportMinSeverity <= LinqScanSeverity.Critical)
+        {
             parts.Add($"[red]{summary.CriticalCount}[/] critical");
+        }
 
         if (reportMinSeverity is null || reportMinSeverity <= LinqScanSeverity.Error)
+        {
             parts.Add($"[red]{summary.ErrorCount}[/] error");
+        }
 
         if (reportMinSeverity is null || reportMinSeverity <= LinqScanSeverity.Warning)
+        {
             parts.Add($"[yellow]{summary.WarningCount}[/] warning");
+        }
 
         if (reportMinSeverity is null || reportMinSeverity <= LinqScanSeverity.Info)
+        {
             parts.Add($"[cyan]{summary.InfoCount}[/] info");
+        }
 
         return string.Join(" · ", parts);
     }

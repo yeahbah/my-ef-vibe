@@ -11,8 +11,10 @@ public sealed class LinqScanRuleCatalogTests
     [InlineData("client-eval", LinqScanSeverity.Warning)]
     [InlineData("unordered-take", LinqScanSeverity.Warning)]
     [InlineData("query-site", LinqScanSeverity.Info)]
-    public void GetSeverity_KnownRules_ReturnsExpected(string ruleId, LinqScanSeverity expected) =>
+    public void GetSeverity_KnownRules_ReturnsExpected(string ruleId, LinqScanSeverity expected)
+    {
         Assert.Equal(expected, LinqScanRuleCatalog.GetSeverity(ruleId));
+    }
 
     [Theory]
     [InlineData("critical", LinqScanSeverity.Critical)]

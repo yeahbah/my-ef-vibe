@@ -72,23 +72,10 @@ internal static class EntityDescriptor
                     $"[bold]{Markup.Escape(match.DbSetName)}[/] [grey]→[/] [cyan]{Markup.Escape(entityType.FullName ?? entityType.Name)}[/]"),
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(Color.Grey),
-                Padding = new Padding(1, 0, 1, 0),
+                Padding = new Padding(1, 0, 1, 0)
             });
 
         AnsiConsole.WriteLine();
-    }
-
-    internal enum EntityResolveResult
-    {
-        NotFound,
-        Found,
-        Ambiguous,
-    }
-
-    internal sealed class EntityResolveOutcome
-    {
-        internal (string DbSetName, Type EntityType)? Match { get; init; }
-        internal IReadOnlyList<(string DbSetName, Type EntityType)>? AmbiguousMatches { get; init; }
     }
 
     internal static EntityResolveResult TryResolveEntity(
@@ -167,10 +154,14 @@ internal static class EntityDescriptor
         foreach (var property in dbContext.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!property.PropertyType.IsGenericType)
+            {
                 continue;
+            }
 
-            if (!typeof(System.Linq.IQueryable).IsAssignableFrom(property.PropertyType))
+            if (!typeof(IQueryable).IsAssignableFrom(property.PropertyType))
+            {
                 continue;
+            }
 
             var elementType = property.PropertyType.GetGenericArguments()[0];
 
@@ -196,22 +187,32 @@ internal static class EntityDescriptor
         foreach (var property in entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (property.GetIndexParameters().Length > 0)
+            {
                 continue;
+            }
 
             var isNavigation = IsNavigationProperty(property, entityTypeNames);
             var row = BuildMemberRow(property.Name, property.PropertyType, isNavigation, modelProperties);
 
             if (isNavigation)
+            {
                 navigationRows.Add(row);
+            }
             else
+            {
                 scalarRows.Add(row);
+            }
         }
 
         foreach (var row in scalarRows.OrderBy(static member => member.Name, StringComparer.OrdinalIgnoreCase))
+        {
             yield return row;
+        }
 
         foreach (var row in navigationRows.OrderBy(static member => member.Name, StringComparer.OrdinalIgnoreCase))
+        {
             yield return row;
+        }
     }
 
     private static MemberRow BuildMemberRow(
@@ -222,27 +223,38 @@ internal static class EntityDescriptor
     {
         var underlying = Nullable.GetUnderlyingType(clrType) ?? clrType;
         var isNullable = clrType != underlying
-                         || (modelProperties?.TryGetValue(name, out var modelProperty) == true && modelProperty.IsNullable);
+                         || (modelProperties?.TryGetValue(name, out var modelProperty) == true &&
+                             modelProperty.IsNullable);
 
         var notes = new List<string>();
 
         if (isNavigation)
+        {
             notes.Add("navigation");
+        }
 
         if (modelProperties?.TryGetValue(name, out var mapped) == true)
         {
             if (mapped.IsPrimaryKey)
+            {
                 notes.Add("PK");
+            }
 
             if (mapped.IsForeignKey)
+            {
                 notes.Add("FK");
+            }
 
             if (!string.IsNullOrWhiteSpace(mapped.ColumnName)
                 && !string.Equals(mapped.ColumnName, name, StringComparison.OrdinalIgnoreCase))
+            {
                 notes.Add($"column: {mapped.ColumnName}");
+            }
 
             if (mapped.MaxLength is int maxLength)
+            {
                 notes.Add($"max {maxLength}");
+            }
         }
 
         return new MemberRow(
@@ -257,14 +269,18 @@ internal static class EntityDescriptor
         var propertyType = property.PropertyType;
 
         if (entityTypeNames.Contains(propertyType))
+        {
             return true;
+        }
 
         if (propertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(propertyType))
         {
             var elementType = propertyType.GetGenericArguments()[0];
 
             if (entityTypeNames.Contains(elementType))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -273,31 +289,49 @@ internal static class EntityDescriptor
     private static string FormatTypeName(Type type)
     {
         if (type == typeof(string))
+        {
             return "string";
+        }
 
         if (type == typeof(int))
+        {
             return "int";
+        }
 
         if (type == typeof(long))
+        {
             return "long";
+        }
 
         if (type == typeof(bool))
+        {
             return "bool";
+        }
 
         if (type == typeof(decimal))
+        {
             return "decimal";
+        }
 
         if (type == typeof(DateTime))
+        {
             return "DateTime";
+        }
 
         if (type == typeof(DateTimeOffset))
+        {
             return "DateTimeOffset";
+        }
 
         if (type == typeof(Guid))
+        {
             return "Guid";
+        }
 
         if (Nullable.GetUnderlyingType(type) is { } underlying)
+        {
             return $"{FormatTypeName(underlying)}?";
+        }
 
         if (type.IsGenericType)
         {
@@ -307,7 +341,9 @@ internal static class EntityDescriptor
                 || definition == typeof(IList<>)
                 || definition == typeof(ICollection<>)
                 || definition == typeof(IEnumerable<>))
+            {
                 return $"{FormatTypeName(type.GetGenericArguments()[0])}[]";
+            }
         }
 
         return type.Name;
@@ -318,17 +354,23 @@ internal static class EntityDescriptor
         var model = dbContext.GetType().GetProperty("Model")?.GetValue(dbContext);
 
         if (model is null)
+        {
             return null;
+        }
 
         foreach (var method in model.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!string.Equals(method.Name, "FindEntityType", StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var parameters = method.GetParameters();
 
             if (parameters.Length != 1 || parameters[0].ParameterType != typeof(Type))
+            {
                 continue;
+            }
 
             try
             {
@@ -351,27 +393,37 @@ internal static class EntityDescriptor
         {
             if (!string.Equals(method.Name, "GetProperties", StringComparison.Ordinal)
                 || method.GetParameters().Length != 0)
+            {
                 continue;
+            }
 
             properties = method.Invoke(modelEntity, null) as IEnumerable;
 
             if (properties is not null)
+            {
                 break;
+            }
         }
 
         if (properties is null)
+        {
             yield break;
+        }
 
         foreach (var property in properties)
         {
             if (property is null)
+            {
                 continue;
+            }
 
             var propertyType = property.GetType();
             var name = propertyType.GetProperty("Name")?.GetValue(property) as string ?? string.Empty;
 
             if (string.IsNullOrEmpty(name))
+            {
                 continue;
+            }
 
             yield return new ModelPropertyInfo(
                 name,
@@ -392,16 +444,31 @@ internal static class EntityDescriptor
 
     private static string? ReadString(object target, string methodName)
     {
-        var method = target.GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
+        var method = target.GetType()
+            .GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
 
         return method?.Invoke(target, null) as string;
     }
 
     private static int? ReadInt(object target, string methodName)
     {
-        var method = target.GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
+        var method = target.GetType()
+            .GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
 
         return method?.Invoke(target, null) as int?;
+    }
+
+    internal enum EntityResolveResult
+    {
+        NotFound,
+        Found,
+        Ambiguous
+    }
+
+    internal sealed class EntityResolveOutcome
+    {
+        internal (string DbSetName, Type EntityType)? Match { get; init; }
+        internal IReadOnlyList<(string DbSetName, Type EntityType)>? AmbiguousMatches { get; init; }
     }
 
     internal sealed record MemberRow(string Name, string TypeDisplay, string Nullable, string Notes);

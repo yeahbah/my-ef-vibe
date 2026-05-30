@@ -31,11 +31,15 @@ internal sealed class DbContextScanScope
 
     internal bool HasMultipleContexts { get; }
 
-    internal bool IsSelectedContextType(string typeName) =>
-        SelectedContextTypeNames.Contains(typeName);
+    internal bool IsSelectedContextType(string typeName)
+    {
+        return SelectedContextTypeNames.Contains(typeName);
+    }
 
-    internal static DbContextScanScope Create(string efProjectPath, string startupProjectPath, Type selectedContextType) =>
-        Create(efProjectPath, startupProjectPath, selectedContextType.Name);
+    internal static DbContextScanScope Create(string efProjectPath, string startupProjectPath, Type selectedContextType)
+    {
+        return Create(efProjectPath, startupProjectPath, selectedContextType.Name);
+    }
 
     internal static DbContextScanScope Create(
         string efProjectPath,

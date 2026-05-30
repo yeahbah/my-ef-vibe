@@ -8,11 +8,11 @@ public sealed class DbSetPropertyEntityExtractorTests
     public void TryExtractConcreteEntityTypeName_finds_entity_from_DbContext_property()
     {
         const string code = """
-            var addresses = await DbContext.BusinessEntityAddresses
-                .AsNoTracking()
-                .Where(bea => bea.BusinessEntityId == businessEntityId)
-                .ToListAsync(cancellationToken);
-            """;
+                            var addresses = await DbContext.BusinessEntityAddresses
+                                .AsNoTracking()
+                                .Where(bea => bea.BusinessEntityId == businessEntityId)
+                                .ToListAsync(cancellationToken);
+                            """;
 
         Assert.True(
             DbSetPropertyEntityExtractor.TryExtractConcreteEntityTypeName(
@@ -60,9 +60,13 @@ internal sealed class MappingProbeContextWithDbSet : DbContext
 {
     public DbSet<UnmappedCurrency> BusinessEntityAddresses => Set<UnmappedCurrency>();
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
         optionsBuilder.UseInMemoryDatabase("dbset-property-probe");
+    }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
         modelBuilder.Ignore<UnmappedCurrency>();
+    }
 }

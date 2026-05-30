@@ -15,11 +15,13 @@ internal sealed record DiagnosticSqlCaptureBinding(
 
 internal static class DiagnosticSqlCaptureResolver
 {
-    private static readonly ConcurrentDictionary<string, DiagnosticSqlCaptureBinding?> Bindings = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, DiagnosticSqlCaptureBinding?> Bindings =
+        new(StringComparer.Ordinal);
 
     internal static DiagnosticSqlCaptureBinding? Resolve(object dbContextInstance)
     {
-        var key = ResolveRelationalAssembly(dbContextInstance)?.FullName ?? dbContextInstance.GetType().Assembly.FullName!;
+        var key = ResolveRelationalAssembly(dbContextInstance)?.FullName ??
+                  dbContextInstance.GetType().Assembly.FullName!;
 
         return Bindings.GetOrAdd(key, _ => LocateBinding(dbContextInstance));
     }
@@ -29,7 +31,9 @@ internal static class DiagnosticSqlCaptureResolver
         var serviceProvider = GetInfrastructureServiceProvider(dbContextInstance);
 
         if (serviceProvider is null)
+        {
             return null;
+        }
 
         try
         {
@@ -49,9 +53,11 @@ internal static class DiagnosticSqlCaptureResolver
         {
             if (assembly.GetType(
                     "Microsoft.EntityFrameworkCore.Diagnostics.CommandExecutedEventData",
-                    throwOnError: false)
+                    false)
                 is not null)
+            {
                 return assembly;
+            }
         }
 
         return null;
@@ -66,7 +72,9 @@ internal static class DiagnosticSqlCaptureResolver
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
             if (seen.Add(assembly))
+            {
                 yield return assembly;
+            }
         }
     }
 
@@ -75,23 +83,29 @@ internal static class DiagnosticSqlCaptureResolver
         var relationalAssembly = ResolveRelationalAssembly(dbContextInstance);
 
         if (relationalAssembly is null)
+        {
             return null;
+        }
 
         var eventDataType = relationalAssembly.GetType(
             "Microsoft.EntityFrameworkCore.Diagnostics.CommandExecutedEventData",
-            throwOnError: false);
+            false);
 
         if (eventDataType is null)
+        {
             return null;
+        }
 
         var relationalEventIdType = relationalAssembly.GetType(
             "Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId",
-            throwOnError: false);
+            false);
 
         var commandExecutedEventName = ResolveCommandExecutedEventName(relationalEventIdType);
 
         if (commandExecutedEventName is null)
+        {
             return null;
+        }
 
         var contextProperty = eventDataType.GetProperty("Context");
 
@@ -102,7 +116,9 @@ internal static class DiagnosticSqlCaptureResolver
         var logLevelProperty = eventDataType.GetProperty("LogLevel");
 
         if (contextProperty is null || commandProperty is null || durationProperty is null || logLevelProperty is null)
+        {
             return null;
+        }
 
         return new DiagnosticSqlCaptureBinding(
             commandExecutedEventName,
@@ -117,7 +133,9 @@ internal static class DiagnosticSqlCaptureResolver
     private static string? ResolveCommandExecutedEventName(Type? relationalEventIdType)
     {
         if (relationalEventIdType is null)
+        {
             return null;
+        }
 
         try
         {
@@ -126,12 +144,16 @@ internal static class DiagnosticSqlCaptureResolver
                 BindingFlags.Public | BindingFlags.Static);
 
             if (commandExecutedField is null)
+            {
                 return null;
+            }
 
             var eventId = commandExecutedField.GetValue(null);
 
             if (eventId is null)
+            {
                 return null;
+            }
 
             return eventId.GetType().GetProperty("Name")?.GetValue(eventId) as string;
         }
@@ -146,16 +168,22 @@ internal static class DiagnosticSqlCaptureResolver
         foreach (var iface in dbContextInstance.GetType().GetInterfaces())
         {
             if (!iface.IsGenericType)
+            {
                 continue;
+            }
 
             if (!string.Equals(
                     iface.GetGenericTypeDefinition().FullName,
                     "Microsoft.EntityFrameworkCore.Infrastructure.IInfrastructure`1",
                     StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             if (iface.GetGenericArguments()[0] != typeof(IServiceProvider))
+            {
                 continue;
+            }
 
             return iface.GetProperty("Instance")?.GetValue(dbContextInstance) as IServiceProvider;
         }

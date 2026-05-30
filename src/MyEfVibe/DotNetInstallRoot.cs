@@ -7,7 +7,9 @@ internal static class DotNetInstallRoot
         var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
 
         if (!string.IsNullOrWhiteSpace(dotnetRoot) && Directory.Exists(dotnetRoot))
+        {
             return Path.GetFullPath(dotnetRoot);
+        }
 
         var coreLibDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
 

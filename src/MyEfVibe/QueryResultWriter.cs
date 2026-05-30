@@ -15,7 +15,7 @@ internal static class QueryResultWriter
         CancellationToken cancellationToken = default)
     {
         var useSpectre = outputFormat == CliOutputFormat.Text
-            && (output is null || output == Console.Out);
+                         && (output is null || output == Console.Out);
 
         host.EnsureEntityFrameworkRelationalLoaded();
         host.EnsureAspNetCoreSharedFrameworkLoaded();

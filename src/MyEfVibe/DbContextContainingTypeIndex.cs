@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace MyEfVibe;
 
 /// <summary>
-/// Maps containing type names to the concrete DbContext type they use (from ctor/field/base analysis).
+///     Maps containing type names to the concrete DbContext type they use (from ctor/field/base analysis).
 /// </summary>
 internal sealed class DbContextContainingTypeIndex
 {
@@ -34,12 +34,16 @@ internal sealed class DbContextContainingTypeIndex
             var typeName = typeDeclaration.Identifier.Text;
 
             if (string.IsNullOrWhiteSpace(typeName))
+            {
                 continue;
+            }
 
             var boundContext = TryResolveContextTypeForDeclaration(typeDeclaration, scope);
 
             if (boundContext is null)
+            {
                 continue;
+            }
 
             index._contextTypeByContainingType[typeName] = boundContext;
         }
@@ -52,7 +56,9 @@ internal sealed class DbContextContainingTypeIndex
         contextTypeName = string.Empty;
 
         if (string.IsNullOrWhiteSpace(containingTypeName))
+        {
             return false;
+        }
 
         return _contextTypeByContainingType.TryGetValue(containingTypeName, out contextTypeName!);
     }
@@ -65,25 +71,35 @@ internal sealed class DbContextContainingTypeIndex
         {
             if (DbContextTypeNameSyntax.TryGetSimpleTypeName(parameter.Type, out var typeName)
                 && IsKnownContextType(typeName, scope))
+            {
                 return typeName;
+            }
         }
 
         foreach (var field in typeDeclaration.Members.OfType<FieldDeclarationSyntax>())
         {
             if (!DbContextTypeNameSyntax.TryGetSimpleTypeName(field.Declaration.Type, out var typeName))
+            {
                 continue;
+            }
 
             if (IsKnownContextType(typeName, scope))
+            {
                 return typeName;
+            }
         }
 
         foreach (var property in typeDeclaration.Members.OfType<PropertyDeclarationSyntax>())
         {
             if (!DbContextTypeNameSyntax.TryGetSimpleTypeName(property.Type, out var typeName))
+            {
                 continue;
+            }
 
             if (IsKnownContextType(typeName, scope))
+            {
                 return typeName;
+            }
         }
 
         if (typeDeclaration.BaseList is not null)
@@ -92,13 +108,19 @@ internal sealed class DbContextContainingTypeIndex
             {
                 if (DbContextTypeNameSyntax.TryGetSimpleTypeName(baseType.Type, out var baseTypeName)
                     && IsKnownContextType(baseTypeName, scope))
+                {
                     return baseTypeName;
+                }
 
                 if (TryGetOtherContextFromTypeSyntax(baseType.Type, scope, out var otherContext))
+                {
                     return otherContext;
+                }
 
                 if (InheritsRepositoryBase(baseType.Type))
+                {
                     return scope.SelectedContextTypeName;
+                }
             }
         }
 
@@ -115,7 +137,9 @@ internal sealed class DbContextContainingTypeIndex
         foreach (var name in scope.OtherContextTypeNames)
         {
             if (!text.Contains(name, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             otherContext = name;
             return true;
@@ -133,6 +157,8 @@ internal sealed class DbContextContainingTypeIndex
                || text.Contains("EfRepository", StringComparison.Ordinal);
     }
 
-    private static bool IsKnownContextType(string typeName, DbContextScanScope scope) =>
-        DbContextTypeNameSyntax.Classify(typeName, scope) != DbContextTypeClassification.None;
+    private static bool IsKnownContextType(string typeName, DbContextScanScope scope)
+    {
+        return DbContextTypeNameSyntax.Classify(typeName, scope) != DbContextTypeClassification.None;
+    }
 }

@@ -13,12 +13,14 @@ internal static class LinqScanCiGate
 {
     internal static IReadOnlyList<LinqScanFinding> Filter(
         IReadOnlyList<LinqScanFinding> findings,
-        LinqScanSeverity? minSeverity) =>
-        minSeverity is not { } threshold
+        LinqScanSeverity? minSeverity)
+    {
+        return minSeverity is not { } threshold
             ? findings
             : findings
                 .Where(finding => finding.Severity >= threshold)
                 .ToArray();
+    }
 
     internal static LinqScanCiSummary Summarize(
         IReadOnlyList<LinqScanFinding> findings,
@@ -64,6 +66,8 @@ internal static class LinqScanCiGate
             shouldFail);
     }
 
-    internal static int GetExitCode(LinqScanCiSummary summary) =>
-        summary.ShouldFail ? 1 : 0;
+    internal static int GetExitCode(LinqScanCiSummary summary)
+    {
+        return summary.ShouldFail ? 1 : 0;
+    }
 }

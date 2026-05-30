@@ -63,7 +63,7 @@ internal static class WorkspaceBuilder
             FileName = "dotnet",
             RedirectStandardError = true,
             RedirectStandardOutput = true,
-            UseShellExecute = false,
+            UseShellExecute = false
         };
 
         startInfo.ArgumentList.Add("build");
@@ -88,7 +88,9 @@ internal static class WorkspaceBuilder
         using var buildProcess = Process.Start(startInfo);
 
         if (buildProcess is null)
+        {
             throw new WorkspaceException("Unable to launch the `dotnet` CLI. Ensure the .NET SDK is installed.");
+        }
 
         // Start draining pipes before WaitForExit — otherwise MSBuild/dotnet can fill the 4 KB buffer
         // and block while the parent waits for exit (classic Process redirect deadlock).
@@ -99,7 +101,7 @@ internal static class WorkspaceBuilder
         {
             try
             {
-                buildProcess.Kill(entireProcessTree: true);
+                buildProcess.Kill(true);
             }
             catch
             {
@@ -112,7 +114,9 @@ internal static class WorkspaceBuilder
         var stderr = stderrTask.GetAwaiter().GetResult();
 
         if (buildProcess.ExitCode == 0)
+        {
             return;
+        }
 
         throw new WorkspaceException(
             $"`dotnet build` failed (exit code {buildProcess.ExitCode}).{Environment.NewLine}{stderr}{stdout}");
@@ -124,7 +128,8 @@ internal static class WorkspaceBuilder
         string targetFrameworkMoniker)
     {
         var normalizedProjectPath = Path.GetFullPath(csprojFullPath);
-        var projectKey = $"{SessionPaths.GetProjectSessionFolderName(normalizedProjectPath)}-{ShortHash(normalizedProjectPath)}";
+        var projectKey =
+            $"{SessionPaths.GetProjectSessionFolderName(normalizedProjectPath)}-{ShortHash(normalizedProjectPath)}";
         var tfm = ProjectTargetFrameworkResolver.NormalizeMoniker(targetFrameworkMoniker);
         var root = Path.Combine(
             SessionPaths.EnsureSessionDirectory(sessionDirectory),
@@ -133,7 +138,7 @@ internal static class WorkspaceBuilder
             tfm);
 
         return new ProjectBuildOutput(
-            BaseOutputPath: Path.Combine(root, "bin"));
+            Path.Combine(root, "bin"));
     }
 
     private static string EnsureTrailingSeparator(string path)

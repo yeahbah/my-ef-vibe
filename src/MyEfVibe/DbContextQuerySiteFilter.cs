@@ -10,25 +10,37 @@ internal static class DbContextQuerySiteFilter
         DbContextInstanceIdentifierIndex? instanceIndex = null)
     {
         if (scope is null)
+        {
             return true;
+        }
 
         if (instanceIndex?.StatementReferencesOtherContextInstance(statement) == true)
+        {
             return false;
+        }
 
         if (ReferencesOtherContextType(statement, scope))
+        {
             return false;
+        }
 
         if (ReferencesSelectedContextType(statement, scope))
+        {
             return true;
+        }
 
         if (instanceIndex?.StatementReferencesSelectedContextInstance(statement) == true)
+        {
             return true;
+        }
 
         if (UsesBuiltInContextMemberAlias(statement))
         {
             if (TryGetBoundContextType(containingTypeName, containingTypeIndex, out var boundType)
                 && !scope.IsSelectedContextType(boundType))
+            {
                 return false;
+            }
 
             return true;
         }
@@ -37,7 +49,9 @@ internal static class DbContextQuerySiteFilter
         {
             if (TryGetBoundContextType(containingTypeName, containingTypeIndex, out var boundType)
                 && !scope.IsSelectedContextType(boundType))
+            {
                 return false;
+            }
 
             return true;
         }
@@ -53,7 +67,9 @@ internal static class DbContextQuerySiteFilter
         boundType = string.Empty;
 
         if (string.IsNullOrWhiteSpace(containingTypeName) || containingTypeIndex is null)
+        {
             return false;
+        }
 
         return containingTypeIndex.TryGetBoundContextType(containingTypeName, out boundType!);
     }
@@ -64,7 +80,9 @@ internal static class DbContextQuerySiteFilter
         {
             if (statement.Contains($"{selected}.", StringComparison.Ordinal)
                 || statement.Contains($"<{selected}>", StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -76,7 +94,9 @@ internal static class DbContextQuerySiteFilter
         {
             if (statement.Contains($"{other}.", StringComparison.Ordinal)
                 || statement.Contains($"<{other}>", StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -87,12 +107,16 @@ internal static class DbContextQuerySiteFilter
         foreach (var prefix in DbContextQueryMarkers.BuiltInMemberPrefixes)
         {
             if (prefix.Equals("db.", StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var alias = prefix[..^1];
 
             if (statement.Contains($"{alias}.", StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
 
         return false;

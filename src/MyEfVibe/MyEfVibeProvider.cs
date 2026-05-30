@@ -7,11 +7,13 @@ internal enum MyEfVibeProvider
     Sqlite,
     Oracle,
     MySql,
-    MariaDb,
+    MariaDb
 }
 
 internal static class MyEfVibeProviderExtensions
 {
-    internal static bool UsesMySqlProtocol(this MyEfVibeProvider provider) =>
-        provider is MyEfVibeProvider.MySql or MyEfVibeProvider.MariaDb;
+    internal static bool UsesMySqlProtocol(this MyEfVibeProvider provider)
+    {
+        return provider is MyEfVibeProvider.MySql or MyEfVibeProvider.MariaDb;
+    }
 }

@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace MyEfVibe;
 
 /// <summary>
-/// Removes EF operators that do not affect translated SQL from deep-scan probe expressions.
+///     Removes EF operators that do not affect translated SQL from deep-scan probe expressions.
 /// </summary>
 internal static class EfProbeExpressionSanitizer
 {
@@ -15,13 +15,15 @@ internal static class EfProbeExpressionSanitizer
         "AsSplitQuery",
         "AsSingleQuery",
         "IgnoreQueryFilters",
-        "IgnoreAutoIncludes",
+        "IgnoreAutoIncludes"
     ];
 
     internal static string RemoveTranslationNeutralOperators(string expression)
     {
         if (string.IsNullOrWhiteSpace(expression))
+        {
             return expression;
+        }
 
         var result = expression;
 
@@ -33,7 +35,9 @@ internal static class EfProbeExpressionSanitizer
         }
 
         while (result.Contains("..", StringComparison.Ordinal))
+        {
             result = result.Replace("..", ".", StringComparison.Ordinal);
+        }
 
         result = Regex.Replace(result, @"\s+\.", ".", RegexOptions.CultureInvariant);
 

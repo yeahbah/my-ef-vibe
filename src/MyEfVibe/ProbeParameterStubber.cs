@@ -5,14 +5,16 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace MyEfVibe;
 
 /// <summary>
-/// Replaces method-parameter identifiers in deep-scan probes with literals so expressions compile in the REPL.
+///     Replaces method-parameter identifiers in deep-scan probes with literals so expressions compile in the REPL.
 /// </summary>
 internal static class ProbeParameterStubber
 {
     internal static string Stub(string probeExpression, ProbeStubContext? context = null)
     {
         if (string.IsNullOrWhiteSpace(probeExpression))
+        {
             return probeExpression;
+        }
 
         try
         {
@@ -26,7 +28,9 @@ internal static class ProbeParameterStubber
             var rewritten = new ParameterStubRewriter(context).Visit(tree.GetRoot());
 
             if (rewritten is null)
+            {
                 return singleLine;
+            }
 
             var text = rewritten.ToFullString();
 
@@ -45,13 +49,17 @@ internal static class ProbeParameterStubber
         var index = rewritten.IndexOf(prefix, StringComparison.Ordinal);
 
         if (index < 0)
+        {
             return rewritten.Trim();
+        }
 
         var start = index + prefix.Length;
         var end = rewritten.LastIndexOf(';');
 
         if (end <= start)
+        {
             return rewritten[start..].Trim();
+        }
 
         return rewritten[start..end].Trim();
     }
@@ -61,14 +69,16 @@ internal static class ProbeParameterStubber
         private readonly ProbeStubContext? _context;
         private readonly Stack<HashSet<string>> _lambdaParameters = new();
 
-        internal ParameterStubRewriter(ProbeStubContext? context) =>
+        internal ParameterStubRewriter(ProbeStubContext? context)
+        {
             _context = context;
+        }
 
         public override SyntaxNode? VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node)
         {
             _lambdaParameters.Push(new HashSet<string>(StringComparer.Ordinal)
             {
-                node.Parameter.Identifier.Text,
+                node.Parameter.Identifier.Text
             });
 
             var rewritten = base.VisitSimpleLambdaExpression(node);
@@ -94,7 +104,9 @@ internal static class ProbeParameterStubber
         public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
         {
             if (TryCreateStubFromOuterMemberAccess(node, out var literal))
+            {
                 return literal;
+            }
 
             return base.VisitMemberAccessExpression(node);
         }
@@ -104,19 +116,25 @@ internal static class ProbeParameterStubber
             var rewritten = (InvocationExpressionSyntax)base.VisitInvocationExpression(node)!;
 
             if (rewritten.ArgumentList is null)
+            {
                 return rewritten;
+            }
 
             var arguments = rewritten.ArgumentList.Arguments;
 
             if (arguments.Count == 0)
+            {
                 return rewritten;
+            }
 
             var filtered = arguments
                 .Where(static argument => !IsCancellationTokenArgument(argument))
                 .ToArray();
 
             if (filtered.Length == arguments.Count)
+            {
                 return rewritten;
+            }
 
             return rewritten.WithArgumentList(
                 SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(filtered)));
@@ -135,24 +153,32 @@ internal static class ProbeParameterStubber
                 || IsAnonymousTypeMemberName(node)
                 || IsObjectInitializerMemberName(node)
                 || IsNamedArgumentName(node))
+            {
                 return base.VisitIdentifierName(node);
+            }
 
             if (IsCollectionContainsReceiver(node))
+            {
                 return CreateCollectionStubLiteral(name);
+            }
 
             if (node.Parent is BinaryExpressionSyntax binary)
+            {
                 return CreateStubLiteralForComparison(name, binary, node);
+            }
 
             return CreateStubLiteral(name);
         }
 
-        private static bool IsCollectionContainsReceiver(IdentifierNameSyntax node) =>
-            node.Parent is MemberAccessExpressionSyntax
-            {
-                Expression: var receiver,
-                Name.Identifier.Text: "Contains",
-            }
-            && receiver == node;
+        private static bool IsCollectionContainsReceiver(IdentifierNameSyntax node)
+        {
+            return node.Parent is MemberAccessExpressionSyntax
+                   {
+                       Expression: var receiver,
+                       Name.Identifier.Text: "Contains"
+                   }
+                   && receiver == node;
+        }
 
         private ExpressionSyntax CreateStubLiteralForComparison(
             string name,
@@ -162,17 +188,25 @@ internal static class ProbeParameterStubber
             var other = binary.Left == node ? binary.Right : binary.Left;
 
             if (TryCreateStubLiteralFromEntityProperty(other, out var entityPropertyLiteral))
+            {
                 return entityPropertyLiteral;
+            }
 
             if (other is MemberAccessExpressionSyntax outerMemberAccess
                 && TryCreateStubFromOuterMemberAccess(outerMemberAccess, out var outerMemberLiteral))
+            {
                 return outerMemberLiteral;
+            }
 
             if (IsComparedToGuidMember(other))
+            {
                 return GuidStubLiteral();
+            }
 
             if (IsComparedToNumericMember(other))
+            {
                 return NumericStubLiteral();
+            }
 
             if (IsComparedToStringMember(other))
             {
@@ -199,7 +233,9 @@ internal static class ProbeParameterStubber
                     memberName,
                     out var propertyType)
                 || propertyType is null)
+            {
                 return false;
+            }
 
             literal = CreateStubLiteralForClrType(propertyType);
 
@@ -213,17 +249,23 @@ internal static class ProbeParameterStubber
             literal = null!;
 
             if (memberAccess.Expression is not IdentifierNameSyntax receiver)
+            {
                 return false;
+            }
 
             var receiverName = receiver.Identifier.Text;
 
             if (string.Equals(receiverName, "db", StringComparison.Ordinal)
                 || IsLambdaParameter(receiverName)
                 || IsDeclaredInProbe(receiver))
+            {
                 return false;
+            }
 
             if (_context?.DbContextType is not { } dbContextType)
+            {
                 return false;
+            }
 
             var memberName = memberAccess.Name.Identifier.Text;
 
@@ -233,7 +275,9 @@ internal static class ProbeParameterStubber
                     memberName,
                     out var propertyType)
                 || propertyType is null)
+            {
                 return false;
+            }
 
             literal = CreateStubLiteralForClrType(propertyType);
 
@@ -245,7 +289,9 @@ internal static class ProbeParameterStubber
             memberName = string.Empty;
 
             if (other is not MemberAccessExpressionSyntax memberAccess)
+            {
                 return false;
+            }
 
             memberName = memberAccess.Name.Identifier.Text;
 
@@ -257,7 +303,9 @@ internal static class ProbeParameterStubber
             var underlying = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
 
             if (underlying == typeof(Guid))
+            {
                 return GuidStubLiteral();
+            }
 
             if (underlying == typeof(string))
             {
@@ -272,26 +320,34 @@ internal static class ProbeParameterStubber
             }
 
             if (underlying == typeof(DateTime) || underlying == typeof(DateTimeOffset))
+            {
                 return SyntaxFactory.ParseExpression("DateTime.UtcNow");
+            }
 
-            if (IsIntegralNumericType(underlying) || underlying == typeof(decimal) || underlying == typeof(double) || underlying == typeof(float))
+            if (IsIntegralNumericType(underlying) || underlying == typeof(decimal) || underlying == typeof(double) ||
+                underlying == typeof(float))
+            {
                 return NumericStubLiteral();
+            }
 
             return NumericStubLiteral();
         }
 
-        private static bool IsIntegralNumericType(Type type) =>
-            type == typeof(int)
-            || type == typeof(long)
-            || type == typeof(short)
-            || type == typeof(byte)
-            || type == typeof(uint)
-            || type == typeof(ulong)
-            || type == typeof(ushort)
-            || type == typeof(sbyte);
+        private static bool IsIntegralNumericType(Type type)
+        {
+            return type == typeof(int)
+                   || type == typeof(long)
+                   || type == typeof(short)
+                   || type == typeof(byte)
+                   || type == typeof(uint)
+                   || type == typeof(ulong)
+                   || type == typeof(ushort)
+                   || type == typeof(sbyte);
+        }
 
-        private static bool IsComparedToGuidMember(ExpressionSyntax other) =>
-            other switch
+        private static bool IsComparedToGuidMember(ExpressionSyntax other)
+        {
+            return other switch
             {
                 MemberAccessExpressionSyntax memberAccess =>
                     IsGuidMemberName(memberAccess.Name.Identifier.Text),
@@ -299,11 +355,13 @@ internal static class ProbeParameterStubber
                 IdentifierNameSyntax identifier =>
                     IsGuidMemberName(identifier.Identifier.Text),
 
-                _ => false,
+                _ => false
             };
+        }
 
-        private static bool IsComparedToNumericMember(ExpressionSyntax other) =>
-            other switch
+        private static bool IsComparedToNumericMember(ExpressionSyntax other)
+        {
+            return other switch
             {
                 MemberAccessExpressionSyntax memberAccess =>
                     IsNumericMemberName(memberAccess.Name.Identifier.Text),
@@ -311,32 +369,39 @@ internal static class ProbeParameterStubber
                 IdentifierNameSyntax identifier =>
                     IsNumericMemberName(identifier.Identifier.Text),
 
-                _ => false,
+                _ => false
             };
+        }
 
-        private static bool IsGuidMemberName(string member) =>
-            string.Equals(member, "Rowguid", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(member, "Guid", StringComparison.OrdinalIgnoreCase)
-            || member.EndsWith("Guid", StringComparison.OrdinalIgnoreCase);
+        private static bool IsGuidMemberName(string member)
+        {
+            return string.Equals(member, "Rowguid", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(member, "Guid", StringComparison.OrdinalIgnoreCase)
+                   || member.EndsWith("Guid", StringComparison.OrdinalIgnoreCase);
+        }
 
         private static bool IsNumericMemberName(string member)
         {
             if (IsGuidMemberName(member))
+            {
                 return false;
+            }
 
             return (member.EndsWith("Id", StringComparison.OrdinalIgnoreCase)
                     && !member.EndsWith("ObjectId", StringComparison.OrdinalIgnoreCase))
                    || member.EndsWith("Count", StringComparison.OrdinalIgnoreCase)
                    || member.EndsWith("Key", StringComparison.OrdinalIgnoreCase)
                    || member.EndsWith("No", StringComparison.OrdinalIgnoreCase)
-                   || member.EndsWith("Number", StringComparison.OrdinalIgnoreCase)
-                       && !member.EndsWith("Name", StringComparison.OrdinalIgnoreCase);
+                   || (member.EndsWith("Number", StringComparison.OrdinalIgnoreCase)
+                       && !member.EndsWith("Name", StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsComparedToStringMember(ExpressionSyntax other)
         {
             if (other is not MemberAccessExpressionSyntax memberAccess)
+            {
                 return false;
+            }
 
             var member = memberAccess.Name.Identifier.Text;
 
@@ -344,15 +409,19 @@ internal static class ProbeParameterStubber
                    || member.EndsWith("Name", StringComparison.OrdinalIgnoreCase)
                    || member.EndsWith("Email", StringComparison.OrdinalIgnoreCase)
                    || member.EndsWith("Title", StringComparison.OrdinalIgnoreCase)
-                   || member.EndsWith("Number", StringComparison.OrdinalIgnoreCase)
-                       && !member.EndsWith("Id", StringComparison.OrdinalIgnoreCase);
+                   || (member.EndsWith("Number", StringComparison.OrdinalIgnoreCase)
+                       && !member.EndsWith("Id", StringComparison.OrdinalIgnoreCase));
         }
 
-        private static LiteralExpressionSyntax NumericStubLiteral() =>
-            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(0));
+        private static LiteralExpressionSyntax NumericStubLiteral()
+        {
+            return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(0));
+        }
 
-        private static ExpressionSyntax GuidStubLiteral() =>
-            SyntaxFactory.ParseExpression("Guid.Empty");
+        private static ExpressionSyntax GuidStubLiteral()
+        {
+            return SyntaxFactory.ParseExpression("Guid.Empty");
+        }
 
         private static bool IsInTypeContext(IdentifierNameSyntax node)
         {
@@ -382,30 +451,40 @@ internal static class ProbeParameterStubber
             return false;
         }
 
-        private static bool IsMemberAccessPart(IdentifierNameSyntax node) =>
-            node.Parent is MemberAccessExpressionSyntax memberAccess
-            && memberAccess.Name == node;
+        private static bool IsMemberAccessPart(IdentifierNameSyntax node)
+        {
+            return node.Parent is MemberAccessExpressionSyntax memberAccess
+                   && memberAccess.Name == node;
+        }
 
-        private static bool IsAnonymousTypeMemberName(IdentifierNameSyntax node) =>
-            node.Parent is NameEqualsSyntax nameEquals && nameEquals.Name == node;
+        private static bool IsAnonymousTypeMemberName(IdentifierNameSyntax node)
+        {
+            return node.Parent is NameEqualsSyntax nameEquals && nameEquals.Name == node;
+        }
 
-        private static bool IsNamedArgumentName(IdentifierNameSyntax node) =>
-            node.Parent is NameColonSyntax nameColon && nameColon.Name == node;
+        private static bool IsNamedArgumentName(IdentifierNameSyntax node)
+        {
+            return node.Parent is NameColonSyntax nameColon && nameColon.Name == node;
+        }
 
-        private static bool IsObjectInitializerMemberName(IdentifierNameSyntax node) =>
-            node.Parent is AssignmentExpressionSyntax { Left: var left } assignment
-            && left == node
-            && assignment.Parent is InitializerExpressionSyntax;
+        private static bool IsObjectInitializerMemberName(IdentifierNameSyntax node)
+        {
+            return node.Parent is AssignmentExpressionSyntax { Left: var left } assignment
+                   && left == node
+                   && assignment.Parent is InitializerExpressionSyntax;
+        }
 
         private static bool IsCancellationTokenArgument(ArgumentSyntax argument)
         {
             if (argument.NameColon?.Name.Identifier.Text is "cancellationToken")
+            {
                 return true;
+            }
 
             return argument.Expression switch
             {
                 IdentifierNameSyntax { Identifier.Text: "cancellationToken" } => true,
-                _ => false,
+                _ => false
             };
         }
 
@@ -414,7 +493,9 @@ internal static class ProbeParameterStubber
             foreach (var scope in _lambdaParameters)
             {
                 if (scope.Contains(name))
+                {
                     return true;
+                }
             }
 
             return false;
@@ -426,7 +507,9 @@ internal static class ProbeParameterStubber
             {
                 if (current is VariableDeclaratorSyntax declarator
                     && declarator.Identifier.Text == node.Identifier.Text)
+                {
                     return true;
+                }
             }
 
             return false;
@@ -442,10 +525,14 @@ internal static class ProbeParameterStubber
             }
 
             if (IsLikelyCollectionParameterName(name))
+            {
                 return CreateCollectionStubLiteral(name);
+            }
 
             if (IsLikelyGuidParameterName(name))
+            {
                 return GuidStubLiteral();
+            }
 
             if (string.Equals(name, "key", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(name, "id", StringComparison.OrdinalIgnoreCase)
@@ -487,43 +574,57 @@ internal static class ProbeParameterStubber
         private static bool IsLikelyBooleanParameterName(string name)
         {
             if (name.Length < 4)
+            {
                 return false;
+            }
 
             if (name.StartsWith("is", StringComparison.OrdinalIgnoreCase)
                 && char.IsUpper(name[2]))
+            {
                 return true;
+            }
 
             if (name.StartsWith("has", StringComparison.OrdinalIgnoreCase)
                 && name.Length > 3
                 && char.IsUpper(name[3]))
+            {
                 return true;
+            }
 
             if (name.StartsWith("can", StringComparison.OrdinalIgnoreCase)
                 && name.Length > 3
                 && char.IsUpper(name[3]))
+            {
                 return true;
+            }
 
             return false;
         }
 
-        private static bool IsLikelyGuidParameterName(string name) =>
-            name.Contains("Guid", StringComparison.OrdinalIgnoreCase)
-            || name.EndsWith("ObjectId", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "rowguid", StringComparison.OrdinalIgnoreCase);
+        private static bool IsLikelyGuidParameterName(string name)
+        {
+            return name.Contains("Guid", StringComparison.OrdinalIgnoreCase)
+                   || name.EndsWith("ObjectId", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(name, "rowguid", StringComparison.OrdinalIgnoreCase);
+        }
 
-        private static bool IsLikelyCollectionParameterName(string name) =>
-            name.EndsWith("Ids", StringComparison.OrdinalIgnoreCase)
-            || name.EndsWith("Keys", StringComparison.OrdinalIgnoreCase)
-            || name.EndsWith("Codes", StringComparison.OrdinalIgnoreCase)
-            || name.EndsWith("Values", StringComparison.OrdinalIgnoreCase)
-            || name.EndsWith("List", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "ids", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "keys", StringComparison.OrdinalIgnoreCase);
+        private static bool IsLikelyCollectionParameterName(string name)
+        {
+            return name.EndsWith("Ids", StringComparison.OrdinalIgnoreCase)
+                   || name.EndsWith("Keys", StringComparison.OrdinalIgnoreCase)
+                   || name.EndsWith("Codes", StringComparison.OrdinalIgnoreCase)
+                   || name.EndsWith("Values", StringComparison.OrdinalIgnoreCase)
+                   || name.EndsWith("List", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(name, "ids", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(name, "keys", StringComparison.OrdinalIgnoreCase);
+        }
 
         private static ExpressionSyntax CreateCollectionStubLiteral(string name)
         {
             if (name.Contains("Guid", StringComparison.OrdinalIgnoreCase))
+            {
                 return SyntaxFactory.ParseExpression("new[] { Guid.Empty }");
+            }
 
             if (name.Contains("Code", StringComparison.OrdinalIgnoreCase)
                 || name.Contains("Name", StringComparison.OrdinalIgnoreCase)

@@ -12,19 +12,27 @@ internal static class RelationalQueryableSqlFormatter
         sql = string.Empty;
 
         if (evaluatedProjection is null)
+        {
             return false;
+        }
 
-        if (!typeof(System.Linq.IQueryable).IsAssignableFrom(evaluatedProjection.GetType()))
+        if (!typeof(IQueryable).IsAssignableFrom(evaluatedProjection.GetType()))
+        {
             return false;
+        }
 
         if (!EntityFrameworkReflectionCache.TryInvokeToQueryString(
                 evaluatedProjection,
                 inspectionAssemblies,
                 out var sqlLiteral))
+        {
             return false;
+        }
 
         if (string.IsNullOrWhiteSpace(sqlLiteral))
+        {
             return false;
+        }
 
         sql = sqlLiteral;
         return true;
@@ -37,7 +45,9 @@ internal static class RelationalQueryableSqlFormatter
         string heading = "Translated SQL:")
     {
         if (!TryGetSql(evaluatedProjection, inspectionAssemblies, out var sqlLiteral))
+        {
             return false;
+        }
 
         writer.WriteLine(heading);
         writer.WriteLine(sqlLiteral);
@@ -45,4 +55,3 @@ internal static class RelationalQueryableSqlFormatter
         return true;
     }
 }
-

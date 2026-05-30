@@ -63,9 +63,13 @@ internal static class LinqQueryWarningRules
             foreach (var arguments in EnumerateRawSqlInvocationArguments(normalized, method))
             {
                 if (HasSqlParameterArguments(arguments))
+                {
                     hasParameterizedRaw = true;
+                }
                 else
+                {
                     hasUnparameterizedRaw = true;
+                }
             }
         }
 
@@ -92,7 +96,9 @@ internal static class LinqQueryWarningRules
             var start = text.IndexOf(needle, index, StringComparison.Ordinal);
 
             if (start < 0)
+            {
                 yield break;
+            }
 
             var openParen = start + needle.Length - 1;
 
@@ -153,7 +159,9 @@ internal static class LinqQueryWarningRules
         }
 
         if (start < arguments.Length)
+        {
             yield return arguments[start..];
+        }
     }
 
     private static bool TryExtractParenthesizedContent(string text, int openParenIndex, out string content)
@@ -161,7 +169,9 @@ internal static class LinqQueryWarningRules
         content = string.Empty;
 
         if (!TryFindClosingParenthesis(text, openParenIndex, out var closeParenIndex))
+        {
             return false;
+        }
 
         content = text[(openParenIndex + 1)..closeParenIndex];
         return true;
@@ -172,7 +182,9 @@ internal static class LinqQueryWarningRules
         closeParenIndex = -1;
 
         if (openParenIndex < 0 || openParenIndex >= text.Length || text[openParenIndex] != '(')
+        {
             return false;
+        }
 
         var depth = 0;
 
@@ -221,7 +233,9 @@ internal static class LinqQueryWarningRules
             }
 
             if (text[index] == '"')
+            {
                 return index;
+            }
 
             index++;
         }
@@ -242,7 +256,9 @@ internal static class LinqQueryWarningRules
             }
 
             if (text[index] == '\'')
+            {
                 return index;
+            }
 
             index++;
         }
@@ -255,60 +271,78 @@ internal static class LinqQueryWarningRules
         if (!normalized.Contains(".Take(", StringComparison.Ordinal)
             && !normalized.Contains(".TakeAsync(", StringComparison.Ordinal)
             && !normalized.Contains("Queryable.Take(", StringComparison.Ordinal))
+        {
             return false;
+        }
 
         if (normalized.Contains("OrderBy", StringComparison.Ordinal))
+        {
             return false;
+        }
 
         return !IsSingleRowCapTake(normalized);
     }
 
-    private static bool IsSingleRowCapTake(string normalized) =>
-        normalized.Contains(".Take(1)", StringComparison.Ordinal)
-        || normalized.Contains(".Take( 1)", StringComparison.Ordinal)
-        || normalized.Contains("Queryable.Take(", StringComparison.Ordinal)
-            && normalized.Contains(", 1)", StringComparison.Ordinal);
+    private static bool IsSingleRowCapTake(string normalized)
+    {
+        return normalized.Contains(".Take(1)", StringComparison.Ordinal)
+               || normalized.Contains(".Take( 1)", StringComparison.Ordinal)
+               || (normalized.Contains("Queryable.Take(", StringComparison.Ordinal)
+                   && normalized.Contains(", 1)", StringComparison.Ordinal));
+    }
 
-    private static bool MaterializesWithoutTake(string normalized) =>
-        (normalized.Contains(".ToList()", StringComparison.Ordinal)
-         || normalized.Contains(".ToListAsync(", StringComparison.Ordinal)
-         || normalized.Contains(".ToArray()", StringComparison.Ordinal)
-         || normalized.Contains(".ToArrayAsync(", StringComparison.Ordinal))
-        && !normalized.Contains(".Take(", StringComparison.Ordinal)
-        && !normalized.Contains(".TakeAsync(", StringComparison.Ordinal);
+    private static bool MaterializesWithoutTake(string normalized)
+    {
+        return (normalized.Contains(".ToList()", StringComparison.Ordinal)
+                || normalized.Contains(".ToListAsync(", StringComparison.Ordinal)
+                || normalized.Contains(".ToArray()", StringComparison.Ordinal)
+                || normalized.Contains(".ToArrayAsync(", StringComparison.Ordinal))
+               && !normalized.Contains(".Take(", StringComparison.Ordinal)
+               && !normalized.Contains(".TakeAsync(", StringComparison.Ordinal);
+    }
 
-    private static bool IsIntentionalFullListMaterialization(string? containingMethodName) =>
-        string.Equals(containingMethodName, "ListAllAsync", StringComparison.Ordinal);
+    private static bool IsIntentionalFullListMaterialization(string? containingMethodName)
+    {
+        return string.Equals(containingMethodName, "ListAllAsync", StringComparison.Ordinal);
+    }
 
     private static bool UsesUnboundedTerminalFirst(string normalized)
     {
         if (normalized.Contains(".Take(", StringComparison.Ordinal)
             || normalized.Contains(".TakeAsync(", StringComparison.Ordinal))
+        {
             return false;
+        }
 
         if (!UsesTerminalFirst(normalized))
+        {
             return false;
+        }
 
         return !HasBoundedFirstFilter(normalized);
     }
 
-    private static bool UsesTerminalFirst(string normalized) =>
-        normalized.Contains(".First()", StringComparison.Ordinal)
-        || normalized.Contains(".FirstOrDefault()", StringComparison.Ordinal)
-        || normalized.Contains(".FirstAsync(", StringComparison.Ordinal)
-        || normalized.Contains(".FirstOrDefaultAsync(", StringComparison.Ordinal);
+    private static bool UsesTerminalFirst(string normalized)
+    {
+        return normalized.Contains(".First()", StringComparison.Ordinal)
+               || normalized.Contains(".FirstOrDefault()", StringComparison.Ordinal)
+               || normalized.Contains(".FirstAsync(", StringComparison.Ordinal)
+               || normalized.Contains(".FirstOrDefaultAsync(", StringComparison.Ordinal);
+    }
 
     private static bool HasBoundedFirstFilter(string normalized)
     {
         if (normalized.Contains(".Where(", StringComparison.Ordinal))
+        {
             return true;
+        }
 
         foreach (var method in new[]
                  {
                      "FirstOrDefaultAsync(",
                      "FirstAsync(",
                      "FirstOrDefault(",
-                     "First(",
+                     "First("
                  })
         {
             var index = 0;
@@ -319,7 +353,9 @@ internal static class LinqQueryWarningRules
 
                 if (TryExtractParenthesizedContent(normalized, openParen, out var arguments)
                     && arguments.Contains("=>", StringComparison.Ordinal))
+                {
                     return true;
+                }
 
                 index += method.Length;
             }

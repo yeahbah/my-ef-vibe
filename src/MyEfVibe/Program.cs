@@ -1,5 +1,4 @@
 using CommandLine;
-using Microsoft.CodeAnalysis.Options;
 using Spectre.Console;
 
 namespace MyEfVibe;
@@ -50,7 +49,7 @@ internal static class Program
                         errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
             }
         }
-        
+
 
         return Parser.Default.ParseArguments<EfvibeCliOptions>(args)
             .MapResult(
@@ -64,7 +63,7 @@ internal static class Program
         return await InvokeAsync(options);
     }
 
-    private static async Task<int> InvokeAsync(EfvibeCliOptions options)        
+    private static async Task<int> InvokeAsync(EfvibeCliOptions options)
     {
         if (options.AboutJson)
         {
@@ -83,7 +82,7 @@ internal static class Program
         var dbLogSettings = new DbLogSettings
         {
             Enabled = options.NoDbLog ? false : options.DbLog,
-            Verbose = options.DbLogVerbose,
+            Verbose = options.DbLogVerbose
         };
 
         if (!string.IsNullOrWhiteSpace(options.DbLogLevel)
@@ -96,7 +95,8 @@ internal static class Program
 
         if (!string.IsNullOrWhiteSpace(options.ConnectionString) && parsedProvider is null)
         {
-            CliUi.WriteError("`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
+            CliUi.WriteError(
+                "`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
             return 3;
         }
 
@@ -147,7 +147,9 @@ internal static class Program
             AnsiConsole.MarkupLine($"[dim]EF project:[/] [cyan]{Markup.Escape(projectLabel)}[/]");
 
             if (!string.Equals(resolvedStartup.FullName, resolvedProject.FullName, StringComparison.OrdinalIgnoreCase))
+            {
                 AnsiConsole.MarkupLine($"[dim]Startup project (config):[/] [cyan]{Markup.Escape(startupLabel)}[/]");
+            }
         }
 
         var pendingSessionDirectory = SessionPaths.EnsurePendingSessionDirectory(workspaceRoot);
@@ -170,22 +172,28 @@ internal static class Program
         catch (WorkspaceException workspaceFailure)
         {
             if (quietOutput)
+            {
                 Console.Error.WriteLine(workspaceFailure.Message);
+            }
             else
+            {
                 CliUi.WriteErrorPanel("Workspace failure", workspaceFailure.Message);
+            }
 
             return 10;
         }
 
         if (!quietOutput)
+        {
             AnsiConsole.MarkupLine($"[green]✓[/] Built [cyan]{Markup.Escape(projectLabel)}[/]");
+        }
 
         using var host = WorkspaceHost.Load(workspaceBuild);
 
         var headlessJsonOutput = options.TablesJson
-            || options.DbInfoJson
-            || options.CompletionsJson is not null
-            || !string.IsNullOrWhiteSpace(options.DescribeJson);
+                                 || options.DbInfoJson
+                                 || options.CompletionsJson is not null
+                                 || !string.IsNullOrWhiteSpace(options.DescribeJson);
 
         var allowInteractiveSelection = string.IsNullOrWhiteSpace(oneShotExpression) && !headlessJsonOutput;
 
@@ -264,6 +272,7 @@ internal static class Program
         }
 
         if (!string.IsNullOrWhiteSpace(oneShotExpression))
+        {
             return await QueryRunner.RunOnceAsync(
                 dbContextInstance,
                 session,
@@ -272,6 +281,7 @@ internal static class Program
                 oneShotExpression,
                 outputFormat,
                 options.WithPlan);
+        }
 
         var repl = new QueryRepl(session, host, dbContextInstance, dbLogSettings, projectLabel);
 

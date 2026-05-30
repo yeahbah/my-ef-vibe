@@ -10,17 +10,23 @@ internal static partial class DbContextSourceScanner
     internal static bool ProjectContainsDbContext(string projectDirectory)
     {
         if (!Directory.Exists(projectDirectory))
+        {
             return false;
+        }
 
         foreach (var sourcePath in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
         {
             if (IsUnderBuildArtifacts(sourcePath))
+            {
                 continue;
+            }
 
             try
             {
                 if (DbContextClassDeclarationPattern().IsMatch(File.ReadAllText(sourcePath)))
+                {
                     return true;
+                }
             }
             catch (IOException)
             {
@@ -39,7 +45,9 @@ internal static partial class DbContextSourceScanner
         {
             if (string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase))
+            {
                 return true;
+            }
         }
 
         return false;

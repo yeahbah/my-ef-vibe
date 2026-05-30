@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Text;
 using Spectre.Console;
 
 namespace MyEfVibe;
@@ -35,15 +37,15 @@ internal static class ResultPresenter
             return;
         }
 
-        if (evaluatedProjection is System.Linq.IQueryable queryable)
+        if (evaluatedProjection is IQueryable queryable)
         {
             WriteResultPanel(DescribeDeferredQueryable(queryable));
             return;
         }
 
-        if (evaluatedProjection is System.Collections.IEnumerable sequence and not string)
+        if (evaluatedProjection is IEnumerable sequence and not string)
         {
-            var builder = new System.Text.StringBuilder();
+            var builder = new StringBuilder();
             var printedRowCount = 0;
 
             foreach (var element in sequence)
@@ -70,7 +72,7 @@ internal static class ResultPresenter
                     Header = new PanelHeader($"[bold]Result[/] [grey]({printedRowCount} rows)[/]"),
                     Border = BoxBorder.Rounded,
                     BorderStyle = new Style(Color.Grey),
-                    Padding = new Padding(1, 0, 1, 0),
+                    Padding = new Padding(1, 0, 1, 0)
                 });
 
             AnsiConsole.WriteLine();
@@ -88,7 +90,7 @@ internal static class ResultPresenter
                 Header = new PanelHeader("[bold]Result[/]"),
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(Color.Grey),
-                Padding = new Padding(1, 0, 1, 0),
+                Padding = new Padding(1, 0, 1, 0)
             });
 
         AnsiConsole.WriteLine();
@@ -108,13 +110,13 @@ internal static class ResultPresenter
             return;
         }
 
-        if (evaluatedProjection is System.Linq.IQueryable queryable)
+        if (evaluatedProjection is IQueryable queryable)
         {
             writer.WriteLine(DescribeDeferredQueryable(queryable));
             return;
         }
 
-        if (evaluatedProjection is System.Collections.IEnumerable sequence and not string)
+        if (evaluatedProjection is IEnumerable sequence and not string)
         {
             var printedRowCount = 0;
 
@@ -130,7 +132,9 @@ internal static class ResultPresenter
             }
 
             if (printedRowCount == 0)
+            {
                 writer.WriteLine("(empty)");
+            }
 
             return;
         }
@@ -138,10 +142,11 @@ internal static class ResultPresenter
         writer.WriteLine(evaluatedProjection);
     }
 
-    private static string DescribeDeferredQueryable(System.Linq.IQueryable queryable)
+    private static string DescribeDeferredQueryable(IQueryable queryable)
     {
         var elementTypeName = queryable.ElementType.FullName ?? queryable.ElementType.Name;
 
-        return $"IQueryable<{elementTypeName}> (deferred; add ToList(), ToArray(), First(), Count(), or another terminal operator to execute)";
+        return
+            $"IQueryable<{elementTypeName}> (deferred; add ToList(), ToArray(), First(), Count(), or another terminal operator to execute)";
     }
 }

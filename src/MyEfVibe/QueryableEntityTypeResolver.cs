@@ -8,7 +8,9 @@ internal static class QueryableEntityTypeResolver
         out string entityTypeName)
     {
         if (SetEntityTypeExtractor.TryExtractConcreteEntityTypeName(code, out entityTypeName))
+        {
             return true;
+        }
 
         return DbSetPropertyEntityExtractor.TryExtractConcreteEntityTypeName(code, dbContextType, out entityTypeName);
     }

@@ -4,13 +4,13 @@ namespace MyEfVibe;
 
 internal sealed class ReplCommandHandler
 {
-    private readonly ScriptSession _session;
-    private readonly WorkspaceHost _host;
+    private readonly SessionAnalytics _analytics;
     private readonly object _dbContext;
     private readonly DbLogSettings _dbLogSettings;
-    private readonly SessionAnalytics _analytics;
     private readonly InputHistory _history;
+    private readonly WorkspaceHost _host;
     private readonly LinqScanReviewSession _scanReview;
+    private readonly ScriptSession _session;
 
     internal ReplCommandHandler(
         ScriptSession session,
@@ -69,7 +69,9 @@ internal sealed class ReplCommandHandler
 
             case "next":
                 if (!_scanReview.IsActive)
+                {
                     return false;
+                }
 
                 _scanReview.TryNext();
                 return true;
@@ -77,7 +79,9 @@ internal sealed class ReplCommandHandler
             case "prev":
             case "previous":
                 if (!_scanReview.IsActive)
+                {
                     return false;
+                }
 
                 _scanReview.TryPrevious();
                 return true;
@@ -135,9 +139,13 @@ internal sealed class ReplCommandHandler
 
             case "history":
                 if (parts.Length > 1 && parts[1].Equals("stats", StringComparison.OrdinalIgnoreCase))
+                {
                     AnalyticsPresenter.WriteHistoryStats(_history.Entries, _analytics.Evaluations);
+                }
                 else
+                {
                     CliUi.WriteWarning("Usage: :history stats");
+                }
 
                 return true;
 
@@ -151,9 +159,13 @@ internal sealed class ReplCommandHandler
 
             case "warnings":
                 if (_analytics.LastMetrics is null)
+                {
                     CliUi.WriteWarning("No evaluations yet.");
+                }
                 else
+                {
                     AnalyticsPresenter.WriteWarnings(_analytics.LastMetrics.Warnings);
+                }
 
                 return true;
 
@@ -241,7 +253,9 @@ internal sealed class ReplCommandHandler
                     var progress = new Progress<(int Completed, int Total)>(update =>
                     {
                         if (update.Total == 0)
+                        {
                             return;
+                        }
 
                         context.Status(
                             $"Translating SQL ({update.Completed}/{update.Total})…");
@@ -258,7 +272,9 @@ internal sealed class ReplCommandHandler
                 });
 
         if (result is null)
+        {
             return;
+        }
 
         var (filteredFindings, dismissedSkipped) = LinqScanDismissalStore.FilterFindings(
             result.Findings,

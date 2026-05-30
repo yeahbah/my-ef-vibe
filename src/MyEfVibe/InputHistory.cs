@@ -14,26 +14,37 @@ internal sealed class InputHistory
         var trimmed = entry.Trim();
 
         if (string.IsNullOrEmpty(trimmed))
+        {
             return;
+        }
 
         if (_entries.Count > 0 && string.Equals(_entries[^1], trimmed, StringComparison.Ordinal))
+        {
             return;
+        }
 
         _entries.Add(trimmed);
         _navigationIndex = _entries.Count;
     }
 
-    internal void ResetNavigation() => _navigationIndex = _entries.Count;
+    internal void ResetNavigation()
+    {
+        _navigationIndex = _entries.Count;
+    }
 
     internal bool TryNavigateUp(out string entry)
     {
         entry = string.Empty;
 
         if (_entries.Count == 0)
+        {
             return false;
+        }
 
         if (_navigationIndex > 0)
+        {
             _navigationIndex--;
+        }
 
         entry = _entries[_navigationIndex];
 
@@ -45,7 +56,9 @@ internal sealed class InputHistory
         entry = string.Empty;
 
         if (_entries.Count == 0)
+        {
             return false;
+        }
 
         if (_navigationIndex >= _entries.Count - 1)
         {

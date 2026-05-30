@@ -5,15 +5,15 @@ using System.Text.Json.Serialization;
 namespace MyEfVibe;
 
 /// <summary>
-/// Minimal JSON-RPC language server for <c>db.</c> completion in C# editors.
-/// Supports initialize, textDocument/completion, shutdown, and exit.
+///     Minimal JSON-RPC language server for <c>db.</c> completion in C# editors.
+///     Supports initialize, textDocument/completion, shutdown, and exit.
 /// </summary>
 internal static class LanguageServerRunner
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     internal static async Task<int> RunAsync(
@@ -25,10 +25,14 @@ internal static class LanguageServerRunner
             var message = await ReadMessageAsync(Console.OpenStandardInput(), cancellationToken);
 
             if (message is null)
+            {
                 break;
+            }
 
             if (!TryGetMethod(message.Value, out var method, out var id))
+            {
                 continue;
+            }
 
             switch (method)
             {
@@ -39,14 +43,14 @@ internal static class LanguageServerRunner
                         {
                             completionProvider = new
                             {
-                                triggerCharacters = new[] { "." },
-                            },
+                                triggerCharacters = new[] { "." }
+                            }
                         },
                         serverInfo = new
                         {
                             name = "efvibe",
-                            version = ToolInfo.GetVersion(),
-                        },
+                            version = ToolInfo.GetVersion()
+                        }
                     });
                     break;
 
@@ -66,7 +70,10 @@ internal static class LanguageServerRunner
 
                 default:
                     if (id is not null)
+                    {
                         WriteResponse(id, new { });
+                    }
+
                     break;
             }
         }
@@ -88,24 +95,30 @@ internal static class LanguageServerRunner
                 kind = item.Kind switch
                 {
                     "method" => 2,
-                    _ => 10,
+                    _ => 10
                 },
                 detail = item.Detail,
-                insertText = item.InsertText,
-            }).ToArray(),
+                insertText = item.InsertText
+            }).ToArray()
         };
     }
 
     private static string? TryReadPrefix(JsonElement message)
     {
         if (!message.TryGetProperty("params", out var parameters))
+        {
             return null;
+        }
 
         if (!parameters.TryGetProperty("textDocument", out var textDocument))
+        {
             return "db.";
+        }
 
         if (!textDocument.TryGetProperty("text", out var textElement))
+        {
             return "db.";
+        }
 
         var text = textElement.GetString() ?? string.Empty;
 
@@ -119,7 +132,9 @@ internal static class LanguageServerRunner
         var lineEnd = text.LastIndexOf('\n');
 
         if (lineEnd < 0)
+        {
             lineEnd = -1;
+        }
 
         var line = text[(lineEnd + 1)..];
         var safeCharacter = Math.Clamp(character, 0, line.Length);
@@ -133,7 +148,9 @@ internal static class LanguageServerRunner
         id = null;
 
         if (!message.TryGetProperty("method", out var methodElement))
+        {
             return false;
+        }
 
         method = methodElement.GetString() ?? string.Empty;
 
@@ -143,7 +160,7 @@ internal static class LanguageServerRunner
             {
                 JsonValueKind.Number => idElement.GetInt32(),
                 JsonValueKind.String => idElement.GetString(),
-                _ => null,
+                _ => null
             };
         }
 
@@ -155,11 +172,13 @@ internal static class LanguageServerRunner
         var payload = new Dictionary<string, object?>
         {
             ["jsonrpc"] = "2.0",
-            ["id"] = id,
+            ["id"] = id
         };
 
         if (result is not null)
+        {
             payload["result"] = result;
+        }
 
         WriteMessage(payload);
     }
@@ -182,15 +201,21 @@ internal static class LanguageServerRunner
             var headerLine = await ReadHeaderLineAsync(input, cancellationToken);
 
             if (headerLine is null)
+            {
                 return null;
+            }
 
             if (headerLine.Length == 0)
+            {
                 break;
+            }
 
             var separator = headerLine.IndexOf(':');
 
             if (separator <= 0)
+            {
                 continue;
+            }
 
             headers[headerLine[..separator].Trim()] = headerLine[(separator + 1)..].Trim();
         }
@@ -210,7 +235,9 @@ internal static class LanguageServerRunner
             var chunk = await input.ReadAsync(buffer.AsMemory(read, length - read), cancellationToken);
 
             if (chunk == 0)
+            {
                 return null;
+            }
 
             read += chunk;
         }
@@ -229,12 +256,16 @@ internal static class LanguageServerRunner
             var value = input.ReadByte();
 
             if (value < 0)
+            {
                 return builder.Length == 0 ? null : builder.ToString();
+            }
 
             if (value == '\n')
             {
                 if (builder.Length > 0 && builder[^1] == '\r')
+                {
                     builder.Length--;
+                }
 
                 return builder.ToString();
             }

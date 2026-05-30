@@ -3,9 +3,9 @@ using System.Reflection;
 namespace MyEfVibe;
 
 /// <summary>
-/// Applies host-specific hints to DbContext instances built without DI (for example AdventureWorks
-/// <c>_databaseProvider</c> must be PostgreSQL before the first query so <c>OnModelCreating</c> applies
-/// lowercase schema/table names).
+///     Applies host-specific hints to DbContext instances built without DI (for example AdventureWorks
+///     <c>_databaseProvider</c> must be PostgreSQL before the first query so <c>OnModelCreating</c> applies
+///     lowercase schema/table names).
 /// </summary>
 internal static class DbContextHostHints
 {
@@ -19,14 +19,18 @@ internal static class DbContextHostHints
                             || LooksLikePostgreSqlProviderName(settingsProvider);
 
         if (!usePostgreSql)
+        {
             return;
+        }
 
         TrySetDatabaseProviderField(dbContextInstance, "PostgreSQL");
     }
 
-    private static bool LooksLikePostgreSqlProviderName(string? providerName) =>
-        !string.IsNullOrWhiteSpace(providerName)
-        && providerName.Contains("postgres", StringComparison.OrdinalIgnoreCase);
+    private static bool LooksLikePostgreSqlProviderName(string? providerName)
+    {
+        return !string.IsNullOrWhiteSpace(providerName)
+               && providerName.Contains("postgres", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static void TrySetDatabaseProviderField(object dbContextInstance, string value)
     {

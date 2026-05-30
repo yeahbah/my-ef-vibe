@@ -10,10 +10,14 @@ internal static class ServeScanner
         CancellationToken cancellationToken = default)
     {
         if (!ScanCommandRunner.TryParseMode(modeRaw, out var mode))
+        {
             throw new InvalidOperationException("scan mode must be lite or deep.");
+        }
 
         if (!ScanCommandRunner.TryParseOptionalSeverity(minSeverityRaw, out var minSeverity, out var minSeverityError))
+        {
             throw new InvalidOperationException(minSeverityError ?? "Invalid scan severity.");
+        }
 
         var host = runtime.Host;
         var resolvedProject = host.ProjectPath;
@@ -47,7 +51,7 @@ internal static class ServeScanner
                 runtime.Session,
                 runtime.Host,
                 runtime.DbContext.GetType(),
-                progress: null,
+                null,
                 cancellationToken);
         }
 
@@ -61,9 +65,11 @@ internal static class ServeScanner
         var findings = scanResult.Findings;
 
         if (respectDismissals)
+        {
             (findings, _) = LinqScanDismissalStore.FilterFindings(findings, sessionDirectoryForArtifacts);
+        }
 
-        var reportMinSeverity = ScanCommandRunner.ResolveReportMinSeverity(minSeverity, failOn: null);
+        var reportMinSeverity = ScanCommandRunner.ResolveReportMinSeverity(minSeverity, null);
         findings = LinqScanCiGate.Filter(findings, reportMinSeverity);
 
         var filteredResult = new LinqLiteScanResult(

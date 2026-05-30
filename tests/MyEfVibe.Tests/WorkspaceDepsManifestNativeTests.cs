@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace MyEfVibe.Tests;
@@ -20,7 +19,9 @@ public sealed class WorkspaceDepsManifestNativeTests
             relativeNativePath.Replace('/', Path.DirectorySeparatorChar));
 
         if (!File.Exists(packageRoot))
+        {
             return;
+        }
 
         using var tempDirectory = new TempDirectory();
         var entryDll = Path.Combine(tempDirectory.Path, "Test.Workspace.dll");
@@ -39,15 +40,21 @@ public sealed class WorkspaceDepsManifestNativeTests
     private static (string NativeFileName, string RelativeNativePath) GetNativeAssetForRid(string rid)
     {
         if (rid.StartsWith("osx", StringComparison.OrdinalIgnoreCase))
+        {
             return ("libe_sqlite3.dylib", $"runtimes/{rid}/native/libe_sqlite3.dylib");
+        }
 
         if (rid.StartsWith("linux", StringComparison.OrdinalIgnoreCase))
+        {
             return ("libe_sqlite3.so", $"runtimes/{rid}/native/libe_sqlite3.so");
+        }
 
         if (rid.StartsWith("win", StringComparison.OrdinalIgnoreCase))
+        {
             return ("e_sqlite3.dll", $"runtimes/{rid}/native/e_sqlite3.dll");
+        }
 
-        return ("libe_sqlite3.so", $"runtimes/linux-x64/native/libe_sqlite3.so");
+        return ("libe_sqlite3.so", "runtimes/linux-x64/native/libe_sqlite3.so");
     }
 
     private static string BuildDepsJson(string rid, string relativeNativePath)
@@ -63,19 +70,19 @@ public sealed class WorkspaceDepsManifestNativeTests
                     {
                         runtimeTargets = new Dictionary<string, object>
                         {
-                            [relativeNativePath] = new { rid, assetType = "native" },
-                        },
-                    },
-                },
+                            [relativeNativePath] = new { rid, assetType = "native" }
+                        }
+                    }
+                }
             },
             libraries = new Dictionary<string, object>
             {
                 ["SQLitePCLRaw.lib.e_sqlite3/2.1.11"] = new
                 {
                     type = "package",
-                    path = "sqlitepclraw.lib.e_sqlite3/2.1.11",
-                },
-            },
+                    path = "sqlitepclraw.lib.e_sqlite3/2.1.11"
+                }
+            }
         };
 
         return JsonSerializer.Serialize(document);
@@ -95,7 +102,7 @@ public sealed class WorkspaceDepsManifestNativeTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

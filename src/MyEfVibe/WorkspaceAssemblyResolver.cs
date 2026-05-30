@@ -6,12 +6,13 @@ namespace MyEfVibe;
 internal sealed class WorkspaceAssemblyResolver : IDisposable
 {
     private readonly AssemblyDependencyResolver _dependencyResolver;
-    private readonly WorkspaceDepsManifest? _depsManifest;
-    private readonly SharedFrameworkCatalog _sharedFrameworkCatalog;
     private readonly string _outputDirectory;
+
     private readonly Dictionary<string, Assembly> _resolvedAssemblies =
         new(StringComparer.OrdinalIgnoreCase);
+
     private readonly Func<AssemblyLoadContext, AssemblyName, Assembly?> _resolveHandler;
+    private readonly SharedFrameworkCatalog _sharedFrameworkCatalog;
 
     private WorkspaceAssemblyResolver(
         string entryAssemblyPath,
@@ -19,7 +20,7 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         WorkspaceDepsManifest? depsManifest)
     {
         _dependencyResolver = new AssemblyDependencyResolver(entryAssemblyPath);
-        _depsManifest = depsManifest;
+        DepsManifest = depsManifest;
         _sharedFrameworkCatalog = sharedFrameworkCatalog;
         _outputDirectory = Path.GetDirectoryName(entryAssemblyPath)!;
 
@@ -28,33 +29,46 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         AssemblyLoadContext.Default.Resolving += _resolveHandler;
     }
 
-    internal WorkspaceDepsManifest? DepsManifest => _depsManifest;
+    internal WorkspaceDepsManifest? DepsManifest { get; }
+
+    public void Dispose()
+    {
+        AssemblyLoadContext.Default.Resolving -= _resolveHandler;
+    }
 
     internal static WorkspaceAssemblyResolver Install(
         string entryAssemblyPath,
         SharedFrameworkCatalog sharedFrameworkCatalog,
         WorkspaceDepsManifest? depsManifest)
-        => new(entryAssemblyPath, sharedFrameworkCatalog, depsManifest);
+    {
+        return new WorkspaceAssemblyResolver(entryAssemblyPath, sharedFrameworkCatalog, depsManifest);
+    }
 
     internal Assembly LoadEntryAssembly(string entryAssemblyPath)
-        => AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, entryAssemblyPath);
+    {
+        return AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, entryAssemblyPath);
+    }
 
     internal void PreloadCorePackages()
     {
-        if (_depsManifest is null)
+        if (DepsManifest is null)
+        {
             return;
+        }
 
-        WorkspaceDependencyLoader.PreloadCorePackages(AssemblyLoadContext.Default, _depsManifest);
+        WorkspaceDependencyLoader.PreloadCorePackages(AssemblyLoadContext.Default, DepsManifest);
     }
 
     internal void PreloadStartupReferenceClosure(string startupAssemblyPath, string entryAssemblyPath)
     {
-        if (_depsManifest is null)
+        if (DepsManifest is null)
+        {
             return;
+        }
 
         WorkspaceDependencyLoader.PreloadStartupReferenceClosure(
             AssemblyLoadContext.Default,
-            _depsManifest,
+            DepsManifest,
             startupAssemblyPath,
             entryAssemblyPath);
     }
@@ -62,17 +76,21 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
     internal void PreloadDependencies(
         string entryAssemblyPath,
         string? additionalReferenceClosureAssemblyPath = null)
-        => WorkspaceDependencyLoader.Preload(
+    {
+        WorkspaceDependencyLoader.Preload(
             AssemblyLoadContext.Default,
             _dependencyResolver,
             entryAssemblyPath,
-            _depsManifest,
+            DepsManifest,
             additionalReferenceClosureAssemblyPath);
+    }
 
     internal bool IsOutputDirectoryAssembly(Assembly assembly)
     {
         if (string.IsNullOrEmpty(assembly.Location))
+        {
             return false;
+        }
 
         return assembly.Location.StartsWith(_outputDirectory, StringComparison.OrdinalIgnoreCase);
     }
@@ -80,29 +98,35 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
     internal Assembly? ResolveAssembly(string assemblySimpleName)
     {
         if (string.IsNullOrWhiteSpace(assemblySimpleName))
+        {
             return null;
+        }
 
         return OnResolving(AssemblyLoadContext.Default, new AssemblyName(assemblySimpleName));
     }
 
     internal Assembly? ResolveAssembly(AssemblyName assemblyName)
-        => OnResolving(AssemblyLoadContext.Default, assemblyName);
+    {
+        return OnResolving(AssemblyLoadContext.Default, assemblyName);
+    }
 
     internal bool TryResolveAssemblyPath(string assemblySimpleName, out string absolutePath)
     {
         absolutePath = string.Empty;
 
         if (string.IsNullOrWhiteSpace(assemblySimpleName))
+        {
             return false;
+        }
 
-        return _depsManifest?.TryResolve(assemblySimpleName, out absolutePath) == true;
+        return DepsManifest?.TryResolve(assemblySimpleName, out absolutePath) == true;
     }
 
     internal bool TryResolveAssemblyPath(AssemblyName assemblyName, out string absolutePath)
     {
         absolutePath = string.Empty;
 
-        return _depsManifest?.TryResolve(assemblyName, out absolutePath) == true;
+        return DepsManifest?.TryResolve(assemblyName, out absolutePath) == true;
     }
 
     private Assembly? OnResolving(AssemblyLoadContext context, AssemblyName assemblyName)
@@ -110,13 +134,17 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         var simpleName = assemblyName.Name;
 
         if (string.IsNullOrEmpty(simpleName))
+        {
             return null;
+        }
 
         var cacheKey = AssemblyResolutionHelpers.GetCacheKey(assemblyName);
 
         if (_resolvedAssemblies.TryGetValue(cacheKey, out var cached)
             && AssemblyResolutionHelpers.VersionMatches(assemblyName, cached))
+        {
             return cached;
+        }
 
         var alreadyLoaded = AssemblyResolutionHelpers.FindLoadedAssembly(assemblyName);
 
@@ -143,8 +171,10 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
                                  && !AssemblyResolutionHelpers.IsZeroVersion(assemblyName.Version);
 
         // Prefer version-aware .deps.json resolution when a specific version is requested (e.g. DiagnosticSource 9 for EF 9).
-        if (hasExplicitVersion && _depsManifest?.TryResolve(assemblyName, out var versionedDepsPath) == true)
+        if (hasExplicitVersion && DepsManifest?.TryResolve(assemblyName, out var versionedDepsPath) == true)
+        {
             loaded = TryLoad(context, versionedDepsPath);
+        }
 
         if (loaded is null)
         {
@@ -152,11 +182,15 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
 
             if (resolvedPath is not null
                 && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, resolvedPath))
+            {
                 loaded = TryLoad(context, resolvedPath);
+            }
         }
 
-        if (loaded is null && _depsManifest?.TryResolve(assemblyName, out var depsPath) == true)
+        if (loaded is null && DepsManifest?.TryResolve(assemblyName, out var depsPath) == true)
+        {
             loaded = TryLoad(context, depsPath);
+        }
 
         if (loaded is null)
         {
@@ -165,16 +199,22 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
             if (File.Exists(outputCandidate)
                 && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, outputCandidate)
                 && (!IsSystemTextJson(simpleName) || SystemTextJsonPathSupportsWeb(outputCandidate)))
+            {
                 loaded = TryLoad(context, outputCandidate);
+            }
         }
 
         if (loaded is null
             && _sharedFrameworkCatalog.TryResolve(simpleName, out var sharedPath)
             && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, sharedPath))
+        {
             loaded = TryLoad(context, sharedPath);
+        }
 
         if (loaded is not null)
+        {
             _resolvedAssemblies[cacheKey] = loaded;
+        }
 
         return loaded;
     }
@@ -184,7 +224,9 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
         if (SystemTextJsonCapabilities.TryGetLoaded(out var existing)
             && SystemTextJsonCapabilities.IsCompatible(existing)
             && AssemblyResolutionHelpers.VersionMatches(assemblyName, existing))
+        {
             return existing;
+        }
 
         if (_sharedFrameworkCatalog.TryResolve(SystemTextJsonCapabilities.AssemblySimpleName, out var sharedPath)
             && AssemblyResolutionHelpers.IsCompatibleWithRequestedVersion(assemblyName, sharedPath))
@@ -192,17 +234,21 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
             var shared = TryLoad(context, sharedPath);
 
             if (shared is not null && SystemTextJsonCapabilities.IsCompatible(shared))
+            {
                 return shared;
+            }
         }
 
-        if (_depsManifest?.TryResolve(assemblyName, out var depsPath) == true
+        if (DepsManifest?.TryResolve(assemblyName, out var depsPath) == true
             && SystemTextJsonPathSupportsWeb(depsPath)
             && !IsProjectLocalSystemTextJsonCopy(depsPath))
         {
             var fromDeps = TryLoad(context, depsPath);
 
             if (fromDeps is not null && SystemTextJsonCapabilities.IsCompatible(fromDeps))
+            {
                 return fromDeps;
+            }
         }
 
         var outputCandidate = Path.Combine(_outputDirectory, $"{SystemTextJsonCapabilities.AssemblySimpleName}.dll");
@@ -215,24 +261,35 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
             var fromOutput = TryLoad(context, outputCandidate);
 
             if (fromOutput is not null && SystemTextJsonCapabilities.IsCompatible(fromOutput))
+            {
                 return fromOutput;
+            }
         }
 
         return null;
     }
 
     private static bool IsSystemTextJson(string? simpleName)
-        => string.Equals(simpleName, SystemTextJsonCapabilities.AssemblySimpleName, StringComparison.OrdinalIgnoreCase);
+    {
+        return string.Equals(simpleName, SystemTextJsonCapabilities.AssemblySimpleName,
+            StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool IsProjectLocalSystemTextJsonCopy(string absolutePath)
     {
         var normalized = absolutePath.Replace('\\', Path.DirectorySeparatorChar);
 
-        if (normalized.Contains($"{Path.DirectorySeparatorChar}shared{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+        if (normalized.Contains($"{Path.DirectorySeparatorChar}shared{Path.DirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
-        return normalized.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
-               || normalized.Contains($"{Path.DirectorySeparatorChar}.nuget{Path.DirectorySeparatorChar}packages{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
+        return normalized.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                   StringComparison.OrdinalIgnoreCase)
+               || normalized.Contains(
+                   $"{Path.DirectorySeparatorChar}.nuget{Path.DirectorySeparatorChar}packages{Path.DirectorySeparatorChar}",
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool SystemTextJsonPathSupportsWeb(string absolutePath)
@@ -269,10 +326,5 @@ internal sealed class WorkspaceAssemblyResolver : IDisposable
                 AssemblyName.GetAssemblyName(absolutePath),
                 absolutePath);
         }
-    }
-
-    public void Dispose()
-    {
-        AssemblyLoadContext.Default.Resolving -= _resolveHandler;
     }
 }

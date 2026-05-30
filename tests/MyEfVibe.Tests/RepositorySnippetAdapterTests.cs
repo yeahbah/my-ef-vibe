@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace MyEfVibe.Tests;
 
 public sealed class RepositorySnippetAdapterTests
@@ -6,15 +8,15 @@ public sealed class RepositorySnippetAdapterTests
     public void PrepareForEvaluation_RepositoryQuery_StripsAwaitDbContextAndParameters()
     {
         const string snippet = """
-            await DbContext.BusinessEntities
-                .AsNoTracking()
-                .Where(be => be.Rowguid == entraObjectId && be.IsEntraUser == true)
-                .SelectMany(be => be.Persons)
-                .Include(p => p.BusinessEntity)
-                .Include(p => p.PersonType)
-                .Include(p => p.EmailAddresses)
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                               await DbContext.BusinessEntities
+                                   .AsNoTracking()
+                                   .Where(be => be.Rowguid == entraObjectId && be.IsEntraUser == true)
+                                   .SelectMany(be => be.Persons)
+                                   .Include(p => p.BusinessEntity)
+                                   .Include(p => p.PersonType)
+                                   .Include(p => p.EmailAddresses)
+                                   .FirstOrDefaultAsync(cancellationToken);
+                               """;
 
         var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeAdventureWorksDbContext));
 
@@ -47,12 +49,12 @@ public sealed class RepositorySnippetAdapterTests
     public void PrepareForEvaluation_EmployeeIncludeQuery_RewritesToPublicRuntime()
     {
         const string snippet = """
-            DbContext.Employees
-                .Include(e => e.PersonBusinessEntity)
-                    .ThenInclude(p => p.EmailAddresses)
-                .Where(e => e.BusinessEntityId == businessEntityId)
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                               DbContext.Employees
+                                   .Include(e => e.PersonBusinessEntity)
+                                       .ThenInclude(p => p.EmailAddresses)
+                                   .Where(e => e.BusinessEntityId == businessEntityId)
+                                   .FirstOrDefaultAsync(cancellationToken);
+                               """;
 
         var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeAdventureWorksDbContext));
 
@@ -71,11 +73,11 @@ public sealed class RepositorySnippetAdapterTests
     }
 }
 
-public sealed class FakeAdventureWorksDbContext : Microsoft.EntityFrameworkCore.DbContext
+public sealed class FakeAdventureWorksDbContext : DbContext
 {
-    public Microsoft.EntityFrameworkCore.DbSet<FakeBusinessEntity> BusinessEntities => Set<FakeBusinessEntity>();
+    public DbSet<FakeBusinessEntity> BusinessEntities => Set<FakeBusinessEntity>();
 
-    public Microsoft.EntityFrameworkCore.DbSet<FakeEmployee> Employees => Set<FakeEmployee>();
+    public DbSet<FakeEmployee> Employees => Set<FakeEmployee>();
 }
 
 public sealed class FakeEmployee

@@ -40,15 +40,15 @@ public sealed class ProjectReferenceWalkerTests
         File.WriteAllText(
             projectPath,
             $$"""
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
-              </PropertyGroup>
-              <ItemGroup>
-            {{references}}
-              </ItemGroup>
-            </Project>
-            """);
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+              {{references}}
+                </ItemGroup>
+              </Project>
+              """);
 
         return projectPath;
     }
@@ -71,7 +71,7 @@ public sealed class ProjectReferenceWalkerTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

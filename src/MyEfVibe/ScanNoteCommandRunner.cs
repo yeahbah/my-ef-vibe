@@ -5,8 +5,9 @@ namespace MyEfVibe;
 
 internal static class ScanNoteCommandRunner
 {
-    internal static Task<int> RunFromOptionsAsync(ScanNoteCliOptions options) =>
-        RunAsync(
+    internal static Task<int> RunFromOptionsAsync(ScanNoteCliOptions options)
+    {
+        return RunAsync(
             CliPathHelper.ResolveWorkspace(options.Workspace),
             CliPathHelper.ToFileInfo(options.Project)!,
             options.Context,
@@ -15,6 +16,7 @@ internal static class ScanNoteCommandRunner
             options.Rule,
             options.Text,
             options.Code);
+    }
 
     internal static Task<int> RunAsync(
         DirectoryInfo workspace,
@@ -68,8 +70,9 @@ internal static class ScanNoteCommandRunner
 
 internal static class ScanDismissCommandRunner
 {
-    internal static Task<int> RunFromOptionsAsync(ScanDismissCliOptions options) =>
-        RunAsync(
+    internal static Task<int> RunFromOptionsAsync(ScanDismissCliOptions options)
+    {
+        return RunAsync(
             CliPathHelper.ResolveWorkspace(options.Workspace),
             CliPathHelper.ToFileInfo(options.Project)!,
             options.Context,
@@ -78,6 +81,7 @@ internal static class ScanDismissCommandRunner
             options.Rule,
             options.Note,
             options.Code);
+    }
 
     internal static Task<int> RunAsync(
         DirectoryInfo workspace,
@@ -152,13 +156,13 @@ internal static class ScanNoteCommandRunnerHelpers
             Success = true,
             Action = action,
             Key = key,
-            SessionDirectory = sessionDirectory,
+            SessionDirectory = sessionDirectory
         };
 
         Console.WriteLine(JsonSerializer.Serialize(payload, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         }));
     }
 }

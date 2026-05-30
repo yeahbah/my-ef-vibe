@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace MyEfVibe.Tests;
 
 public sealed class ProbeTranslationPipelineTests
@@ -41,11 +43,11 @@ public sealed class ProbeTranslationPipelineTests
     public void ProbeScriptFormatter_strips_as_no_tracking_from_include_probe()
     {
         const string probe = """
-            db.BusinessEntityAddresses
-                .AsNoTracking()
-                .Include(bea => bea.Address)
-                .Where(bea => bea.BusinessEntityId == 0)
-            """;
+                             db.BusinessEntityAddresses
+                                 .AsNoTracking()
+                                 .Include(bea => bea.Address)
+                                 .Where(bea => bea.BusinessEntityId == 0)
+                             """;
 
         var formatted = ProbeScriptFormatter.ToScriptExpression(probe);
 
@@ -59,23 +61,23 @@ public sealed class ProbeTranslationPipelineTests
     public void FullPipeline_employee_include_graph_matches_repository_snippet_shape()
     {
         const string statement = """
-            return await DbContext.Employees
-                .AsNoTracking()
-                .Include(e => e.PersonBusinessEntity)
-                .Include(e => e.EmployeeDepartmentHistory)
-                    .ThenInclude(dh => dh.Department)
-                .Include(e => e.EmployeeDepartmentHistory)
-                    .ThenInclude(dh => dh.Shift)
-                .Include(e => e.EmployeePayHistory)
-                .Where(e => e.BusinessEntityId == businessEntityId)
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                                 return await DbContext.Employees
+                                     .AsNoTracking()
+                                     .Include(e => e.PersonBusinessEntity)
+                                     .Include(e => e.EmployeeDepartmentHistory)
+                                         .ThenInclude(dh => dh.Department)
+                                     .Include(e => e.EmployeeDepartmentHistory)
+                                         .ThenInclude(dh => dh.Shift)
+                                     .Include(e => e.EmployeePayHistory)
+                                     .Where(e => e.BusinessEntityId == businessEntityId)
+                                     .FirstOrDefaultAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statement,
-            representativeEntityTypeName: nameof(FakeEmployee),
-            dbContextType: typeof(FakeAdventureWorksDbContext),
-            queryEntityTypeName: nameof(FakeEmployee));
+            nameof(FakeEmployee),
+            typeof(FakeAdventureWorksDbContext),
+            nameof(FakeEmployee));
 
         Assert.NotNull(probe);
         Assert.DoesNotContain(".Take(1)", probe, StringComparison.Ordinal);
@@ -101,12 +103,13 @@ public sealed class ProbeTranslationPipelineTests
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statement,
-            representativeEntityTypeName: nameof(FakeODataCity),
-            dbContextType: typeof(FakeODataDbContext),
-            queryEntityTypeName: nameof(FakeODataCity));
+            nameof(FakeODataCity),
+            typeof(FakeODataDbContext),
+            nameof(FakeODataCity));
 
         Assert.NotNull(probe);
-        Assert.Contains("db.Cities.Where(x => x.CityId == 0)", ProbeTestHelper.CollapseWhitespace(probe), StringComparison.Ordinal);
+        Assert.Contains("db.Cities.Where(x => x.CityId == 0)", ProbeTestHelper.CollapseWhitespace(probe),
+            StringComparison.Ordinal);
 
         var script = SnippetNormalizer.ForEvaluation(
             ProbeScriptFormatter.ToScriptExpression(probe),
@@ -144,9 +147,9 @@ public sealed class ProbeTranslationPipelineTests
     }
 }
 
-public sealed class FakeODataDbContext : Microsoft.EntityFrameworkCore.DbContext
+public sealed class FakeODataDbContext : DbContext
 {
-    public Microsoft.EntityFrameworkCore.DbSet<FakeODataCity> Cities => Set<FakeODataCity>();
+    public DbSet<FakeODataCity> Cities => Set<FakeODataCity>();
 }
 
 public sealed class FakeODataCity

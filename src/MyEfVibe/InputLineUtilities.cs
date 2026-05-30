@@ -1,14 +1,16 @@
 namespace MyEfVibe;
 
 /// <summary>
-/// Normalizes REPL line breaks and endings across Windows (<c>\r\n</c>) and Unix (<c>\n</c>).
+///     Normalizes REPL line breaks and endings across Windows (<c>\r\n</c>) and Unix (<c>\n</c>).
 /// </summary>
 internal static class InputLineUtilities
 {
     internal static string NormalizeNewlines(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return text;
+        }
 
         return text
             .Replace("\r\n", "\n", StringComparison.Ordinal)
@@ -18,17 +20,25 @@ internal static class InputLineUtilities
     internal static string[] SplitLines(string? text)
     {
         if (string.IsNullOrEmpty(text))
+        {
             return [string.Empty];
+        }
 
-        return NormalizeNewlines(text).Split('\n', StringSplitOptions.None);
+        return NormalizeNewlines(text).Split('\n');
     }
 
-    internal static string StripCarriageReturns(string line) =>
-        line.TrimEnd('\r');
+    internal static string StripCarriageReturns(string line)
+    {
+        return line.TrimEnd('\r');
+    }
 
-    internal static string TrimLineEnd(string line) =>
-        StripCarriageReturns(line).TrimEnd();
+    internal static string TrimLineEnd(string line)
+    {
+        return StripCarriageReturns(line).TrimEnd();
+    }
 
-    internal static string JoinLines(IEnumerable<string> lines) =>
-        string.Join("\n", lines.Select(StripCarriageReturns)).Trim();
+    internal static string JoinLines(IEnumerable<string> lines)
+    {
+        return string.Join("\n", lines.Select(StripCarriageReturns)).Trim();
+    }
 }

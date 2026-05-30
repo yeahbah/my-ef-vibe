@@ -11,11 +11,13 @@ internal static class LinqScanNoteStore
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    internal static string GetPath(string sessionDirectory) =>
-        Path.Combine(SessionPaths.EnsureSessionDirectory(sessionDirectory), FileName);
+    internal static string GetPath(string sessionDirectory)
+    {
+        return Path.Combine(SessionPaths.EnsureSessionDirectory(sessionDirectory), FileName);
+    }
 
     internal static IReadOnlyList<LinqScanFinding> ApplyNotes(
         IReadOnlyList<LinqScanFinding> findings,
@@ -24,7 +26,9 @@ internal static class LinqScanNoteStore
         var notes = LoadNoteMap(sessionDirectory);
 
         if (notes.Count == 0)
+        {
             return findings;
+        }
 
         return findings
             .Select(finding =>
@@ -39,7 +43,9 @@ internal static class LinqScanNoteStore
         var trimmed = note.Trim();
 
         if (trimmed.Length == 0)
+        {
             throw new ArgumentException("Note text is required.", nameof(note));
+        }
 
         var path = GetPath(sessionDirectory);
         var document = LoadDocument(path);
@@ -71,14 +77,16 @@ internal static class LinqScanNoteStore
     private static LinqScanNotesDocument LoadDocument(string path)
     {
         if (!File.Exists(path))
+        {
             return new LinqScanNotesDocument(1, []);
+        }
 
         try
         {
             var json = File.ReadAllText(path);
 
             return JsonSerializer.Deserialize<LinqScanNotesDocument>(json, JsonOptions)
-                ?? new LinqScanNotesDocument(1, []);
+                   ?? new LinqScanNotesDocument(1, []);
         }
         catch (JsonException)
         {
@@ -90,8 +98,10 @@ internal static class LinqScanNoteStore
         }
     }
 
-    private static void SaveDocument(string path, LinqScanNotesDocument document) =>
+    private static void SaveDocument(string path, LinqScanNotesDocument document)
+    {
         File.WriteAllText(path, JsonSerializer.Serialize(document, JsonOptions));
+    }
 }
 
 internal sealed record LinqScanNotesDocument(int Version, List<LinqScanNoteEntry> Notes);

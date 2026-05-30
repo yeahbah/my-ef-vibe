@@ -1,15 +1,16 @@
 using System.Text;
+using Spectre.Console;
 
 namespace MyEfVibe;
 
 internal sealed class ReplLineReader
 {
-    private readonly InputHistory _history;
+    [ThreadStatic] private static int _lastRenderedLineCount;
+
     private readonly ReplCompletionService? _completion;
-    private readonly LinqScanReviewSession? _scanReview;
+    private readonly InputHistory _history;
     private readonly Queue<string> _pendingRecalledLines = new();
-    [ThreadStatic]
-    private static int _lastRenderedLineCount;
+    private readonly LinqScanReviewSession? _scanReview;
 
     internal ReplLineReader(
         InputHistory history,
@@ -28,7 +29,9 @@ internal sealed class ReplLineReader
         var lines = new List<string>();
 
         while (_pendingRecalledLines.Count > 0)
+        {
             lines.Add(_pendingRecalledLines.Dequeue());
+        }
 
         return lines;
     }
@@ -58,7 +61,10 @@ internal sealed class ReplLineReader
         return ReadLineInteractive(prompt);
     }
 
-    internal void RecordSubmission(string snippet) => _history.Add(snippet);
+    internal void RecordSubmission(string snippet)
+    {
+        _history.Add(snippet);
+    }
 
     private string? ReadLineInteractive(string prompt)
     {
@@ -71,7 +77,7 @@ internal sealed class ReplLineReader
 
         while (true)
         {
-            var key = Console.ReadKey(intercept: true);
+            var key = Console.ReadKey(true);
 
             switch (key.Key)
             {
@@ -92,23 +98,33 @@ internal sealed class ReplLineReader
 
                 case ConsoleKey.UpArrow:
                     if (_history.TryNavigateUp(out var upEntry))
+                    {
                         ApplyRecalledEntry(upEntry, prompt, buffer, ref cursor);
+                    }
                     else
+                    {
                         Console.Beep();
+                    }
 
                     break;
 
                 case ConsoleKey.DownArrow:
                     if (_history.TryNavigateDown(out var downEntry))
+                    {
                         ApplyRecalledEntry(downEntry, prompt, buffer, ref cursor);
+                    }
                     else
+                    {
                         ReplaceBuffer(prompt, buffer, string.Empty, ref cursor);
+                    }
 
                     break;
 
                 case ConsoleKey.Backspace:
                     if (cursor <= 0)
+                    {
                         break;
+                    }
 
                     buffer.Remove(cursor - 1, 1);
                     cursor--;
@@ -119,10 +135,14 @@ internal sealed class ReplLineReader
 
                 case ConsoleKey.Delete:
                     if (TryScanReviewDismiss(prompt, buffer, ref cursor))
+                    {
                         break;
+                    }
 
                     if (cursor >= buffer.Length)
+                    {
                         break;
+                    }
 
                     buffer.Remove(cursor, 1);
 
@@ -132,7 +152,9 @@ internal sealed class ReplLineReader
 
                 case ConsoleKey.LeftArrow:
                     if (TryScanReviewNavigatePrevious(prompt, buffer, ref cursor))
+                    {
                         break;
+                    }
 
                     if (cursor > 0)
                     {
@@ -145,7 +167,9 @@ internal sealed class ReplLineReader
 
                 case ConsoleKey.RightArrow:
                     if (TryScanReviewNavigateNext(prompt, buffer, ref cursor))
+                    {
                         break;
+                    }
 
                     if (cursor < buffer.Length)
                     {
@@ -180,9 +204,13 @@ internal sealed class ReplLineReader
 
                 case ConsoleKey.Tab:
                     if (_completion is not null)
+                    {
                         TryApplyCompletion(prompt, buffer, ref cursor);
+                    }
                     else
+                    {
                         Console.Beep();
+                    }
 
                     break;
 
@@ -212,7 +240,9 @@ internal sealed class ReplLineReader
     private bool TryScanReviewNavigateNext(string prompt, StringBuilder buffer, ref int cursor)
     {
         if (_scanReview?.IsActive != true || buffer.Length > 0 || cursor > 0)
+        {
             return false;
+        }
 
         _scanReview.TryNext();
         RenderMultiline(ResolvePrompt(prompt), buffer, cursor);
@@ -223,7 +253,9 @@ internal sealed class ReplLineReader
     private bool TryScanReviewNavigatePrevious(string prompt, StringBuilder buffer, ref int cursor)
     {
         if (_scanReview?.IsActive != true || buffer.Length > 0 || cursor > 0)
+        {
             return false;
+        }
 
         _scanReview.TryPrevious();
         RenderMultiline(ResolvePrompt(prompt), buffer, cursor);
@@ -234,16 +266,20 @@ internal sealed class ReplLineReader
     private bool TryScanReviewDismiss(string prompt, StringBuilder buffer, ref int cursor)
     {
         if (_scanReview?.IsActive != true || buffer.Length > 0 || cursor > 0)
+        {
             return false;
+        }
 
-        _scanReview.TryDismiss(note: null);
+        _scanReview.TryDismiss(null);
         RenderMultiline(ResolvePrompt(prompt), buffer, cursor);
 
         return true;
     }
 
-    private string ResolvePrompt(string fallbackPrompt) =>
-        _scanReview?.GetActivePrompt() ?? fallbackPrompt;
+    private string ResolvePrompt(string fallbackPrompt)
+    {
+        return _scanReview?.GetActivePrompt() ?? fallbackPrompt;
+    }
 
     private void ApplyRecalledEntry(string entry, string prompt, StringBuilder buffer, ref int cursor)
     {
@@ -254,7 +290,9 @@ internal sealed class ReplLineReader
         _pendingRecalledLines.Clear();
 
         for (var lineIndex = 1; lineIndex < lines.Length; lineIndex++)
+        {
             _pendingRecalledLines.Enqueue(lines[lineIndex]);
+        }
     }
 
     private static void ReplaceBuffer(string prompt, StringBuilder buffer, string text, ref int cursor)
@@ -287,18 +325,22 @@ internal sealed class ReplLineReader
         }
 
         if (suggestions.Count == 0)
+        {
             return;
+        }
 
         var partial = GetCompletionPrefix(line, cursor);
 
         var matches = suggestions
             .Where(suggestion => partial.Length == 0
-                || suggestion.InsertText.StartsWith(partial, StringComparison.OrdinalIgnoreCase)
-                || suggestion.DisplayText.StartsWith(partial, StringComparison.OrdinalIgnoreCase))
+                                 || suggestion.InsertText.StartsWith(partial, StringComparison.OrdinalIgnoreCase)
+                                 || suggestion.DisplayText.StartsWith(partial, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         if (matches.Length == 0)
+        {
             return;
+        }
 
         if (matches.Length == 1)
         {
@@ -316,7 +358,7 @@ internal sealed class ReplLineReader
             {
                 InsertText = extension,
                 ReplaceStart = cursor - partial.Length,
-                ReplaceLength = partial.Length,
+                ReplaceLength = partial.Length
             };
 
             ApplySuggestion(prompt, buffer, ref cursor, merged);
@@ -334,13 +376,17 @@ internal sealed class ReplLineReader
         CompletionSuggestion suggestion)
     {
         if (suggestion.InsertText.Length == 0 && suggestion.ReplaceLength == 0)
+        {
             return;
+        }
 
         var replaceStart = Math.Clamp(suggestion.ReplaceStart, 0, buffer.Length);
         var replaceEnd = Math.Clamp(replaceStart + suggestion.ReplaceLength, replaceStart, buffer.Length);
 
         if (replaceEnd > replaceStart)
+        {
             buffer.Remove(replaceStart, replaceEnd - replaceStart);
+        }
 
         buffer.Insert(replaceStart, suggestion.InsertText);
         cursor = replaceStart + suggestion.InsertText.Length;
@@ -354,15 +400,19 @@ internal sealed class ReplLineReader
         int cursor,
         IReadOnlyList<CompletionSuggestion> matches)
     {
-        Spectre.Console.AnsiConsole.WriteLine();
+        AnsiConsole.WriteLine();
 
         foreach (var match in matches.Take(12))
-            Spectre.Console.AnsiConsole.MarkupLine($"  [grey]•[/] [cyan]{Spectre.Console.Markup.Escape(match.DisplayText)}[/]");
+        {
+            AnsiConsole.MarkupLine($"  [grey]•[/] [cyan]{Markup.Escape(match.DisplayText)}[/]");
+        }
 
         if (matches.Count > 12)
-            Spectre.Console.AnsiConsole.MarkupLine($"  [grey]… and {matches.Count - 12} more[/]");
+        {
+            AnsiConsole.MarkupLine($"  [grey]… and {matches.Count - 12} more[/]");
+        }
 
-        Spectre.Console.AnsiConsole.WriteLine();
+        AnsiConsole.WriteLine();
 
         RenderMultiline(prompt, buffer, cursor);
     }
@@ -381,7 +431,9 @@ internal sealed class ReplLineReader
         var index = Math.Min(cursor, line.Length) - 1;
 
         while (index >= 0 && (char.IsLetterOrDigit(line[index]) || line[index] is '_' or '.'))
+        {
             index--;
+        }
 
         return index + 1;
     }
@@ -391,7 +443,9 @@ internal sealed class ReplLineReader
         var list = values.ToArray();
 
         if (list.Length == 0)
+        {
             return string.Empty;
+        }
 
         var prefix = list[0];
 
@@ -401,12 +455,16 @@ internal sealed class ReplLineReader
             var max = Math.Min(prefix.Length, value.Length);
 
             while (length < max && prefix[length] == value[length])
+            {
                 length++;
+            }
 
             prefix = prefix[..length];
 
             if (prefix.Length == 0)
+            {
                 break;
+            }
         }
 
         return prefix;
@@ -437,23 +495,31 @@ internal sealed class ReplLineReader
         }
 
         if (_lastRenderedLineCount > 1)
+        {
             Console.Write($"\x1b[{_lastRenderedLineCount - 1}A");
+        }
 
         for (var index = 0; index < _lastRenderedLineCount; index++)
         {
             Console.Write("\r\x1b[2K");
 
             if (index < _lastRenderedLineCount - 1)
+            {
                 Console.WriteLine();
+            }
         }
 
         if (_lastRenderedLineCount > 1)
+        {
             Console.Write($"\x1b[{_lastRenderedLineCount - 1}A");
+        }
 
         for (var index = 0; index < lines.Length; index++)
         {
             if (index > 0)
+            {
                 Console.WriteLine();
+            }
 
             var linePrompt = index == 0 ? primaryPrompt : CliUi.ContinuationPrompt;
             CliUi.WritePrompt(linePrompt);
@@ -465,7 +531,9 @@ internal sealed class ReplLineReader
         var linesBelow = lines.Length - 1 - lineIndex;
 
         if (linesBelow > 0)
+        {
             Console.Write($"\x1b[{linesBelow}A");
+        }
 
         var activePrompt = lineIndex == 0 ? primaryPrompt : CliUi.ContinuationPrompt;
         Console.Write("\r");
@@ -475,6 +543,8 @@ internal sealed class ReplLineReader
         var tailLength = lines[lineIndex].Length - column;
 
         if (tailLength > 0)
+        {
             Console.Write(new string('\b', tailLength));
+        }
     }
 }

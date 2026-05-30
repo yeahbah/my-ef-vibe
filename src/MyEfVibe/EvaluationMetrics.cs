@@ -7,7 +7,7 @@ internal enum ResultKind
     String,
     Enumerable,
     Queryable,
-    Object,
+    Object
 }
 
 internal sealed record EvaluationMetrics(
@@ -25,8 +25,9 @@ internal sealed record EvaluationMetrics(
     IReadOnlyList<string> Warnings,
     bool Succeeded)
 {
-    internal static EvaluationMetrics Failed(string snippet, long totalMilliseconds, string message) =>
-        new(
+    internal static EvaluationMetrics Failed(string snippet, long totalMilliseconds, string message)
+    {
+        return new EvaluationMetrics(
             snippet,
             totalMilliseconds,
             null,
@@ -40,4 +41,5 @@ internal sealed record EvaluationMetrics(
             null,
             new[] { message },
             false);
+    }
 }

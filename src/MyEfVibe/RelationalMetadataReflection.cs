@@ -1,9 +1,10 @@
+using System.Collections;
 using System.Reflection;
 
 namespace MyEfVibe;
 
 /// <summary>
-/// Resolves EF Core relational metadata extension methods and enumerates model entities via reflection.
+///     Resolves EF Core relational metadata extension methods and enumerates model entities via reflection.
 /// </summary>
 internal static class RelationalMetadataReflection
 {
@@ -41,15 +42,19 @@ internal static class RelationalMetadataReflection
             .FirstOrDefault(loaded => loaded is not null);
 
         if (relationalAssembly is null)
+        {
             return null;
+        }
 
         var cacheKey = relationalAssembly.FullName ?? RelationalAssemblyName;
 
         if (Cache.TryGetValue(cacheKey, out var cached))
+        {
             return cached;
+        }
 
-        var entityExtensionsType = relationalAssembly.GetType(EntityTypeExtensionsTypeName, throwOnError: false);
-        var propertyExtensionsType = relationalAssembly.GetType(PropertyExtensionsTypeName, throwOnError: false);
+        var entityExtensionsType = relationalAssembly.GetType(EntityTypeExtensionsTypeName, false);
+        var propertyExtensionsType = relationalAssembly.GetType(PropertyExtensionsTypeName, false);
 
         if (entityExtensionsType is null || propertyExtensionsType is null)
         {
@@ -70,7 +75,9 @@ internal static class RelationalMetadataReflection
             ?.GetValue(modelBuilder);
 
         if (model is null)
+        {
             yield break;
+        }
 
         var getEntityTypes = model.GetType()
             .GetInterfaces()
@@ -78,17 +85,21 @@ internal static class RelationalMetadataReflection
             ?.GetMethod(
                 "GetEntityTypes",
                 BindingFlags.Public | BindingFlags.Instance,
-                binder: null,
-                types: Type.EmptyTypes,
-                modifiers: null);
+                null,
+                Type.EmptyTypes,
+                null);
 
-        if (getEntityTypes?.Invoke(model, null) is not System.Collections.IEnumerable entityTypes)
+        if (getEntityTypes?.Invoke(model, null) is not IEnumerable entityTypes)
+        {
             yield break;
+        }
 
         foreach (var entityType in entityTypes)
         {
             if (entityType is not null)
+            {
                 yield return entityType;
+            }
         }
     }
 
@@ -99,13 +110,17 @@ internal static class RelationalMetadataReflection
             .FirstOrDefault(iface => string.Equals(iface.FullName, IEntityTypeFullName, StringComparison.Ordinal))
             ?.GetMethod("GetProperties", BindingFlags.Public | BindingFlags.Instance);
 
-        if (getProperties?.Invoke(entityType, null) is not System.Collections.IEnumerable properties)
+        if (getProperties?.Invoke(entityType, null) is not IEnumerable properties)
+        {
             yield break;
+        }
 
         foreach (var property in properties)
         {
             if (property is not null)
+            {
                 yield return property;
+            }
         }
     }
 
@@ -116,7 +131,9 @@ internal static class RelationalMetadataReflection
             var columnName = relationalMetadata.GetColumnName(property);
 
             if (string.IsNullOrEmpty(columnName))
+            {
                 continue;
+            }
 
             relationalMetadata.SetColumnName(property, columnName.ToLowerInvariant());
         }
@@ -145,7 +162,9 @@ internal static class RelationalMetadataReflection
                 || setTableName is null
                 || getColumnName is null
                 || setColumnName is null)
+            {
                 return null;
+            }
 
             return new RelationalMetadataMethods(
                 getSchema,
@@ -156,28 +175,49 @@ internal static class RelationalMetadataReflection
                 setColumnName);
         }
 
-        internal string? GetSchema(object entityType) => getSchema.Invoke(null, [entityType]) as string;
+        internal string? GetSchema(object entityType)
+        {
+            return getSchema.Invoke(null, [entityType]) as string;
+        }
 
-        internal void SetSchema(object entityType, string? schema) => setSchema.Invoke(null, [entityType, schema]);
+        internal void SetSchema(object entityType, string? schema)
+        {
+            setSchema.Invoke(null, [entityType, schema]);
+        }
 
-        internal string? GetTableName(object entityType) => getTableName.Invoke(null, [entityType]) as string;
+        internal string? GetTableName(object entityType)
+        {
+            return getTableName.Invoke(null, [entityType]) as string;
+        }
 
-        internal void SetTableName(object entityType, string tableName) => setTableName.Invoke(null, [entityType, tableName]);
+        internal void SetTableName(object entityType, string tableName)
+        {
+            setTableName.Invoke(null, [entityType, tableName]);
+        }
 
-        internal string? GetColumnName(object property) => getColumnName.Invoke(null, [property]) as string;
+        internal string? GetColumnName(object property)
+        {
+            return getColumnName.Invoke(null, [property]) as string;
+        }
 
-        internal void SetColumnName(object property, string columnName) =>
+        internal void SetColumnName(object property, string columnName)
+        {
             setColumnName.Invoke(null, [property, columnName]);
+        }
 
         private static MethodInfo? FindExtensionMethod(Type extensionsType, string methodName, int parameterCount)
         {
             foreach (var method in extensionsType.GetMethods(BindingFlags.Static | BindingFlags.Public))
             {
                 if (!string.Equals(method.Name, methodName, StringComparison.Ordinal))
+                {
                     continue;
+                }
 
                 if (method.GetParameters().Length != parameterCount)
+                {
                     continue;
+                }
 
                 return method;
             }

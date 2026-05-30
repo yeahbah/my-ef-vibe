@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,8 +10,10 @@ internal static class LinqQuerySiteCollector
     internal static IReadOnlyList<LinqQuerySite> Collect(
         string efProjectPath,
         string startupProjectPath,
-        Type selectedDbContextType) =>
-        Collect(efProjectPath, startupProjectPath, selectedDbContextType.Name);
+        Type selectedDbContextType)
+    {
+        return Collect(efProjectPath, startupProjectPath, selectedDbContextType.Name);
+    }
 
     internal static IReadOnlyList<LinqQuerySite> Collect(
         string efProjectPath,
@@ -26,7 +29,9 @@ internal static class LinqQuerySiteCollector
             var projectDirectory = Path.GetDirectoryName(projectPath)!;
 
             foreach (var sourcePath in LinqProjectSourceWalker.EnumerateSourceFiles(projectDirectory))
+            {
                 sites.AddRange(CollectFromFile(sourcePath, scope));
+            }
         }
 
         return sites;
@@ -52,7 +57,7 @@ internal static class LinqQuerySiteCollector
         var tree = CSharpSyntaxTree.ParseText(
             sourceText,
             path: absolutePath,
-            encoding: System.Text.Encoding.UTF8);
+            encoding: Encoding.UTF8);
 
         var root = tree.GetCompilationUnitRoot();
         var containingTypeIndex = DbContextContainingTypeIndex.Build(sourceText, scope);
@@ -63,12 +68,16 @@ internal static class LinqQuerySiteCollector
             var methodName = GetSimpleMethodName(invocation.Expression);
 
             if (methodName is null || !LinqQueryInvocationNames.ScanTargets.Contains(methodName))
+            {
                 continue;
+            }
 
             var statement = GetStatementText(invocation);
 
             if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement, scope, instanceIndex))
+            {
                 continue;
+            }
 
             var containingTypeName = GetContainingTypeName(invocation);
 
@@ -78,7 +87,9 @@ internal static class LinqQuerySiteCollector
                     containingTypeName,
                     containingTypeIndex,
                     instanceIndex))
+            {
                 continue;
+            }
 
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
             var preview = ToPreviewLine(statement);
@@ -92,13 +103,15 @@ internal static class LinqQuerySiteCollector
         }
     }
 
-    private static string? GetSimpleMethodName(ExpressionSyntax expression) =>
-        expression switch
+    private static string? GetSimpleMethodName(ExpressionSyntax expression)
+    {
+        return expression switch
         {
             MemberAccessExpressionSyntax member => member.Name.Identifier.Text,
             IdentifierNameSyntax identifier => identifier.Identifier.Text,
-            _ => null,
+            _ => null
         };
+    }
 
     private static string GetStatementText(SyntaxNode node)
     {
@@ -106,7 +119,9 @@ internal static class LinqQuerySiteCollector
         var text = statement?.ToString() ?? node.ToString();
 
         if (LinqEfQueryHeuristics.LooksLikeEfQuery(text))
+        {
             return text;
+        }
 
         var block = node.FirstAncestorOrSelf<BlockSyntax>();
 
@@ -117,7 +132,9 @@ internal static class LinqQuerySiteCollector
                 var siblingText = sibling.ToString();
 
                 if (LinqEfQueryHeuristics.LooksLikeEfQuery(siblingText))
+                {
                     return siblingText;
+                }
             }
         }
 

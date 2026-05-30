@@ -11,10 +11,14 @@ internal static class DbSetEntityDiscovery
         foreach (var property in dbContextType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!property.PropertyType.IsGenericType)
+            {
                 continue;
+            }
 
-            if (!typeof(System.Linq.IQueryable).IsAssignableFrom(property.PropertyType))
+            if (!typeof(IQueryable).IsAssignableFrom(property.PropertyType))
+            {
                 continue;
+            }
 
             types.Add(property.PropertyType.GetGenericArguments()[0]);
         }
@@ -32,15 +36,21 @@ internal static class DbSetEntityDiscovery
         foreach (var property in dbContext.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!property.PropertyType.IsGenericType)
+            {
                 continue;
+            }
 
-            if (!typeof(System.Linq.IQueryable).IsAssignableFrom(property.PropertyType))
+            if (!typeof(IQueryable).IsAssignableFrom(property.PropertyType))
+            {
                 continue;
+            }
 
             var elementType = property.PropertyType.GetGenericArguments()[0];
 
             if (!string.IsNullOrWhiteSpace(elementType.Name))
+            {
                 names.Add(elementType.Name);
+            }
         }
 
         return names
@@ -52,12 +62,16 @@ internal static class DbSetEntityDiscovery
     internal static string? SelectRepresentativeEntityName(IReadOnlyList<string> entityTypeNames)
     {
         if (entityTypeNames.Count == 0)
+        {
             return null;
+        }
 
         foreach (var preferred in new[] { "Product", "Person", "Customer", "Order" })
         {
             if (entityTypeNames.Contains(preferred, StringComparer.Ordinal))
+            {
                 return preferred;
+            }
         }
 
         return entityTypeNames[0];

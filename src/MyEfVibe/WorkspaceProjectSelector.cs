@@ -4,38 +4,48 @@ internal static class WorkspaceProjectSelector
 {
     private const int AutoPickScoreGap = 15;
 
-    internal sealed record RankedProject(string CsprojPath, int Score, string Label);
-
     internal static FileInfo Resolve(string searchDirectory, string? explicitCsprojPathOrNull)
     {
         var normalizedSearch =
             Path.GetFullPath(searchDirectory.TrimEnd(Path.DirectorySeparatorChar));
 
         if (!Directory.Exists(normalizedSearch))
+        {
             throw new WorkspaceException($"Project search directory `{normalizedSearch}` does not exist.");
+        }
 
         if (!string.IsNullOrWhiteSpace(explicitCsprojPathOrNull))
+        {
             return ProjectPathResolver.ResolveCsproj(explicitCsprojPathOrNull, normalizedSearch);
+        }
 
         var discovered = DiscoverCsproj(normalizedSearch)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         if (discovered.Length == 0)
+        {
             throw new WorkspaceException($"No `.csproj` files were discovered under `{normalizedSearch}`.");
+        }
 
         if (discovered.Length == 1)
+        {
             return new FileInfo(discovered.Single());
+        }
 
         var ranked = RankProjects(normalizedSearch, discovered);
 
         if (ranked.Count == 0 || ranked[0].Score <= 0)
+        {
             return PromptAmongAllProjects(normalizedSearch, discovered);
+        }
 
         if (ranked.Count == 1
             || ranked[0].Score - ranked[1].Score >= AutoPickScoreGap
             || !InteractiveSelection.CanPrompt)
+        {
             return new FileInfo(ranked[0].CsprojPath);
+        }
 
         return PromptAmongRankedProjects(ranked);
     }
@@ -61,37 +71,53 @@ internal static class WorkspaceProjectSelector
     private static int ScoreProject(string csprojPath, IReadOnlyDictionary<string, bool> containsDbContext)
     {
         if (CsprojInspector.IsTestProject(csprojPath))
+        {
             return -100;
+        }
 
         var score = 0;
         var projectDirectory = Path.GetDirectoryName(csprojPath)!;
         var fileName = Path.GetFileNameWithoutExtension(csprojPath);
 
         if (containsDbContext.GetValueOrDefault(csprojPath))
+        {
             score += 40;
+        }
 
         if (CsprojInspector.HasEfCorePackageReference(csprojPath))
+        {
             score += 20;
+        }
 
         if (CsprojInspector.IsExecutableOutput(csprojPath))
+        {
             score += 25;
+        }
 
         if (CsprojInspector.UsesWebSdk(csprojPath))
+        {
             score += 30;
+        }
 
         if (ReferencesDbContextProject(csprojPath, containsDbContext))
+        {
             score += 35;
+        }
 
         if (fileName.EndsWith(".API", StringComparison.OrdinalIgnoreCase)
             || fileName.EndsWith("Api", StringComparison.OrdinalIgnoreCase)
             || fileName.Contains("Host", StringComparison.OrdinalIgnoreCase))
+        {
             score += 10;
+        }
 
         if (projectDirectory.Contains($"{Path.DirectorySeparatorChar}tools{Path.DirectorySeparatorChar}",
                 StringComparison.OrdinalIgnoreCase)
             || projectDirectory.Contains($"{Path.DirectorySeparatorChar}database{Path.DirectorySeparatorChar}",
                 StringComparison.OrdinalIgnoreCase))
+        {
             score -= 25;
+        }
 
         return score;
     }
@@ -105,16 +131,24 @@ internal static class WorkspaceProjectSelector
         var traits = new List<string>();
 
         if (containsDbContext.GetValueOrDefault(csprojPath))
+        {
             traits.Add("DbContext");
+        }
 
         if (CsprojInspector.IsExecutableOutput(csprojPath))
+        {
             traits.Add("executable");
+        }
 
         if (CsprojInspector.HasEfCorePackageReference(csprojPath))
+        {
             traits.Add("EF Core");
+        }
 
         if (ReferencesDbContextProject(csprojPath, containsDbContext))
+        {
             traits.Add("references DbContext project");
+        }
 
         return traits.Count == 0
             ? relative
@@ -135,15 +169,21 @@ internal static class WorkspaceProjectSelector
             var (current, depth) = queue.Dequeue();
 
             if (depth > maxDepth)
+            {
                 continue;
+            }
 
             foreach (var referencePath in CsprojInspector.GetProjectReferencePaths(current))
             {
                 if (containsDbContext.GetValueOrDefault(referencePath))
+                {
                     return true;
+                }
 
                 if (visited.Add(referencePath))
+                {
                     queue.Enqueue((referencePath, depth + 1));
+                }
             }
         }
 
@@ -184,5 +224,9 @@ internal static class WorkspaceProjectSelector
     }
 
     private static IEnumerable<string> DiscoverCsproj(string normalizedSearchDirectory)
-        => ProjectReferenceWalker.EnumerateCsprojFiles(normalizedSearchDirectory);
+    {
+        return ProjectReferenceWalker.EnumerateCsprojFiles(normalizedSearchDirectory);
+    }
+
+    internal sealed record RankedProject(string CsprojPath, int Score, string Label);
 }

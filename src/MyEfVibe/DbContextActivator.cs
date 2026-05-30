@@ -1,11 +1,35 @@
 using System.Collections.Immutable;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 
 namespace MyEfVibe;
 
 internal static class DbContextActivator
 {
+    private static readonly IReadOnlyDictionary<MyEfVibeProvider, ProviderExtensionSpec[]> ProviderExtensionSpecs =
+        new Dictionary<MyEfVibeProvider, ProviderExtensionSpec[]>
+        {
+            [MyEfVibeProvider.SqlServer] =
+                [new ProviderExtensionSpec("Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer")],
+            [MyEfVibeProvider.Npgsql] =
+                [new ProviderExtensionSpec("Npgsql.EntityFrameworkCore.PostgreSQL", "UseNpgsql")],
+            [MyEfVibeProvider.Sqlite] =
+                [new ProviderExtensionSpec("Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite")],
+            [MyEfVibeProvider.Oracle] =
+                [new ProviderExtensionSpec("Oracle.EntityFrameworkCore", "UseOracle")],
+            [MyEfVibeProvider.MySql] =
+            [
+                new ProviderExtensionSpec("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
+                new ProviderExtensionSpec("MySql.EntityFrameworkCore", "UseMySQL")
+            ],
+            [MyEfVibeProvider.MariaDb] =
+            [
+                new ProviderExtensionSpec("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
+                new ProviderExtensionSpec("MySql.EntityFrameworkCore", "UseMySQL")
+            ]
+        };
+
     internal static Type ResolveContextType(
         WorkspaceHost host,
         string? contextFullName,
@@ -17,7 +41,9 @@ internal static class DbContextActivator
                 .ToArray();
 
         if (discoveredDbContextTypes.Length == 0)
+        {
             throw new InvalidOperationException(BuildNoDbContextDiscoveredMessage(host, contextFullName));
+        }
 
         return SelectDbContextType(
             discoveredDbContextTypes,
@@ -45,7 +71,9 @@ internal static class DbContextActivator
         }
 
         if (provider.HasValue)
+        {
             host.EnsureProviderDependenciesLoaded(provider.Value);
+        }
 
         var selectedDbContextType = ResolveContextType(host, contextFullName, allowInteractiveSelection);
 
@@ -149,23 +177,33 @@ internal static class DbContextActivator
             + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.";
 
         if (designTimeFactoryErrors is { Count: > 0 })
+        {
             failureMessage +=
                 $"{Environment.NewLine}{Environment.NewLine}Design-time factory attempts:"
                 + $"{Environment.NewLine}"
                 + string.Join(Environment.NewLine, designTimeFactoryErrors.Select(static line => $" - {line}"));
+        }
 
         if (resolvedConnectionFromConfiguration)
         {
-            failureMessage += $"{Environment.NewLine}{Environment.NewLine}Configuration was read from the startup project";
+            failureMessage +=
+                $"{Environment.NewLine}{Environment.NewLine}Configuration was read from the startup project";
 
             if (string.IsNullOrWhiteSpace(connectionString))
+            {
                 failureMessage += ", but no connection string was found.";
+            }
             else if (!provider.HasValue)
-                failureMessage += ", but the database provider could not be inferred. Pass `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).";
+            {
+                failureMessage +=
+                    ", but the database provider could not be inferred. Pass `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).";
+            }
             else
+            {
                 failureMessage +=
                     ", but constructing `DbContextOptions` failed."
                     + " Ensure EF provider packages are referenced by the `-p` project and restore/build succeeded.";
+            }
         }
 
         throw new InvalidOperationException(failureMessage);
@@ -192,12 +230,14 @@ internal static class DbContextActivator
                 _ => throw new InvalidOperationException(
                     $"DbContext `{contextFullName}` is ambiguous. Specify the full name with `-c`:{Environment.NewLine}"
                     + string.Join(Environment.NewLine,
-                        matches.Select(static ctx => $" - {ctx.FullName}"))),
+                        matches.Select(static ctx => $" - {ctx.FullName}")))
             };
         }
 
         if (discoveredDbContextTypes.Count == 1)
+        {
             return discoveredDbContextTypes[0];
+        }
 
         if (allowInteractiveSelection && InteractiveSelection.CanPrompt)
         {
@@ -225,7 +265,9 @@ internal static class DbContextActivator
 
         if (!string.IsNullOrWhiteSpace(preferredContextFullName)
             && TryResolveContextType(host, preferredContextFullName, out var preferred))
+        {
             return ImmutableArray.Create(preferred);
+        }
 
         var distinctConcreteContexts = new HashSet<Type>();
 
@@ -234,7 +276,9 @@ internal static class DbContextActivator
         foreach (var assembly in host.EnumerateDiscoveryAssemblies())
         {
             if (ReferenceEquals(assembly, host.PrimaryAssembly))
+            {
                 continue;
+            }
 
             AddDbContextTypesFromAssembly(assembly, distinctConcreteContexts);
         }
@@ -245,7 +289,9 @@ internal static class DbContextActivator
     private static void AddDbContextTypesFromAssembly(Assembly assembly, HashSet<Type> distinctConcreteContexts)
     {
         foreach (var candidate in EnumerateDbContextCandidates(assembly))
+        {
             distinctConcreteContexts.Add(candidate);
+        }
     }
 
     private static bool TryResolveContextType(WorkspaceHost host, string contextName, out Type resolved)
@@ -253,15 +299,21 @@ internal static class DbContextActivator
         resolved = null!;
 
         if (TryResolveContextTypeInAssembly(host.PrimaryAssembly, contextName, out resolved))
+        {
             return true;
+        }
 
         foreach (var assembly in host.EnumerateDiscoveryAssemblies())
         {
             if (ReferenceEquals(assembly, host.PrimaryAssembly))
+            {
                 continue;
+            }
 
             if (TryResolveContextTypeInAssembly(assembly, contextName, out resolved))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -273,7 +325,7 @@ internal static class DbContextActivator
 
         if (contextName.Contains('.', StringComparison.Ordinal))
         {
-            var fromGetType = assembly.GetType(contextName, throwOnError: false, ignoreCase: true);
+            var fromGetType = assembly.GetType(contextName, false, true);
 
             if (fromGetType is not null && SafeIsConcreteDbContext(fromGetType))
             {
@@ -287,16 +339,22 @@ internal static class DbContextActivator
         foreach (var candidate in EnumerateDbContextCandidates(assembly))
         {
             if (!ContextNameMatcher.Matches(candidate, contextName))
+            {
                 continue;
+            }
 
             if (uniqueMatch is not null && !ReferenceEquals(uniqueMatch, candidate))
+            {
                 return false;
+            }
 
             uniqueMatch = candidate;
         }
 
         if (uniqueMatch is null)
+        {
             return false;
+        }
 
         resolved = uniqueMatch;
 
@@ -311,19 +369,27 @@ internal static class DbContextActivator
         foreach (var candidate in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
         {
             if (!SafeIsConcreteDbContext(candidate))
+            {
                 continue;
+            }
 
             if (seen.Add(candidate.FullName ?? candidate.Name))
+            {
                 candidates.Add(candidate);
+            }
         }
 
         foreach (var candidate in ReflectionToolkit.EnumerateLoadableTypes(assembly))
         {
             if (!SafeIsConcreteDbContext(candidate))
+            {
                 continue;
+            }
 
             if (seen.Add(candidate.FullName ?? candidate.Name))
+            {
                 candidates.Add(candidate);
+            }
         }
 
         return candidates;
@@ -365,7 +431,7 @@ internal static class DbContextActivator
         var scannedSummary = scannedAssemblies.Length == 0
             ? "No workspace assemblies were scanned."
             : "Scanned assemblies: " + string.Join(", ", scannedAssemblies)
-              + (scannedAssemblies.Length == 12 ? ", …" : string.Empty);
+                                     + (scannedAssemblies.Length == 12 ? ", …" : string.Empty);
 
         var requestedHint = string.IsNullOrWhiteSpace(requestedContextFullName)
             ? string.Empty
@@ -383,10 +449,14 @@ internal static class DbContextActivator
     private static bool IsConcreteDbContext(Type candidate)
     {
         if (!candidate.IsClass || candidate.IsAbstract)
+        {
             return false;
+        }
 
         if (string.Equals(candidate.FullName, "Microsoft.EntityFrameworkCore.DbContext", StringComparison.Ordinal))
+        {
             return false;
+        }
 
         string? namespaceName;
 
@@ -404,16 +474,24 @@ internal static class DbContextActivator
         }
 
         if (namespaceName?.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal) == true)
+        {
             return false;
+        }
 
         var dbContextBase = ResolveDbContextBaseType(candidate.Assembly);
 
         if (dbContextBase is not null)
+        {
             return dbContextBase.IsAssignableFrom(candidate) && !ReferenceEquals(candidate, dbContextBase);
+        }
 
         for (var walk = candidate.BaseType; walk is not null; walk = walk.BaseType)
+        {
             if (string.Equals(walk.FullName, "Microsoft.EntityFrameworkCore.DbContext", StringComparison.Ordinal))
+            {
                 return true;
+            }
+        }
 
         return false;
     }
@@ -423,7 +501,9 @@ internal static class DbContextActivator
         foreach (var loaded in AppDomain.CurrentDomain.GetAssemblies())
         {
             if (!string.Equals(loaded.GetName().Name, "Microsoft.EntityFrameworkCore", StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             return loaded.GetType("Microsoft.EntityFrameworkCore.DbContext");
         }
@@ -435,7 +515,9 @@ internal static class DbContextActivator
                     string.Equals(name.Name, "Microsoft.EntityFrameworkCore", StringComparison.Ordinal));
 
             if (referenced is null)
+            {
                 return null;
+            }
 
             return AssemblyLoadContext.Default.LoadFromAssemblyName(referenced)
                 .GetType("Microsoft.EntityFrameworkCore.DbContext");
@@ -466,15 +548,20 @@ internal static class DbContextActivator
             var factoryKey = candidate.AssemblyQualifiedName ?? candidate.FullName ?? candidate.Name;
 
             if (!seenFactoryTypes.Add(factoryKey))
+            {
                 continue;
+            }
 
             if (!IsDesignTimeDbContextFactory(candidate, dbContextConcreteType))
+            {
                 continue;
+            }
 
             if (!TryCreateFactoryInstance(candidate, out var factoryObject))
             {
                 errors ??= [];
-                errors.Add($"{candidate.FullName}: could not create factory instance (needs a public parameterless constructor).");
+                errors.Add(
+                    $"{candidate.FullName}: could not create factory instance (needs a public parameterless constructor).");
                 continue;
             }
 
@@ -504,7 +591,9 @@ internal static class DbContextActivator
             var key = candidate.FullName ?? candidate.Name;
 
             if (seen.Add(key))
+            {
                 candidates.Add(candidate);
+            }
         }
 
         return candidates;
@@ -513,10 +602,14 @@ internal static class DbContextActivator
     private static bool IsDesignTimeDbContextFactory(Type candidate, Type dbContextConcreteType)
     {
         if (!candidate.IsClass || candidate.IsAbstract)
+        {
             return false;
+        }
 
         if (candidate.GetInterfaces().Any(iface => IsDesignTimeFactoryInterface(iface, dbContextConcreteType)))
+        {
             return true;
+        }
 
         return HasCreateDbContextMethod(candidate, dbContextConcreteType);
     }
@@ -524,21 +617,29 @@ internal static class DbContextActivator
     private static bool HasCreateDbContextMethod(Type factoryType, Type dbContextConcreteType)
     {
         foreach (var method in factoryType.GetMethods(BindingFlags.Instance | BindingFlags.Public
-                                                         | BindingFlags.NonPublic))
+                                                                            | BindingFlags.NonPublic))
         {
             if (!string.Equals(method.Name, "CreateDbContext", StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             if (!dbContextConcreteType.IsAssignableFrom(method.ReturnType))
+            {
                 continue;
+            }
 
             var parameters = method.GetParameters();
 
             if (parameters.Length == 0)
+            {
                 return true;
+            }
 
             if (parameters.Length == 1 && parameters[0].ParameterType == typeof(string[]))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -550,9 +651,9 @@ internal static class DbContextActivator
 
         var parameterlessCtor = factoryType.GetConstructor(
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            binder: null,
+            null,
             Type.EmptyTypes,
-            modifiers: null);
+            null);
 
         if (parameterlessCtor is not null)
         {
@@ -599,16 +700,18 @@ internal static class DbContextActivator
         {
             var parameters = createMethod.GetParameters();
 
-            object?[]? invokeArguments = parameters switch
+            var invokeArguments = parameters switch
             {
                 [] => Array.Empty<object?>(),
                 [{ ParameterType: var parameterType }] when parameterType == typeof(string[])
                     => new object?[] { Array.Empty<string>() },
-                _ => null,
+                _ => null
             };
 
             if (invokeArguments is null)
+            {
                 continue;
+            }
 
             try
             {
@@ -647,7 +750,9 @@ internal static class DbContextActivator
 
         error = lastFailure?.Message ?? "CreateDbContext failed.";
         if (lastFailure is not null)
+        {
             error += $"{Environment.NewLine}{lastFailure}";
+        }
 
         return false;
     }
@@ -662,10 +767,14 @@ internal static class DbContextActivator
         var startupDirectory = Path.GetDirectoryName(startupProjectPath)!;
 
         if (ProjectAssemblyNameMatches(projectPath, factoryAssemblyName))
+        {
             return projectDirectory;
+        }
 
         if (ProjectAssemblyNameMatches(startupProjectPath, factoryAssemblyName))
+        {
             return startupDirectory;
+        }
 
         // Heuristic fallback:
         // - Visual Studio / ef tools commonly run with cwd = startup project directory
@@ -675,40 +784,33 @@ internal static class DbContextActivator
         var startupHasAppSettings = File.Exists(Path.Combine(startupDirectory, "appsettings.json"));
 
         if (projectHasAppSettings && !startupHasAppSettings)
+        {
             return projectDirectory;
+        }
 
         return startupDirectory;
     }
 
-    private static bool ProjectAssemblyNameMatches(string projectPath, string? assemblyName) =>
-        !string.IsNullOrWhiteSpace(assemblyName)
-        && string.Equals(
-            CsprojReader.ReadLogicalAssemblyName(projectPath),
-            assemblyName,
-            StringComparison.OrdinalIgnoreCase);
-
-    private sealed class CurrentDirectoryScope : IDisposable
+    private static bool ProjectAssemblyNameMatches(string projectPath, string? assemblyName)
     {
-        private readonly string _previousDirectory;
-
-        private CurrentDirectoryScope(string workingDirectory)
-        {
-            _previousDirectory = Directory.GetCurrentDirectory();
-            Directory.SetCurrentDirectory(workingDirectory);
-        }
-
-        internal static CurrentDirectoryScope Enter(string workingDirectory) => new(workingDirectory);
-
-        public void Dispose() => Directory.SetCurrentDirectory(_previousDirectory);
+        return !string.IsNullOrWhiteSpace(assemblyName)
+               && string.Equals(
+                   CsprojReader.ReadLogicalAssemblyName(projectPath),
+                   assemblyName,
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsDesignTimeFactoryInterface(Type iface, Type dbContextConcreteType)
     {
         if (!iface.IsGenericType || iface.GenericTypeArguments.Length != 1)
+        {
             return false;
+        }
 
         if (iface.GenericTypeArguments[0] != dbContextConcreteType)
+        {
             return false;
+        }
 
         var genericDefinition = iface.IsGenericTypeDefinition
             ? iface
@@ -745,13 +847,17 @@ internal static class DbContextActivator
         var efAssembly = LoadWorkspaceAssembly(host, "Microsoft.EntityFrameworkCore");
 
         if (efAssembly is null)
+        {
             return false;
+        }
 
         var openBuilderType =
             efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContextOptionsBuilder`1");
 
         if (openBuilderType is null)
+        {
             return false;
+        }
 
         var closedBuilderType =
             openBuilderType.MakeGenericType(dbContextConcreteType);
@@ -759,34 +865,43 @@ internal static class DbContextActivator
         var builderCtor = closedBuilderType.GetConstructor(Type.EmptyTypes);
 
         if (builderCtor is null)
+        {
             return false;
+        }
 
         var builderInstance = builderCtor.Invoke(Array.Empty<object?>());
 
         if (builderInstance is null)
+        {
             return false;
+        }
 
         if (!TryInvokeUseProviderExtension(host, builderInstance, connectionString, providerKey))
+        {
             return false;
+        }
 
         ProviderOptionsConfigurator.TryApplyEfCoreNamingConventions(host, builderInstance, providerKey);
 
         var closedOptionsType =
-            efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContextOptions`1")!.MakeGenericType(dbContextConcreteType);
+            efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContextOptions`1")!.MakeGenericType(
+                dbContextConcreteType);
 
         var optionsPropertyAccessor =
             closedBuilderType.GetProperty(
                 "Options",
                 BindingFlags.Instance | BindingFlags.Public,
-                binder: null,
-                returnType: closedOptionsType,
-                types: Type.EmptyTypes,
-                modifiers: null);
+                null,
+                closedOptionsType,
+                Type.EmptyTypes,
+                null);
 
         var compiledOptionsConcreteInstance = optionsPropertyAccessor?.GetValue(builderInstance);
 
         if (compiledOptionsConcreteInstance is null)
+        {
             return false;
+        }
 
         var optionsInstanceType = compiledOptionsConcreteInstance.GetType();
 
@@ -809,12 +924,16 @@ internal static class DbContextActivator
                     || optionsInstanceType.IsAssignableTo(optionsParameter)));
 
         if (matchingCtor is null)
+        {
             return false;
+        }
 
         var createdContextInstance = matchingCtor.Invoke(new[] { compiledOptionsConcreteInstance });
 
         if (createdContextInstance is null)
+        {
             return false;
+        }
 
         instance = createdContextInstance;
 
@@ -837,30 +956,40 @@ internal static class DbContextActivator
         var accessor = TryResolveSqliteDatabaseProviderAccessor(host, dbContextConcreteType.Assembly);
 
         if (accessor is null)
+        {
             return false;
+        }
 
         var accessorType = accessor.GetType();
         var optionsInstanceType = compiledOptionsConcreteInstance.GetType();
 
         foreach (var ctor in dbContextConcreteType.GetConstructors(BindingFlags.Instance | BindingFlags.Public
-                                                                     | BindingFlags.NonPublic))
+                     | BindingFlags.NonPublic))
         {
             var parameters = ctor.GetParameters();
 
             if (parameters.Length != 2)
+            {
                 continue;
+            }
 
             if (!parameters[0].ParameterType.IsAssignableFrom(optionsInstanceType)
                 && !optionsInstanceType.IsAssignableTo(parameters[0].ParameterType))
+            {
                 continue;
+            }
 
             if (!parameters[1].ParameterType.IsAssignableFrom(accessorType))
+            {
                 continue;
+            }
 
             var created = ctor.Invoke([compiledOptionsConcreteInstance, accessor]);
 
             if (created is null)
+            {
                 continue;
+            }
 
             instance = created;
 
@@ -879,17 +1008,23 @@ internal static class DbContextActivator
                 if (!candidate.Name.EndsWith("SqliteDatabaseProviderAccessor", StringComparison.Ordinal)
                     || !candidate.IsClass
                     || candidate.IsAbstract)
+                {
                     continue;
+                }
 
                 if (!ImplementsDatabaseProviderAccessor(candidate))
+                {
                     continue;
+                }
 
                 var instanceProperty = candidate.GetProperty(
                     "Instance",
                     BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
 
                 if (instanceProperty?.GetValue(null) is { } instance)
+                {
                     return instance;
+                }
             }
         }
 
@@ -901,7 +1036,9 @@ internal static class DbContextActivator
         yield return contextAssembly;
 
         foreach (var loaded in host.EnumerateLoadedAssemblies())
+        {
             yield return loaded;
+        }
     }
 
     private static bool ImplementsDatabaseProviderAccessor(Type candidate)
@@ -909,52 +1046,35 @@ internal static class DbContextActivator
         foreach (var iface in candidate.GetInterfaces())
         {
             if (string.Equals(iface.Name, "IDatabaseProviderAccessor", StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
 
         return false;
     }
 
     private static Assembly? LoadWorkspaceAssembly(WorkspaceHost host, string assemblyName)
-        => host.LoadAssembly(assemblyName);
-
-    private readonly record struct ProviderExtensionSpec(string AssemblyName, string MethodName);
-
-    private static readonly IReadOnlyDictionary<MyEfVibeProvider, ProviderExtensionSpec[]> ProviderExtensionSpecs =
-        new Dictionary<MyEfVibeProvider, ProviderExtensionSpec[]>
-        {
-            [MyEfVibeProvider.SqlServer] =
-                [new("Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer")],
-            [MyEfVibeProvider.Npgsql] =
-                [new("Npgsql.EntityFrameworkCore.PostgreSQL", "UseNpgsql")],
-            [MyEfVibeProvider.Sqlite] =
-                [new("Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite")],
-            [MyEfVibeProvider.Oracle] =
-                [new("Oracle.EntityFrameworkCore", "UseOracle")],
-            [MyEfVibeProvider.MySql] =
-            [
-                new("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
-                new("MySql.EntityFrameworkCore", "UseMySQL"),
-            ],
-            [MyEfVibeProvider.MariaDb] =
-            [
-                new("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
-                new("MySql.EntityFrameworkCore", "UseMySQL"),
-            ],
-        };
+    {
+        return host.LoadAssembly(assemblyName);
+    }
 
     private static bool TryInvokeUseProviderExtension(WorkspaceHost host, object closedBuilderInstance,
         string connectionString, MyEfVibeProvider providerKey)
     {
         if (!ProviderExtensionSpecs.TryGetValue(providerKey, out var specs))
+        {
             return false;
+        }
 
         foreach (var spec in specs)
         {
             var providerAssembly = ResolveProviderAssembly(host, spec.AssemblyName);
 
             if (providerAssembly is null)
+            {
                 continue;
+            }
 
             if (providerKey.UsesMySqlProtocol()
                 && string.Equals(spec.MethodName, "UseMySql", StringComparison.Ordinal)
@@ -963,7 +1083,9 @@ internal static class DbContextActivator
                     closedBuilderInstance,
                     connectionString,
                     providerKey))
+            {
                 return true;
+            }
 
             if (ProviderOptionsConfigurator.TryInvokeUseProviderWithOptions(
                     host,
@@ -972,7 +1094,9 @@ internal static class DbContextActivator
                     connectionString,
                     spec.MethodName,
                     providerKey))
+            {
                 return true;
+            }
 
             if (!(providerKey.UsesMySqlProtocol()
                   && string.Equals(spec.MethodName, "UseMySql", StringComparison.Ordinal))
@@ -981,7 +1105,9 @@ internal static class DbContextActivator
                     closedBuilderInstance,
                     connectionString,
                     spec.MethodName))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -995,24 +1121,34 @@ internal static class DbContextActivator
     {
         foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(providerAssembly))
         foreach (var staticMethodCandidate in exported.GetMethods(BindingFlags.Static | BindingFlags.Public
-                                                                   | BindingFlags.NonPublic))
+                     | BindingFlags.NonPublic))
         {
-            if (!staticMethodCandidate.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute), false))
+            if (!staticMethodCandidate.IsDefined(typeof(ExtensionAttribute), false))
+            {
                 continue;
+            }
 
             if (!string.Equals(staticMethodCandidate.Name, methodName, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var parametersDetailed = staticMethodCandidate.GetParameters();
 
             if (parametersDetailed.Length < 2)
+            {
                 continue;
+            }
 
             if (!parametersDetailed[0].ParameterType.IsAssignableFrom(closedBuilderInstance.GetType()))
+            {
                 continue;
+            }
 
             if (parametersDetailed[1].ParameterType != typeof(string))
+            {
                 continue;
+            }
 
             var invokeArguments = new object?[parametersDetailed.Length];
             invokeArguments[0] = closedBuilderInstance;
@@ -1027,5 +1163,30 @@ internal static class DbContextActivator
     }
 
     private static Assembly? ResolveProviderAssembly(WorkspaceHost host, string providerAssemblyName)
-        => LoadWorkspaceAssembly(host, providerAssemblyName);
+    {
+        return LoadWorkspaceAssembly(host, providerAssemblyName);
+    }
+
+    private sealed class CurrentDirectoryScope : IDisposable
+    {
+        private readonly string _previousDirectory;
+
+        private CurrentDirectoryScope(string workingDirectory)
+        {
+            _previousDirectory = Directory.GetCurrentDirectory();
+            Directory.SetCurrentDirectory(workingDirectory);
+        }
+
+        public void Dispose()
+        {
+            Directory.SetCurrentDirectory(_previousDirectory);
+        }
+
+        internal static CurrentDirectoryScope Enter(string workingDirectory)
+        {
+            return new CurrentDirectoryScope(workingDirectory);
+        }
+    }
+
+    private readonly record struct ProviderExtensionSpec(string AssemblyName, string MethodName);
 }

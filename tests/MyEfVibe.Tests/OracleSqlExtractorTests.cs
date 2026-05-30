@@ -6,17 +6,17 @@ public sealed class OracleSqlExtractorTests
     public void TryExtractExplainableSql_DbmsSqlBlock_InlinesBindAndReturnsSelect()
     {
         const string plSql = """
-            DECLARE
-            l_sql     varchar2(32767);
-            l_cur     pls_integer;
-            BEGIN
-            l_cur := dbms_sql.open_cursor;
-            l_sql := 'SELECT "a"."PRODUCTID" FROM "AW_PRODUCT" "a" FETCH FIRST :p_p ROWS ONLY';
-            dbms_sql.parse(l_cur, l_sql, dbms_sql.native);
-            dbms_sql.bind_variable(l_cur, ':p_p', 10);
-            l_execute:= dbms_sql.execute(l_cur);
-            END;
-            """;
+                             DECLARE
+                             l_sql     varchar2(32767);
+                             l_cur     pls_integer;
+                             BEGIN
+                             l_cur := dbms_sql.open_cursor;
+                             l_sql := 'SELECT "a"."PRODUCTID" FROM "AW_PRODUCT" "a" FETCH FIRST :p_p ROWS ONLY';
+                             dbms_sql.parse(l_cur, l_sql, dbms_sql.native);
+                             dbms_sql.bind_variable(l_cur, ':p_p', 10);
+                             l_execute:= dbms_sql.execute(l_cur);
+                             END;
+                             """;
 
         var sql = OracleSqlExtractor.TryExtractExplainableSql(plSql);
 

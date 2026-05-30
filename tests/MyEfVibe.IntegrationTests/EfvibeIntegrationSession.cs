@@ -30,12 +30,20 @@ internal sealed class EfvibeIntegrationSession : IAsyncDisposable
 
     internal string SessionDirectory { get; }
 
+    public ValueTask DisposeAsync()
+    {
+        Host.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
     internal static async Task<EfvibeIntegrationSession> ConnectAsync(
         IntegrationScenario scenario,
         CancellationToken cancellationToken = default)
     {
         if (!DatabaseProbe.TryValidateScenario(scenario, out var validationFailure))
+        {
             throw new InvalidOperationException(validationFailure);
+        }
 
         var workspaceRoot = Path.Combine(
             Path.GetTempPath(),
@@ -59,7 +67,7 @@ internal sealed class EfvibeIntegrationSession : IAsyncDisposable
         var dbContextType = DbContextActivator.ResolveContextType(
             host,
             scenario.Context,
-            allowInteractiveSelection: false);
+            false);
 
         var sessionDirectory = SessionPaths.EnsureDbContextSessionDirectory(
             workspaceRoot,
@@ -75,7 +83,7 @@ internal sealed class EfvibeIntegrationSession : IAsyncDisposable
             scenario.Context,
             scenario.ConnectionString,
             provider,
-            allowInteractiveSelection: false);
+            false);
 
         var scriptSession = new ScriptSession(
             dbContext.GetType(),
@@ -96,11 +104,5 @@ internal sealed class EfvibeIntegrationSession : IAsyncDisposable
             dbContext,
             scriptSession,
             sessionDirectory);
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        Host.Dispose();
-        return ValueTask.CompletedTask;
     }
 }

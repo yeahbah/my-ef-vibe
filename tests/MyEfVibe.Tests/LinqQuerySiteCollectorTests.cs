@@ -6,61 +6,61 @@ public sealed class LinqQuerySiteCollectorTests
     public void Collect_finds_injected_context_field_in_api_controller()
     {
         using var temp = new TempDirectory();
-            var apiDir = Path.Combine(temp.Path, "Api");
-            var dbDir = Path.Combine(temp.Path, "Database");
-            Directory.CreateDirectory(apiDir);
-            Directory.CreateDirectory(dbDir);
+        var apiDir = Path.Combine(temp.Path, "Api");
+        var dbDir = Path.Combine(temp.Path, "Database");
+        Directory.CreateDirectory(apiDir);
+        Directory.CreateDirectory(dbDir);
 
-            var dbProject = Path.Combine(dbDir, "App.Database.csproj");
-            File.WriteAllText(
-                dbProject,
-                """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
-                  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
-                </Project>
-                """);
+        var dbProject = Path.Combine(dbDir, "App.Database.csproj");
+        File.WriteAllText(
+            dbProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+            </Project>
+            """);
 
-            File.WriteAllText(
-                Path.Combine(dbDir, "FakeRewriterDbContext.cs"),
-                """
-                using Microsoft.EntityFrameworkCore;
-                public class FakeRewriterDbContext : DbContext
+        File.WriteAllText(
+            Path.Combine(dbDir, "FakeRewriterDbContext.cs"),
+            """
+            using Microsoft.EntityFrameworkCore;
+            public class FakeRewriterDbContext : DbContext
+            {
+                public FakeRewriterDbContext(DbContextOptions<FakeRewriterDbContext> options) : base(options) { }
+                public DbSet<FakeRewriterUser> Users => Set<FakeRewriterUser>();
+            }
+            public class FakeRewriterUser { public int Id { get; set; } }
+            """);
+
+        var apiProject = Path.Combine(apiDir, "App.Api.csproj");
+        File.WriteAllText(
+            apiProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="../Database/App.Database.csproj" />
+              </ItemGroup>
+              <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+            </Project>
+            """);
+
+        File.WriteAllText(
+            Path.Combine(apiDir, "EntitiesController.cs"),
+            """
+            using Microsoft.EntityFrameworkCore;
+            public sealed class EntitiesController
+            {
+                private readonly FakeRewriterDbContext _context;
+                public EntitiesController(FakeRewriterDbContext context) => _context = context;
+                public void GetCity(int key)
                 {
-                    public FakeRewriterDbContext(DbContextOptions<FakeRewriterDbContext> options) : base(options) { }
-                    public DbSet<FakeRewriterUser> Users => Set<FakeRewriterUser>();
+                    var entity = _context.Users.Where(x => x.Id == key);
+                    if (!entity.Any()) { }
                 }
-                public class FakeRewriterUser { public int Id { get; set; } }
-                """);
-
-            var apiProject = Path.Combine(apiDir, "App.Api.csproj");
-            File.WriteAllText(
-                apiProject,
-                """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
-                  <ItemGroup>
-                    <ProjectReference Include="../Database/App.Database.csproj" />
-                  </ItemGroup>
-                  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
-                </Project>
-                """);
-
-            File.WriteAllText(
-                Path.Combine(apiDir, "EntitiesController.cs"),
-                """
-                using Microsoft.EntityFrameworkCore;
-                public sealed class EntitiesController
-                {
-                    private readonly FakeRewriterDbContext _context;
-                    public EntitiesController(FakeRewriterDbContext context) => _context = context;
-                    public void GetCity(int key)
-                    {
-                        var entity = _context.Users.Where(x => x.Id == key);
-                        if (!entity.Any()) { }
-                    }
-                }
-                """);
+            }
+            """);
 
         var sites = LinqQuerySiteCollector.Collect(
             dbProject,
@@ -140,13 +140,18 @@ public sealed class LinqQuerySiteCollectorTests
             "Projects/WideWorldImporters/src");
 
         if (!Directory.Exists(wwiRoot))
+        {
             return;
+        }
 
-        var efProject = Path.Combine(wwiRoot, "WideWorldImporters.Server.Database/WideWorldImporters.Server.Database.csproj");
+        var efProject = Path.Combine(wwiRoot,
+            "WideWorldImporters.Server.Database/WideWorldImporters.Server.Database.csproj");
         var apiProject = Path.Combine(wwiRoot, "WideWorldImporters.Server.Api/WideWorldImporters.Server.Api.csproj");
 
         if (!File.Exists(efProject) || !File.Exists(apiProject))
+        {
             return;
+        }
 
         var sites = LinqQuerySiteCollector.Collect(
             efProject,
@@ -165,7 +170,9 @@ public sealed class LinqQuerySiteCollectorTests
         while (dir is not null)
         {
             if (File.Exists(Path.Combine(dir.FullName, "MyEfVibe.slnx")))
+            {
                 return dir.FullName;
+            }
 
             dir = dir.Parent;
         }
@@ -191,7 +198,7 @@ public sealed class LinqQuerySiteCollectorTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

@@ -36,5 +36,8 @@ internal sealed class WorkspaceRuntime : IDisposable
 
     internal SessionAnalytics Analytics { get; } = new();
 
-    public void Dispose() => Host.Dispose();
+    public void Dispose()
+    {
+        Host.Dispose();
+    }
 }

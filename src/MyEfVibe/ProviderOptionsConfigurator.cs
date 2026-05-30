@@ -1,40 +1,44 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace MyEfVibe;
 
 /// <summary>
-/// Applies optional provider builder extensions (e.g. <c>UseNetTopologySuite</c>) when the EF project
-/// references the corresponding satellite packages — mirrors <c>UseSqlServer(conn, o =&gt; o.UseNetTopologySuite())</c>.
+///     Applies optional provider builder extensions (e.g. <c>UseNetTopologySuite</c>) when the EF project
+///     references the corresponding satellite packages — mirrors
+///     <c>UseSqlServer(conn, o =&gt; o.UseNetTopologySuite())</c>.
 /// </summary>
 internal static class ProviderOptionsConfigurator
 {
-    private readonly record struct OptionalProviderExtension(string AssemblyName, string ExtensionMethodName);
-
     private static readonly OptionalProviderExtension[] SqlServerExtensions =
     [
         new("Microsoft.EntityFrameworkCore.SqlServer.NetTopologySuite", "UseNetTopologySuite"),
-        new("Microsoft.EntityFrameworkCore.SqlServer.HierarchyId", "UseHierarchyId"),
+        new("Microsoft.EntityFrameworkCore.SqlServer.HierarchyId", "UseHierarchyId")
     ];
 
     private static readonly OptionalProviderExtension[] NpgsqlExtensions =
     [
-        new("Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite", "UseNetTopologySuite"),
+        new("Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite", "UseNetTopologySuite")
     ];
 
     private static readonly OptionalProviderExtension[] MySqlExtensions =
     [
-        new("Pomelo.EntityFrameworkCore.MySql.NetTopologySuite", "UseNetTopologySuite"),
+        new("Pomelo.EntityFrameworkCore.MySql.NetTopologySuite", "UseNetTopologySuite")
     ];
 
-    internal static bool HasOptionalExtensions(WorkspaceHost host, MyEfVibeProvider provider) =>
-        GetExtensions(provider).Any(extension => host.LoadAssembly(extension.AssemblyName) is not null);
+    internal static bool HasOptionalExtensions(WorkspaceHost host, MyEfVibeProvider provider)
+    {
+        return GetExtensions(provider).Any(extension => host.LoadAssembly(extension.AssemblyName) is not null);
+    }
 
     internal static void Apply(WorkspaceHost host, MyEfVibeProvider provider, object providerOptionsBuilder)
     {
         foreach (var extension in GetExtensions(provider))
         {
             if (host.LoadAssembly(extension.AssemblyName) is null)
+            {
                 continue;
+            }
 
             TryInvokeProviderBuilderExtension(
                 host,
@@ -45,9 +49,9 @@ internal static class ProviderOptionsConfigurator
     }
 
     /// <summary>
-    /// Chains <c>UseSnakeCaseNamingConvention</c> (or lowercase) on <see cref="DbContextOptionsBuilder"/>
-    /// when the EF project references <c>EFCore.NamingConventions</c> — required for PostgreSQL samples that
-    /// map <c>Production.Product</c> to <c>production.product</c>.
+    ///     Chains <c>UseSnakeCaseNamingConvention</c> (or lowercase) on <see cref="DbContextOptionsBuilder" />
+    ///     when the EF project references <c>EFCore.NamingConventions</c> — required for PostgreSQL samples that
+    ///     map <c>Production.Product</c> to <c>production.product</c>.
     /// </summary>
     internal static void TryApplyEfCoreNamingConventions(
         WorkspaceHost host,
@@ -71,7 +75,9 @@ internal static class ProviderOptionsConfigurator
                             "EFCore.NamingConventions",
                             methodName,
                             dbContextOptionsBuilder))
+                    {
                         return;
+                    }
                 }
 
                 return;
@@ -98,27 +104,33 @@ internal static class ProviderOptionsConfigurator
         var efAssembly = host.LoadAssembly("Microsoft.EntityFrameworkCore");
 
         if (efAssembly is null)
+        {
             return;
+        }
 
         var replacementType = EfVibeModelCustomizerEmitter.TryGetOrCreate(host, afterBaseMethod);
 
         if (replacementType is null)
+        {
             return;
+        }
 
         var serviceTypes = new[]
         {
             efAssembly.GetType(
                 "Microsoft.EntityFrameworkCore.Infrastructure.IModelCustomizer",
-                throwOnError: false),
+                false),
             efAssembly.GetType(
                 "Microsoft.EntityFrameworkCore.Infrastructure.ModelCustomizer",
-                throwOnError: false),
+                false)
         };
 
         foreach (var serviceType in serviceTypes.Where(static type => type is not null))
         {
             if (TryReplaceService(dbContextOptionsBuilder, serviceType!, replacementType))
+            {
                 return;
+            }
         }
     }
 
@@ -127,17 +139,24 @@ internal static class ProviderOptionsConfigurator
         Type serviceType,
         Type replacementType)
     {
-        foreach (var replaceMethod in dbContextOptionsBuilder.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public))
+        foreach (var replaceMethod in dbContextOptionsBuilder.GetType()
+                     .GetMethods(BindingFlags.Instance | BindingFlags.Public))
         {
             if (!string.Equals(replaceMethod.Name, "ReplaceService", StringComparison.Ordinal)
                 || !replaceMethod.IsGenericMethodDefinition)
+            {
                 continue;
+            }
 
             if (replaceMethod.GetGenericArguments().Length != 2)
+            {
                 continue;
+            }
 
             if (replaceMethod.GetParameters().Any(static parameter => !parameter.IsOptional))
+            {
                 continue;
+            }
 
             try
             {
@@ -163,38 +182,53 @@ internal static class ProviderOptionsConfigurator
         MyEfVibeProvider providerKey)
     {
         if (!HasOptionalExtensions(host, providerKey))
+        {
             return false;
+        }
 
         foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(providerAssembly))
         foreach (var staticMethodCandidate in exported.GetMethods(BindingFlags.Static | BindingFlags.Public
-                                                                   | BindingFlags.NonPublic))
+                     | BindingFlags.NonPublic))
         {
-            if (!staticMethodCandidate.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute), false))
+            if (!staticMethodCandidate.IsDefined(typeof(ExtensionAttribute), false))
+            {
                 continue;
+            }
 
             if (!string.Equals(staticMethodCandidate.Name, useProviderMethodName, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var parametersDetailed = staticMethodCandidate.GetParameters();
 
             if (parametersDetailed.Length != 3)
+            {
                 continue;
+            }
 
             if (!parametersDetailed[0].ParameterType.IsAssignableFrom(closedBuilderInstance.GetType()))
+            {
                 continue;
+            }
 
             if (parametersDetailed[1].ParameterType != typeof(string))
+            {
                 continue;
+            }
 
             if (!parametersDetailed[2].ParameterType.IsGenericType
                 || parametersDetailed[2].ParameterType.GetGenericTypeDefinition() != typeof(Action<>))
+            {
                 continue;
+            }
 
             var configurator = new ProviderOptionsDelegate(host, providerKey);
             var configureMethod = typeof(ProviderOptionsDelegate).GetMethod(
                 nameof(ProviderOptionsDelegate.Configure),
                 BindingFlags.Instance | BindingFlags.Public)!;
-            var configureDelegate = Delegate.CreateDelegate(parametersDetailed[2].ParameterType, configurator, configureMethod);
+            var configureDelegate =
+                Delegate.CreateDelegate(parametersDetailed[2].ParameterType, configurator, configureMethod);
 
             staticMethodCandidate.Invoke(null, [closedBuilderInstance, connectionString, configureDelegate]);
 
@@ -204,21 +238,26 @@ internal static class ProviderOptionsConfigurator
         return false;
     }
 
-    private static IEnumerable<OptionalProviderExtension> GetExtensions(MyEfVibeProvider provider) =>
-        provider switch
+    private static IEnumerable<OptionalProviderExtension> GetExtensions(MyEfVibeProvider provider)
+    {
+        return provider switch
         {
             MyEfVibeProvider.SqlServer => SqlServerExtensions,
             MyEfVibeProvider.Npgsql => NpgsqlExtensions,
             MyEfVibeProvider.MySql or MyEfVibeProvider.MariaDb => MySqlExtensions,
-            _ => Array.Empty<OptionalProviderExtension>(),
+            _ => Array.Empty<OptionalProviderExtension>()
         };
+    }
 
     private static bool TryInvokeDbContextOptionsBuilderExtension(
         WorkspaceHost host,
         string extensionAssemblyName,
         string extensionMethodName,
-        object dbContextOptionsBuilder) =>
-        TryInvokeProviderBuilderExtension(host, extensionAssemblyName, extensionMethodName, dbContextOptionsBuilder);
+        object dbContextOptionsBuilder)
+    {
+        return TryInvokeProviderBuilderExtension(host, extensionAssemblyName, extensionMethodName,
+            dbContextOptionsBuilder);
+    }
 
     private static bool TryInvokeProviderBuilderExtension(
         WorkspaceHost host,
@@ -229,25 +268,33 @@ internal static class ProviderOptionsConfigurator
         var extensionAssembly = host.LoadAssembly(extensionAssemblyName);
 
         if (extensionAssembly is null)
+        {
             return false;
+        }
 
         var builderType = providerOptionsBuilder.GetType();
 
         foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(extensionAssembly))
         foreach (var staticMethodCandidate in exported.GetMethods(BindingFlags.Static | BindingFlags.Public
-                                                                   | BindingFlags.NonPublic))
+                     | BindingFlags.NonPublic))
         {
-            if (!staticMethodCandidate.IsDefined(typeof(System.Runtime.CompilerServices.ExtensionAttribute), false))
+            if (!staticMethodCandidate.IsDefined(typeof(ExtensionAttribute), false))
+            {
                 continue;
+            }
 
             if (!string.Equals(staticMethodCandidate.Name, extensionMethodName, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var parametersDetailed = staticMethodCandidate.GetParameters();
 
             if (parametersDetailed.Length != 1
                 || !parametersDetailed[0].ParameterType.IsAssignableFrom(builderType))
+            {
                 continue;
+            }
 
             staticMethodCandidate.Invoke(null, [providerOptionsBuilder]);
 
@@ -257,9 +304,13 @@ internal static class ProviderOptionsConfigurator
         return false;
     }
 
+    private readonly record struct OptionalProviderExtension(string AssemblyName, string ExtensionMethodName);
+
     private sealed class ProviderOptionsDelegate(WorkspaceHost host, MyEfVibeProvider provider)
     {
-        public void Configure(object providerOptionsBuilder) =>
-            ProviderOptionsConfigurator.Apply(host, provider, providerOptionsBuilder);
+        public void Configure(object providerOptionsBuilder)
+        {
+            Apply(host, provider, providerOptionsBuilder);
+        }
     }
 }

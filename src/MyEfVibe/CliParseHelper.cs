@@ -9,12 +9,16 @@ internal static class CliParseHelper
     {
         if (errors.Any(static error =>
                 error.Tag is ErrorType.HelpRequestedError or ErrorType.VersionRequestedError))
+        {
             return 0;
+        }
 
         CliUi.Configure();
 
         foreach (var error in errors)
+        {
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(error.ToString() ?? string.Empty)}[/]");
+        }
 
         return 1;
     }

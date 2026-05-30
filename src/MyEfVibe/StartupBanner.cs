@@ -1,3 +1,4 @@
+using System.Text;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
@@ -14,7 +15,7 @@ internal static class StartupBanner
         "magenta",
         "cyan",
         "green",
-        "red",
+        "red"
     ];
 
     private static readonly string[] TitleLines =
@@ -24,7 +25,7 @@ internal static class StartupBanner
         " ██╔████╔██║ ╚████╔╝      █████╗   ███████╗     ██║   ██║██║██████╔╝█████╗  ",
         " ██║╚██╔╝██║  ╚██╔╝       ██╔══╝   ██╔════╝     ╚██╗ ██╔╝██║██╔══██╗██╔══╝  ",
         " ██║ ╚═╝ ██║   ██║        ███████╗ ██║          ╚████╔╝ ██║██████╔╝███████╗ ",
-        " ╚═╝     ╚═╝   ╚═╝        ╚══════╝ ╚═╝           ╚═══╝  ╚═╝╚═════╝ ╚══════╝ ",
+        " ╚═╝     ╚═╝   ╚═╝        ╚══════╝ ╚═╝           ╚═══╝  ╚═╝╚═════╝ ╚══════╝ "
     ];
 
     private static readonly string[] UnicornLines =
@@ -53,7 +54,7 @@ internal static class StartupBanner
         "  '===~'   |  |    (, <.",
         "           / /       \\. \\",
         "         _/ /          \\_\\",
-        "        /_!/            >_\\",
+        "        /_!/            >_\\"
     ];
 
     internal static void Write()
@@ -71,7 +72,7 @@ internal static class StartupBanner
             {
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(Color.Grey),
-                Padding = new Padding(1, 0, 1, 0),
+                Padding = new Padding(1, 0, 1, 0)
             });
 
         AnsiConsole.WriteLine();
@@ -82,19 +83,23 @@ internal static class StartupBanner
         var rows = new List<IRenderable>();
 
         for (var lineIndex = 0; lineIndex < TitleLines.Length; lineIndex++)
+        {
             rows.Add(new Markup(ToRainbowTitleMarkup(TitleLines[lineIndex], lineIndex)));
+        }
 
         rows.Add(Text.Empty);
 
         for (var index = 0; index < UnicornLines.Length; index++)
+        {
             rows.Add(new Markup(ToUnicornLineMarkup(UnicornLines[index], index)));
+        }
 
         return new Rows([.. rows]);
     }
 
     private static string ToRainbowTitleMarkup(string line, int lineIndex)
     {
-        var builder = new System.Text.StringBuilder();
+        var builder = new StringBuilder();
         var paletteIndex = lineIndex % RainbowPalette.Length;
 
         for (var offset = 0; offset < line.Length; offset += RainbowSegmentWidth)
@@ -121,7 +126,7 @@ internal static class StartupBanner
             <= 5 => "magenta",
             <= 10 => "cyan",
             <= 16 => "white",
-            _ => "green",
+            _ => "green"
         };
 
         return $"[{color}]{Markup.Escape(line)}[/]";
@@ -132,11 +137,15 @@ internal static class StartupBanner
         Console.WriteLine();
 
         foreach (var line in TitleLines)
+        {
             Console.WriteLine(line);
+        }
 
         Console.WriteLine();
 
         foreach (var line in UnicornLines)
+        {
             Console.WriteLine(line);
+        }
     }
 }

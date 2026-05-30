@@ -1,7 +1,7 @@
 namespace MyEfVibe;
 
 /// <summary>
-/// Distinguishes EF Core query call sites from in-memory LINQ (reflection, HTTP, collections).
+///     Distinguishes EF Core query call sites from in-memory LINQ (reflection, HTTP, collections).
 /// </summary>
 internal static class LinqEfQueryHeuristics
 {
@@ -16,7 +16,7 @@ internal static class LinqEfQueryHeuristics
         "Directory.",
         "File.",
         "Path.",
-        "HttpContext.",
+        "HttpContext."
     ];
 
     internal static bool LooksLikeEfQuery(
@@ -25,14 +25,18 @@ internal static class LinqEfQueryHeuristics
         DbContextInstanceIdentifierIndex? instanceIndex = null)
     {
         if (string.IsNullOrWhiteSpace(statement))
+        {
             return false;
+        }
 
         var normalized = statement.ReplaceLineEndings(" ");
 
         foreach (var marker in NonEfMarkers)
         {
             if (normalized.Contains(marker, StringComparison.Ordinal))
+            {
                 return false;
+            }
         }
 
         if (instanceIndex is not null)
@@ -40,7 +44,9 @@ internal static class LinqEfQueryHeuristics
             foreach (var prefix in instanceIndex.EnumerateSelectedMemberPrefixes())
             {
                 if (normalized.Contains(prefix, StringComparison.Ordinal))
+                {
                     return true;
+                }
             }
         }
 
@@ -50,20 +56,26 @@ internal static class LinqEfQueryHeuristics
             {
                 if (normalized.Contains($"{selected}.", StringComparison.Ordinal)
                     || normalized.Contains($"<{selected}>", StringComparison.Ordinal))
+                {
                     return true;
+                }
             }
         }
 
         foreach (var prefix in DbContextQueryMarkers.BuiltInMemberPrefixes)
         {
             if (normalized.Contains(prefix, StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
 
         foreach (var typeName in DbContextQueryMarkers.TypeNameFragments)
         {
             if (normalized.Contains(typeName, StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
 
         return false;

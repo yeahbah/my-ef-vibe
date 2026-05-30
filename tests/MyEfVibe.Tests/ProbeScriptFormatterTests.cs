@@ -6,10 +6,10 @@ public sealed class ProbeScriptFormatterTests
     public void ToScriptExpression_MultilineQuery_CollapsesToSingleLine()
     {
         const string probe = """
-            db.Employees
-                .Include(e => e.Department)
-                .Where(e => e.BusinessEntityId == businessEntityId)
-            """;
+                             db.Employees
+                                 .Include(e => e.Department)
+                                 .Where(e => e.BusinessEntityId == businessEntityId)
+                             """;
 
         var script = ProbeScriptFormatter.ToScriptExpression(probe);
 

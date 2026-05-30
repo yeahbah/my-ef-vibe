@@ -32,7 +32,7 @@ internal sealed class ReplCompletionService
         "Skip",
         "Distinct",
         "AsNoTracking",
-        "AsQueryable",
+        "AsQueryable"
     ];
 
     internal Task<IReadOnlyList<CompletionSuggestion>> GetSuggestionsAsync(
@@ -41,17 +41,23 @@ internal sealed class ReplCompletionService
         CancellationToken cancellationToken = default)
     {
         if (cursorPosition < 0 || cursorPosition > currentLine.Length)
+        {
             return Task.FromResult<IReadOnlyList<CompletionSuggestion>>(Array.Empty<CompletionSuggestion>());
+        }
 
         var wordStart = cursorPosition;
 
         while (wordStart > 0 && IsIdentifierPart(currentLine[wordStart - 1]))
+        {
             wordStart--;
+        }
 
         var prefix = currentLine[wordStart..cursorPosition];
 
         if (prefix.Length == 0)
+        {
             return Task.FromResult<IReadOnlyList<CompletionSuggestion>>(Array.Empty<CompletionSuggestion>());
+        }
 
         var suggestions = Keywords
             .Where(keyword => keyword.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
@@ -66,5 +72,7 @@ internal sealed class ReplCompletionService
     }
 
     private static bool IsIdentifierPart(char character)
-        => char.IsLetterOrDigit(character) || character is '_' or '@';
+    {
+        return char.IsLetterOrDigit(character) || character is '_' or '@';
+    }
 }

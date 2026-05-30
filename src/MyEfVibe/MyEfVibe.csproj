@@ -1,50 +1,50 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>MyEfVibe</RootNamespace>
-    <AssemblyName>myefvibe</AssemblyName>
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>MyEfVibe</RootNamespace>
+        <AssemblyName>myefvibe</AssemblyName>
 
-    <!-- Global tool: install with `dotnet tool install -g efvibe`, run as `efvibe` (dotnet-* ids are reserved on NuGet) -->
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>efvibe</ToolCommandName>
-    <PackageId>efvibe</PackageId>
-    <Title>MyEfVibe — EF Core LINQ REPL</Title>
-    <PackageTags>efcore;entity-framework-core;ef-core;dotnet-tool;global-tool;linq;repl;cli;database;orm;interactive;shell</PackageTags>
-    <!-- Published version is set by CI tags; this is the local/dev fallback. -->
-    <Version>0.5.28</Version>
-    <Description>Interactive global .NET tool (efvibe) to run LINQ against an external project's EF Core DbContext with SQL, query plans, and session analytics.</Description>
-    <Authors>Arnold Diaz</Authors>
-    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://myefvibe.com</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/yeahbah/my-ef-vibe.git</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageReleaseNotes>Workspace deps/RID loading for macOS SqlClient; smart project selection; SQL Server :plan batch fix; ConfigurationManager preload; keyword tab completion.</PackageReleaseNotes>
-    <RollForward>Major</RollForward>
-  </PropertyGroup>
+        <!-- Global tool: install with `dotnet tool install -g efvibe`, run as `efvibe` (dotnet-* ids are reserved on NuGet) -->
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>efvibe</ToolCommandName>
+        <PackageId>efvibe</PackageId>
+        <Title>MyEfVibe — EF Core LINQ REPL</Title>
+        <PackageTags>efcore;entity-framework-core;ef-core;dotnet-tool;global-tool;linq;repl;cli;database;orm;interactive;shell</PackageTags>
+        <!-- Published version is set by CI tags; this is the local/dev fallback. -->
+        <Version>0.5.28</Version>
+        <Description>Interactive global .NET tool (efvibe) to run LINQ against an external project's EF Core DbContext with SQL, query plans, and session analytics.</Description>
+        <Authors>Arnold Diaz</Authors>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>https://myefvibe.com</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/yeahbah/my-ef-vibe.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageReleaseNotes>Workspace deps/RID loading for macOS SqlClient; smart project selection; SQL Server :plan batch fix; ConfigurationManager preload; keyword tab completion.</PackageReleaseNotes>
+        <RollForward>Major</RollForward>
+    </PropertyGroup>
 
-  <Target Name="RemoveHostConfigurationManager" AfterTargets="Build">
-    <Delete Files="$(TargetDir)System.Configuration.ConfigurationManager.dll" ContinueOnError="true" />
-    <Delete Files="$(TargetDir)System.Text.Json.dll" ContinueOnError="true" />
-  </Target>
+    <Target Name="RemoveHostConfigurationManager" AfterTargets="Build">
+        <Delete Files="$(TargetDir)System.Configuration.ConfigurationManager.dll" ContinueOnError="true"/>
+        <Delete Files="$(TargetDir)System.Text.Json.dll" ContinueOnError="true"/>
+    </Target>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="MyEfVibe.Tests" />
-    <InternalsVisibleTo Include="MyEfVibe.IntegrationTests" />
-  </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="MyEfVibe.Tests"/>
+        <InternalsVisibleTo Include="MyEfVibe.IntegrationTests"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
+    <ItemGroup>
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="\"/>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.12.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.12.0" />
-    <PackageReference Include="Spectre.Console" Version="0.54.0" />
-    <PackageReference Include="CommandLineParser" Version="2.9.1" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.12.0"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.12.0"/>
+        <PackageReference Include="Spectre.Console" Version="0.54.0"/>
+        <PackageReference Include="CommandLineParser" Version="2.9.1"/>
+    </ItemGroup>
 </Project>

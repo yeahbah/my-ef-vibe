@@ -39,10 +39,10 @@ internal static class LanguageServerCommandRunner
             options.Context,
             options.ConnectionString,
             options.Provider,
-            dbLogEnabled: false,
-            noDbLog: true,
-            dbLogLevelRaw: null,
-            dbLogVerbose: false,
+            false,
+            true,
+            null,
+            false,
             options.Framework,
             cancellationToken);
 

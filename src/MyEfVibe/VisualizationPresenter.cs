@@ -25,7 +25,9 @@ internal static class VisualizationPresenter
     internal static void WriteSessionTimings(IReadOnlyList<EvaluationMetrics> evaluations)
     {
         if (!EnsureInteractive())
+        {
             return;
+        }
 
         var recent = evaluations
             .Where(static metrics => metrics.Succeeded)
@@ -58,7 +60,9 @@ internal static class VisualizationPresenter
     internal static void WriteLastTimingBreakdown(EvaluationMetrics? metrics)
     {
         if (!EnsureInteractive())
+        {
             return;
+        }
 
         if (metrics is null || !metrics.Succeeded)
         {
@@ -80,10 +84,14 @@ internal static class VisualizationPresenter
             .ShowTags();
 
         if (dbMs > 0)
+        {
             chart.AddItem("database", dbMs, Color.Yellow);
+        }
 
         if (appMs > 0)
+        {
             chart.AddItem("app / roslyn", appMs, Color.Cyan1);
+        }
 
         AnsiConsole.MarkupLine("[bold]Last evaluation time[/]");
         AnsiConsole.Write(chart);
@@ -95,7 +103,9 @@ internal static class VisualizationPresenter
     internal static void WriteCompare(EvaluationMetrics? baseline, EvaluationMetrics? current)
     {
         if (!EnsureInteractive())
+        {
             return;
+        }
 
         if (baseline is null || current is null)
         {
@@ -130,14 +140,18 @@ internal static class VisualizationPresenter
     internal static void WriteBenchmarkTimings(IReadOnlyList<long> timingsMs)
     {
         if (!EnsureInteractive() || timingsMs.Count == 0)
+        {
             return;
+        }
 
         var chart = new BarChart()
             .Width(Console.WindowWidth > 0 ? Math.Min(Console.WindowWidth - 4, 60) : 50)
             .Label("[bold]Benchmark iterations[/] [grey](ms)[/]");
 
         for (var index = 0; index < timingsMs.Count; index++)
+        {
             chart.AddItem($"#{index + 1}", timingsMs[index], Color.Cyan1);
+        }
 
         AnsiConsole.Write(chart);
         AnsiConsole.WriteLine();
@@ -146,7 +160,9 @@ internal static class VisualizationPresenter
     internal static void WriteTableRowCounts(IReadOnlyList<(string DbSet, string EntityType, int? Count)> sets)
     {
         if (!EnsureInteractive())
+        {
             return;
+        }
 
         var countable = sets
             .Where(static set => set.Count is not null)
@@ -163,7 +179,9 @@ internal static class VisualizationPresenter
             .Label("[bold]DbSet row counts[/]");
 
         foreach (var set in countable)
+        {
             chart.AddItem(set.DbSet, set.Count!.Value, Color.Green);
+        }
 
         AnsiConsole.Write(chart);
         AnsiConsole.WriteLine();
@@ -172,7 +190,9 @@ internal static class VisualizationPresenter
     internal static void WriteResultNumeric(IReadOnlyList<object?> rows)
     {
         if (!EnsureInteractive())
+        {
             return;
+        }
 
         if (rows.Count == 0)
         {
@@ -218,7 +238,9 @@ internal static class VisualizationPresenter
         var first = rows.FirstOrDefault(static row => row is not null);
 
         if (first is null)
+        {
             return false;
+        }
 
         foreach (var property in GetReadableProperties(first))
         {
@@ -227,7 +249,9 @@ internal static class VisualizationPresenter
             foreach (var row in rows)
             {
                 if (row is null)
+                {
                     continue;
+                }
 
                 var raw = ReadProperty(row, property);
 
@@ -262,11 +286,13 @@ internal static class VisualizationPresenter
         return false;
     }
 
-    private static IEnumerable<PropertyInfo> GetReadableProperties(object row) =>
-        row.GetType()
+    private static IEnumerable<PropertyInfo> GetReadableProperties(object row)
+    {
+        return row.GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(static property => property.CanRead && property.GetIndexParameters().Length == 0)
             .OrderBy(static property => property.Name, StringComparer.Ordinal);
+    }
 
     private static object? ReadProperty(object row, PropertyInfo property)
     {
@@ -284,8 +310,8 @@ internal static class VisualizationPresenter
     {
         var type = Nullable.GetUnderlyingType(value.GetType()) ?? value.GetType();
 
-        return type.IsPrimitive && type != typeof(bool) && type != typeof(char)
-            || type == typeof(decimal);
+        return (type.IsPrimitive && type != typeof(bool) && type != typeof(char))
+               || type == typeof(decimal);
     }
 
     private static bool TryToDouble(object? value, out double number)
@@ -293,7 +319,9 @@ internal static class VisualizationPresenter
         number = 0;
 
         if (value is null)
+        {
             return false;
+        }
 
         switch (value)
         {
@@ -309,7 +337,9 @@ internal static class VisualizationPresenter
     private static bool EnsureInteractive()
     {
         if (!Console.IsOutputRedirected)
+        {
             return true;
+        }
 
         CliUi.WriteWarning("Charts require an interactive terminal.");
         return false;

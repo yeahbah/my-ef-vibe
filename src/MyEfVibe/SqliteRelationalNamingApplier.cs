@@ -1,8 +1,8 @@
 namespace MyEfVibe;
 
 /// <summary>
-/// Maps SQL Server-style schema/table pairs to SQLite <c>Schema.Table</c> physical names (see DuckDB conversion)
-/// and lowercases column names to match pgloader-derived SQLite files.
+///     Maps SQL Server-style schema/table pairs to SQLite <c>Schema.Table</c> physical names (see DuckDB conversion)
+///     and lowercases column names to match pgloader-derived SQLite files.
 /// </summary>
 public static class SqliteRelationalNamingApplier
 {
@@ -16,7 +16,9 @@ public static class SqliteRelationalNamingApplier
         var relationalMetadata = RelationalMetadataReflection.Resolve(modelBuilder);
 
         if (relationalMetadata is null)
+        {
             return;
+        }
 
         foreach (var entityType in RelationalMetadataReflection.EnumerateEntityTypes(modelBuilder))
         {

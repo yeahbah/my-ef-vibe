@@ -19,7 +19,7 @@ internal static class WorkspaceRuntimeBootstrap
         var dbLogSettings = new DbLogSettings
         {
             Enabled = noDbLog ? false : dbLogEnabled,
-            Verbose = dbLogVerbose,
+            Verbose = dbLogVerbose
         };
 
         if (!string.IsNullOrWhiteSpace(dbLogLevelRaw)
@@ -31,7 +31,9 @@ internal static class WorkspaceRuntimeBootstrap
         var parsedProvider = ProviderParser.ParseOrNull(providerRaw);
 
         if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
+        {
             return (null, 3, "`--connection-string` requires `--provider`.");
+        }
 
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
         var searchDirectory = ProjectPathResolver.ResolveSearchDirectory(
@@ -86,7 +88,7 @@ internal static class WorkspaceRuntimeBootstrap
             dbContextType = DbContextActivator.ResolveContextType(
                 host,
                 contextFullName,
-                allowInteractiveSelection: false);
+                false);
         }
         catch (InvalidOperationException resolutionFailure)
         {
@@ -109,7 +111,7 @@ internal static class WorkspaceRuntimeBootstrap
                 contextFullName,
                 connectionString,
                 parsedProvider,
-                allowInteractiveSelection: false);
+                false);
         }
         catch (InvalidOperationException resolutionFailure)
         {

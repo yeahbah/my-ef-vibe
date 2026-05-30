@@ -89,7 +89,8 @@ internal static class LinqScanPresenter
     {
         CliUi.WriteWarning("Usage: :scan lite | :scan deep");
         AnsiConsole.MarkupLine("[grey]:scan lite[/] — static Roslyn heuristics");
-        AnsiConsole.MarkupLine("[grey]:scan deep[/] — lite scan + translated SQL + EXPLAIN via live [cyan]db[/] (requires connection)");
+        AnsiConsole.MarkupLine(
+            "[grey]:scan deep[/] — lite scan + translated SQL + EXPLAIN via live [cyan]db[/] (requires connection)");
     }
 
     private static void WriteSummaryPanel(
@@ -132,7 +133,7 @@ internal static class LinqScanPresenter
             {
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(Color.Grey),
-                Padding = new Padding(1, 0, 1, 0),
+                Padding = new Padding(1, 0, 1, 0)
             });
 
         AnsiConsole.WriteLine();

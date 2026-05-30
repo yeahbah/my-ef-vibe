@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 
 namespace MyEfVibe.Tests;
 
@@ -7,7 +8,7 @@ public sealed class SystemTextJsonCapabilitiesTests
     [Fact]
     public void IsCompatibleLoaded_WhenFrameworkJsonIsLoaded_ReturnsTrue()
     {
-        _ = typeof(System.Text.Json.JsonSerializerOptions).Assembly;
+        _ = typeof(JsonSerializerOptions).Assembly;
 
         Assert.True(SystemTextJsonCapabilities.IsCompatibleLoaded());
     }
@@ -26,9 +27,11 @@ public sealed class SystemTextJsonCapabilitiesTests
 
     private sealed class SharedFrameworkAssemblyStub(string name, Version version, string location) : Assembly
     {
-        public override AssemblyName GetName() => new(name) { Version = version };
-
         public override string Location => location;
-    }
 
+        public override AssemblyName GetName()
+        {
+            return new AssemblyName(name) { Version = version };
+        }
+    }
 }

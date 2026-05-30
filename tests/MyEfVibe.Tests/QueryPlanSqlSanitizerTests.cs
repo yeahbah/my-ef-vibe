@@ -15,7 +15,7 @@ public sealed class QueryPlanSqlSanitizerTests
               -- duration: 1 ms
             """;
 
-        var selected = DbLogSqlExtractor.SelectPlanSql([captured], translatedSql: null);
+        var selected = DbLogSqlExtractor.SelectPlanSql([captured], null);
 
         Assert.Equal(captured, selected);
     }

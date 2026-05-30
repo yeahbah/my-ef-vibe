@@ -10,13 +10,17 @@ internal static class AssemblyReferenceReader
     internal static IEnumerable<AssemblyName> Read(string assemblyPath)
     {
         if (!File.Exists(assemblyPath))
+        {
             yield break;
+        }
 
         using var stream = File.OpenRead(assemblyPath);
         using var peReader = new PEReader(stream);
 
         if (!peReader.HasMetadata)
+        {
             yield break;
+        }
 
         var reader = peReader.GetMetadataReader();
 
@@ -26,12 +30,16 @@ internal static class AssemblyReferenceReader
             var name = reader.GetString(assemblyReference.Name);
 
             if (string.IsNullOrEmpty(name))
+            {
                 continue;
+            }
 
             var culture = reader.GetString(assemblyReference.Culture);
 
             if (string.IsNullOrEmpty(culture))
+            {
                 culture = "neutral";
+            }
 
             var token = reader.GetBlobBytes(assemblyReference.PublicKeyOrToken);
 
@@ -48,7 +56,9 @@ internal static class AssemblyReferenceReader
         var builder = new StringBuilder(token.Length * 2);
 
         foreach (var value in token)
+        {
             builder.Append(value.ToString("x2"));
+        }
 
         return builder.ToString();
     }

@@ -8,7 +8,9 @@ public sealed class DbContextProviderOverrideTests
         var persistenceDll = FindPrebuiltPersistenceDll();
 
         if (persistenceDll is null)
+        {
             return;
+        }
 
         var outputDirectory = Path.GetDirectoryName(persistenceDll)!;
         using var host = LoadHost(persistenceDll, outputDirectory);
@@ -18,7 +20,7 @@ public sealed class DbContextProviderOverrideTests
             "AdventureWorksDbContext",
             "Host=localhost;Port=5432;Database=adventureworks;Username=postgres;Password=Your_strong_Password123!",
             MyEfVibeProvider.Npgsql,
-            allowInteractiveSelection: false);
+            false);
 
         var providerName = dbContext.GetType()
             .GetProperty("Database")?
@@ -32,19 +34,22 @@ public sealed class DbContextProviderOverrideTests
 
     private static WorkspaceHost LoadHost(string persistenceDll, string outputDirectory)
     {
-        var efProject = "/home/adiaz/Projects/AdventureWorks/apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj";
+        var efProject =
+            "/home/adiaz/Projects/AdventureWorks/apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj";
 
         if (!File.Exists(efProject))
+        {
             throw new InvalidOperationException($"AdventureWorks EF project not found: {efProject}");
+        }
 
         var workspaceBuild = new WorkspaceBuildResult(
-            SessionDirectory: Path.Combine(Path.GetTempPath(), "efvibe-tests", Guid.NewGuid().ToString("N")),
-            ProjectPath: efProject,
-            StartupProjectPath: efProject,
-            OutputDirectory: outputDirectory,
-            PrimaryAssemblyDll: persistenceDll,
-            TargetFrameworkMoniker: "net10.0",
-            ProjectBuildOutput: new ProjectBuildOutput(outputDirectory));
+            Path.Combine(Path.GetTempPath(), "efvibe-tests", Guid.NewGuid().ToString("N")),
+            efProject,
+            efProject,
+            outputDirectory,
+            persistenceDll,
+            "net10.0",
+            new ProjectBuildOutput(outputDirectory));
 
         return WorkspaceHost.Load(workspaceBuild);
     }
@@ -54,10 +59,13 @@ public sealed class DbContextProviderOverrideTests
         var root = Path.Combine(Path.GetTempPath(), "efvibe-integration");
 
         if (!Directory.Exists(root))
+        {
             return null;
+        }
 
         return Directory
             .EnumerateFiles(root, "AdventureWorks.Infrastructure.Persistence.dll", SearchOption.AllDirectories)
-            .FirstOrDefault(path => path.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+            .FirstOrDefault(path => path.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal));
     }
 }

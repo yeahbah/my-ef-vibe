@@ -12,12 +12,16 @@ internal static class HostRuntimeFramework
             ?.FrameworkName;
 
         if (string.IsNullOrWhiteSpace(targetFramework))
+        {
             return null;
+        }
 
         var frameworkName = new FrameworkName(targetFramework);
 
         if (!string.Equals(frameworkName.Identifier, ".NETCoreApp", StringComparison.OrdinalIgnoreCase))
+        {
             return null;
+        }
 
         return FormattableString.Invariant($"net{frameworkName.Version.Major}.{frameworkName.Version.Minor}");
     }

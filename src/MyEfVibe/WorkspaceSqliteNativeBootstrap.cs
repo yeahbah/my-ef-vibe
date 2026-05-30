@@ -6,9 +6,9 @@ using System.Runtime.Loader;
 namespace MyEfVibe;
 
 /// <summary>
-/// Loads <c>e_sqlite3</c> from the workspace <c>.deps.json</c> RID native assets (e.g.
-/// <c>runtimes/osx-x64/native/libe_sqlite3.dylib</c>). Library outputs often omit these files;
-/// without this, Microsoft.Data.Sqlite.SqliteConnection fails in the efvibe host process.
+///     Loads <c>e_sqlite3</c> from the workspace <c>.deps.json</c> RID native assets (e.g.
+///     <c>runtimes/osx-x64/native/libe_sqlite3.dylib</c>). Library outputs often omit these files;
+///     without this, Microsoft.Data.Sqlite.SqliteConnection fails in the efvibe host process.
 /// </summary>
 internal static class WorkspaceSqliteNativeBootstrap
 {
@@ -20,23 +20,29 @@ internal static class WorkspaceSqliteNativeBootstrap
     internal static void EnsureRegistered(WorkspaceDepsManifest? depsManifest)
     {
         if (depsManifest is null)
+        {
             return;
+        }
 
         if (!depsManifest.TryResolveNativeLibrary(out var nativePath, GetCandidateNativeFileNames()))
+        {
             return;
+        }
 
         RegisterNativeLibrary(nativePath);
     }
 
     /// <summary>
-    /// Initializes SQLitePCL when the workspace project does not reference EF SQLite (provider override path).
+    ///     Initializes SQLitePCL when the workspace project does not reference EF SQLite (provider override path).
     /// </summary>
     internal static void EnsureBatteriesInitialized(WorkspaceHost host)
     {
         lock (Gate)
         {
             if (_initialized)
+            {
                 return;
+            }
 
             if (!host.TryResolveAssemblyPath("Microsoft.Data.Sqlite", out var dataSqlitePath))
             {
@@ -86,11 +92,13 @@ internal static class WorkspaceSqliteNativeBootstrap
             var providerReference = new AssemblyName("SQLitePCLRaw.provider.e_sqlite3")
             {
                 Version = coreReference.Version,
-                ContentType = coreReference.ContentType,
+                ContentType = coreReference.ContentType
             };
 
             if (coreReference.GetPublicKeyToken() is { } publicKeyToken)
+            {
                 providerReference.SetPublicKeyToken(publicKeyToken);
+            }
 
             if (!host.TryResolveAssemblyPath(providerReference, out var providerPath))
             {
@@ -127,16 +135,23 @@ internal static class WorkspaceSqliteNativeBootstrap
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 if (!string.Equals(assembly.GetName().Name, "SQLitePCLRaw.core", StringComparison.OrdinalIgnoreCase))
+                {
                     continue;
+                }
 
                 if (!AssemblyName.ReferenceMatchesDefinition(coreReference, assembly.GetName()))
+                {
                     continue;
+                }
 
-                var rawType = assembly.GetType("SQLitePCL.raw", throwOnError: false);
+                var rawType = assembly.GetType("SQLitePCL.raw", false);
 
-                if (rawType?.GetMethod("get_Provider", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                if (rawType?.GetMethod("get_Provider",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                         ?.Invoke(null, null) is not null)
+                {
                     return true;
+                }
             }
         }
         catch
@@ -148,35 +163,43 @@ internal static class WorkspaceSqliteNativeBootstrap
 
     private static bool TrySetESqlite3Provider(Assembly coreAssembly, Assembly providerAssembly)
     {
-        var providerType = providerAssembly.GetType("SQLitePCL.SQLite3Provider_e_sqlite3", throwOnError: false);
+        var providerType = providerAssembly.GetType("SQLitePCL.SQLite3Provider_e_sqlite3", false);
 
         if (providerType is null)
+        {
             return false;
+        }
 
         var providerInstance = Activator.CreateInstance(providerType);
 
         if (providerInstance is null)
+        {
             return false;
+        }
 
-        var rawType = coreAssembly.GetType("SQLitePCL.raw", throwOnError: false);
+        var rawType = coreAssembly.GetType("SQLitePCL.raw", false);
 
         if (rawType is null)
+        {
             return false;
+        }
 
         var setProvider = rawType.GetMethod(
             "SetProvider",
             BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
 
         if (setProvider is null)
+        {
             return false;
+        }
 
         try
         {
             setProvider.Invoke(null, [providerInstance]);
 
             return rawType.GetMethod("get_Provider", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                       ?.Invoke(null, null)
-                   is not null;
+                    ?.Invoke(null, null)
+                is not null;
         }
         catch
         {
@@ -187,7 +210,9 @@ internal static class WorkspaceSqliteNativeBootstrap
     private static void TryRegisterNativeFromNuGetCache()
     {
         if (_nativeLibraryPath is not null)
+        {
             return;
+        }
 
         var nuGetRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -196,7 +221,9 @@ internal static class WorkspaceSqliteNativeBootstrap
             "sqlitepclraw.lib.e_sqlite3");
 
         if (!Directory.Exists(nuGetRoot))
+        {
             return;
+        }
 
         foreach (var versionFolder in Directory.EnumerateDirectories(nuGetRoot)
                      .OrderByDescending(static path => Path.GetFileName(path), StringComparer.Ordinal))
@@ -213,7 +240,9 @@ internal static class WorkspaceSqliteNativeBootstrap
                         fileName);
 
                     if (!File.Exists(candidate))
+                    {
                         continue;
+                    }
 
                     RegisterNativeLibrary(candidate);
                     return;
@@ -227,7 +256,9 @@ internal static class WorkspaceSqliteNativeBootstrap
         lock (Gate)
         {
             if (_nativeLibraryPath is not null)
+            {
                 return;
+            }
 
             _nativeLibraryPath = nativePath;
             AssemblyLoadContext.Default.ResolvingUnmanagedDll += OnResolvingUnmanagedDll;
@@ -249,7 +280,7 @@ internal static class WorkspaceSqliteNativeBootstrap
     {
         var connectionType = dataSqliteAssembly.GetType(
             "Microsoft.Data.Sqlite.SqliteConnection",
-            throwOnError: false);
+            false);
 
         if (connectionType is null)
         {
@@ -263,10 +294,14 @@ internal static class WorkspaceSqliteNativeBootstrap
     private static IntPtr OnResolvingUnmanagedDll(Assembly assembly, string unmanagedDllName)
     {
         if (_nativeLibraryPath is null || !IsSqliteNativeName(unmanagedDllName))
+        {
             return IntPtr.Zero;
+        }
 
         if (_nativeHandle != IntPtr.Zero)
+        {
             return _nativeHandle;
+        }
 
         try
         {
@@ -284,9 +319,11 @@ internal static class WorkspaceSqliteNativeBootstrap
     }
 
     private static bool IsSqliteNativeName(string unmanagedDllName)
-        => unmanagedDllName.Equals("e_sqlite3", StringComparison.OrdinalIgnoreCase)
-           || unmanagedDllName.Equals("libe_sqlite3", StringComparison.OrdinalIgnoreCase)
-           || unmanagedDllName.Contains("e_sqlite3", StringComparison.OrdinalIgnoreCase);
+    {
+        return unmanagedDllName.Equals("e_sqlite3", StringComparison.OrdinalIgnoreCase)
+               || unmanagedDllName.Equals("libe_sqlite3", StringComparison.OrdinalIgnoreCase)
+               || unmanagedDllName.Contains("e_sqlite3", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string[] GetCandidateNativeFileNames()
     {
@@ -295,7 +332,7 @@ internal static class WorkspaceSqliteNativeBootstrap
             return
             [
                 "libe_sqlite3.dylib",
-                "e_sqlite3.dylib",
+                "e_sqlite3.dylib"
             ];
         }
 
@@ -304,12 +341,14 @@ internal static class WorkspaceSqliteNativeBootstrap
             return
             [
                 "libe_sqlite3.so",
-                "e_sqlite3.so",
+                "e_sqlite3.so"
             ];
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
             return ["e_sqlite3.dll"];
+        }
 
         return ["e_sqlite3.dll", "libe_sqlite3.so", "libe_sqlite3.dylib"];
     }

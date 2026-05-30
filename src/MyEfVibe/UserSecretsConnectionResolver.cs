@@ -14,12 +14,16 @@ internal static class UserSecretsConnectionResolver
         provider = null;
 
         if (!CsprojInspector.TryGetUserSecretsId(projectPath, out var userSecretsId))
+        {
             return false;
+        }
 
         var secretsPath = ResolveSecretsFilePath(userSecretsId);
 
         if (secretsPath is null || !TryReadConnectionString(secretsPath, out connectionString))
+        {
             return false;
+        }
 
         provider = AppSettingsConnectionResolver.InferProvider(outputDirectory, connectionString);
 
@@ -31,7 +35,9 @@ internal static class UserSecretsConnectionResolver
         var secretsRoot = GetUserSecretsRootDirectory();
 
         if (string.IsNullOrEmpty(secretsRoot))
+        {
             return null;
+        }
 
         var candidate = Path.Combine(secretsRoot, userSecretsId, "secrets.json");
 
@@ -61,7 +67,9 @@ internal static class UserSecretsConnectionResolver
         connectionString = string.Empty;
 
         if (!ConfigurationJson.TryParseFile(secretsPath, out var document) || document is null)
+        {
             return false;
+        }
 
         using (document)
         {
@@ -89,7 +97,9 @@ internal static class UserSecretsConnectionResolver
         foreach (var entry in root.EnumerateObject())
         {
             if (!entry.Name.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             if (entry.Value.GetString() is { Length: > 0 } first)
             {

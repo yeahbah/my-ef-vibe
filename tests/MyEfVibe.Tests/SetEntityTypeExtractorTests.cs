@@ -6,10 +6,10 @@ public sealed class SetEntityTypeExtractorTests
     public void TryExtractConcreteEntityTypeName_finds_Currency_from_Set_call()
     {
         const string code = """
-            return await _dbContext.Set<Currency>()
-                .AsNoTracking()
-                .ToListAsync(cancellationToken);
-            """;
+                            return await _dbContext.Set<Currency>()
+                                .AsNoTracking()
+                                .ToListAsync(cancellationToken);
+                            """;
 
         Assert.True(SetEntityTypeExtractor.TryExtractConcreteEntityTypeName(code, out var entityType));
         Assert.Equal("Currency", entityType);

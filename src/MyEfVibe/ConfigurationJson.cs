@@ -7,7 +7,7 @@ internal static class ConfigurationJson
     internal static readonly JsonDocumentOptions DocumentOptions = new()
     {
         CommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
+        AllowTrailingCommas = true
     };
 
     internal static bool TryParseFile(string path, out JsonDocument? document)
@@ -30,7 +30,9 @@ internal static class ConfigurationJson
         }
 
         if (string.IsNullOrWhiteSpace(json))
+        {
             return false;
+        }
 
         try
         {

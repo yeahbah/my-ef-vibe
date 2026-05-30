@@ -35,7 +35,8 @@ public sealed class WorkspaceBuilderTests
               </PropertyGroup>
             </Project>
             """);
-        File.WriteAllText(Path.Combine(projectDirectory, "Sample.cs"), "namespace SampleApp; public sealed class Sample { }");
+        File.WriteAllText(Path.Combine(projectDirectory, "Sample.cs"),
+            "namespace SampleApp; public sealed class Sample { }");
 
         try
         {
@@ -52,7 +53,9 @@ public sealed class WorkspaceBuilderTests
         finally
         {
             if (Directory.Exists(root))
-                Directory.Delete(root, recursive: true);
+            {
+                Directory.Delete(root, true);
+            }
         }
     }
 
@@ -78,25 +81,27 @@ public sealed class WorkspaceBuilderTests
               </PropertyGroup>
             </Project>
             """);
-        File.WriteAllText(Path.Combine(efProjectDirectory, "SampleContext.cs"), "namespace Sample.Persistence; public sealed class SampleContext { }");
+        File.WriteAllText(Path.Combine(efProjectDirectory, "SampleContext.cs"),
+            "namespace Sample.Persistence; public sealed class SampleContext { }");
 
         var startupProjectPath = Path.Combine(startupProjectDirectory, "Sample.Api.csproj");
         File.WriteAllText(
             startupProjectPath,
             $$"""
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <OutputType>Exe</OutputType>
-                <TargetFramework>net10.0</TargetFramework>
-                <ImplicitUsings>enable</ImplicitUsings>
-                <Nullable>enable</Nullable>
-              </PropertyGroup>
-              <ItemGroup>
-                <ProjectReference Include="{{efProjectPath}}" />
-              </ItemGroup>
-            </Project>
-            """);
-        File.WriteAllText(Path.Combine(startupProjectDirectory, "Program.cs"), "Console.WriteLine(typeof(Sample.Persistence.SampleContext).FullName);");
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <OutputType>Exe</OutputType>
+                  <TargetFramework>net10.0</TargetFramework>
+                  <ImplicitUsings>enable</ImplicitUsings>
+                  <Nullable>enable</Nullable>
+                </PropertyGroup>
+                <ItemGroup>
+                  <ProjectReference Include="{{efProjectPath}}" />
+                </ItemGroup>
+              </Project>
+              """);
+        File.WriteAllText(Path.Combine(startupProjectDirectory, "Program.cs"),
+            "Console.WriteLine(typeof(Sample.Persistence.SampleContext).FullName);");
 
         try
         {
@@ -115,7 +120,9 @@ public sealed class WorkspaceBuilderTests
         finally
         {
             if (Directory.Exists(root))
-                Directory.Delete(root, recursive: true);
+            {
+                Directory.Delete(root, true);
+            }
         }
     }
 }

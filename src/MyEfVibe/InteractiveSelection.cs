@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Spectre.Console;
 
 namespace MyEfVibe;
@@ -12,13 +13,19 @@ internal static class InteractiveSelection
         where T : notnull
     {
         if (options.Count == 0)
+        {
             throw new ArgumentException("At least one option is required.", nameof(options));
+        }
 
         if (options.Count == 1)
+        {
             return options[0].Value;
+        }
 
         if (!CanPrompt)
+        {
             throw new InvalidOperationException(BuildNonInteractiveMessage(title, options));
+        }
 
         var labels = options.ToDictionary(static option => option.Value);
 
@@ -30,8 +37,10 @@ internal static class InteractiveSelection
                 .UseConverter(value => labels[value].Label));
     }
 
-    internal static int ResolvePromptPageSize(int optionCount) =>
-        Math.Max(3, Math.Min(12, optionCount));
+    internal static int ResolvePromptPageSize(int optionCount)
+    {
+        return Math.Max(3, Math.Min(12, optionCount));
+    }
 
     private static string BuildNonInteractiveMessage<T>(string title, IReadOnlyList<SelectionOption<T>> options)
         where T : notnull
@@ -41,8 +50,10 @@ internal static class InteractiveSelection
         return $"{StripMarkup(title)}{Environment.NewLine}{string.Join(Environment.NewLine, lines)}";
     }
 
-    private static string StripMarkup(string markup) =>
-        System.Text.RegularExpressions.Regex.Replace(markup, @"\[[^\]]*\]", string.Empty);
+    private static string StripMarkup(string markup)
+    {
+        return Regex.Replace(markup, @"\[[^\]]*\]", string.Empty);
+    }
 }
 
 internal readonly record struct SelectionOption<T>(T Value, string Label) where T : notnull;

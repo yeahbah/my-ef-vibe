@@ -5,8 +5,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace MyEfVibe;
 
 /// <summary>
-/// Replaces open generic type parameters (for example <c>Set&lt;T&gt;()</c>) with a concrete entity
-/// type so deep-scan probes compile in the REPL.
+///     Replaces open generic type parameters (for example <c>Set&lt;T&gt;()</c>) with a concrete entity
+///     type so deep-scan probes compile in the REPL.
 /// </summary>
 internal static class OpenGenericProbeBinder
 {
@@ -14,7 +14,9 @@ internal static class OpenGenericProbeBinder
     {
         if (string.IsNullOrWhiteSpace(probeExpression)
             || string.IsNullOrWhiteSpace(concreteEntityTypeName))
+        {
             return probeExpression;
+        }
 
         try
         {
@@ -28,7 +30,9 @@ internal static class OpenGenericProbeBinder
             var rewritten = new OpenGenericTypeArgumentRewriter(concreteEntityTypeName).Visit(tree.GetRoot());
 
             if (rewritten is null)
+            {
                 return singleLine;
+            }
 
             var text = rewritten.ToFullString();
 
@@ -43,7 +47,9 @@ internal static class OpenGenericProbeBinder
     internal static bool ContainsOpenGenericTypeParameter(string expression)
     {
         if (string.IsNullOrWhiteSpace(expression))
+        {
             return false;
+        }
 
         try
         {
@@ -68,13 +74,19 @@ internal static class OpenGenericProbeBinder
     internal static bool IsOpenTypeParameterName(string name)
     {
         if (string.IsNullOrEmpty(name))
+        {
             return false;
+        }
 
         if (string.Equals(name, "T", StringComparison.Ordinal))
+        {
             return true;
+        }
 
         if (!name.StartsWith('T') || name.Length < 2)
+        {
             return false;
+        }
 
         return char.IsUpper(name[1]);
     }
@@ -86,13 +98,17 @@ internal static class OpenGenericProbeBinder
         var index = rewritten.IndexOf(prefix, StringComparison.Ordinal);
 
         if (index < 0)
+        {
             return rewritten.Trim();
+        }
 
         var start = index + prefix.Length;
         var end = rewritten.LastIndexOf(';');
 
         if (end <= start)
+        {
             return rewritten[start..].Trim();
+        }
 
         return rewritten[start..end].Trim();
     }

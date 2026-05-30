@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-
 namespace MyEfVibe.Tests;
 
 public sealed class ProbeParseDiagnosticsTests

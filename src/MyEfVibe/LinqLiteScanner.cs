@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -15,9 +16,14 @@ internal static class LinqLiteScanner
         DbContextScanScope? scope = null;
 
         if (selectedDbContextType is not null)
+        {
             scope = DbContextScanScope.Create(efProjectPath, startupProjectPath, selectedDbContextType);
+        }
         else if (!string.IsNullOrWhiteSpace(selectedContextTypeName))
+        {
             scope = DbContextScanScope.Create(efProjectPath, startupProjectPath, selectedContextTypeName);
+        }
+
         var findings = new List<LinqScanFinding>();
         var filesScanned = 0;
         var projectPaths = LinqProjectSourceWalker.CollectScanProjectPaths(efProjectPath, startupProjectPath);
@@ -63,7 +69,7 @@ internal static class LinqLiteScanner
         var tree = CSharpSyntaxTree.ParseText(
             sourceText,
             path: absolutePath,
-            encoding: System.Text.Encoding.UTF8);
+            encoding: Encoding.UTF8);
 
         var root = tree.GetCompilationUnitRoot();
         var containingTypeIndex = scope is null
@@ -80,12 +86,16 @@ internal static class LinqLiteScanner
             var methodName = GetSimpleMethodName(invocation.Expression);
 
             if (methodName is null || !LinqQueryInvocationNames.ScanTargets.Contains(methodName))
+            {
                 continue;
+            }
 
             var statement = GetStatementText(invocation);
 
             if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement, scope, instanceIndex))
+            {
                 continue;
+            }
 
             var containingTypeName = GetContainingTypeName(invocation);
             var containingMethodName = GetContainingMethodName(invocation);
@@ -96,7 +106,9 @@ internal static class LinqLiteScanner
                     containingTypeName,
                     containingTypeIndex,
                     instanceIndex))
+            {
                 continue;
+            }
 
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
             var preview = ToPreviewLine(statement);
@@ -106,7 +118,9 @@ internal static class LinqLiteScanner
                 var key = $"{line}|{ruleId}|{message}";
 
                 if (!reported.Add(key))
+                {
                     continue;
+                }
 
                 findings.Add(LinqScanFinding.Create(
                     absolutePath,
@@ -118,10 +132,14 @@ internal static class LinqLiteScanner
         }
 
         foreach (var loop in root.DescendantNodes().OfType<ForEachStatementSyntax>())
+        {
             AnalyzeLoop(absolutePath, loop, findings, reported, scope, containingTypeIndex, instanceIndex);
+        }
 
         foreach (var loop in root.DescendantNodes().OfType<ForStatementSyntax>())
+        {
             AnalyzeLoop(absolutePath, loop, findings, reported, scope, containingTypeIndex, instanceIndex);
+        }
 
         return findings;
     }
@@ -138,7 +156,9 @@ internal static class LinqLiteScanner
         var bodyText = loopStatement.ToString();
 
         if (!LooksLikeQueryInLoop(bodyText))
+        {
             return;
+        }
 
         var containingTypeName = GetContainingTypeName(loopStatement);
 
@@ -148,7 +168,9 @@ internal static class LinqLiteScanner
                 containingTypeName,
                 containingTypeIndex,
                 instanceIndex))
+        {
             return;
+        }
 
         var line = loopStatement.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
         const string ruleId = "n-plus-one";
@@ -156,7 +178,9 @@ internal static class LinqLiteScanner
         var key = $"{line}|{ruleId}|{message}";
 
         if (!reported.Add(key))
+        {
             return;
+        }
 
         findings.Add(LinqScanFinding.Create(
             absolutePath,
@@ -175,20 +199,24 @@ internal static class LinqLiteScanner
             || bodyText.Contains(".Single", StringComparison.Ordinal)
             || bodyText.Contains(".Count(", StringComparison.Ordinal)
             || bodyText.Contains(".Any(", StringComparison.Ordinal))
+        {
             return true;
+        }
 
         return bodyText.Contains("db.", StringComparison.Ordinal)
                || bodyText.Contains("DbContext", StringComparison.Ordinal)
                || bodyText.Contains("Set<", StringComparison.Ordinal);
     }
 
-    private static string? GetSimpleMethodName(ExpressionSyntax expression) =>
-        expression switch
+    private static string? GetSimpleMethodName(ExpressionSyntax expression)
+    {
+        return expression switch
         {
             MemberAccessExpressionSyntax member => member.Name.Identifier.Text,
             IdentifierNameSyntax identifier => identifier.Identifier.Text,
-            _ => null,
+            _ => null
         };
+    }
 
     private static string? GetContainingTypeName(SyntaxNode node)
     {
@@ -197,8 +225,10 @@ internal static class LinqLiteScanner
         return typeDeclaration?.Identifier.Text;
     }
 
-    private static string? GetContainingMethodName(SyntaxNode node) =>
-        node.FirstAncestorOrSelf<MethodDeclarationSyntax>()?.Identifier.Text;
+    private static string? GetContainingMethodName(SyntaxNode node)
+    {
+        return node.FirstAncestorOrSelf<MethodDeclarationSyntax>()?.Identifier.Text;
+    }
 
     private static string GetStatementText(SyntaxNode node)
     {
@@ -206,7 +236,9 @@ internal static class LinqLiteScanner
         var text = statement?.ToString() ?? node.ToString();
 
         if (LinqEfQueryHeuristics.LooksLikeEfQuery(text))
+        {
             return text;
+        }
 
         var block = node.FirstAncestorOrSelf<BlockSyntax>();
 
@@ -217,7 +249,9 @@ internal static class LinqLiteScanner
                 var siblingText = sibling.ToString();
 
                 if (LinqEfQueryHeuristics.LooksLikeEfQuery(siblingText))
+                {
                     return siblingText;
+                }
             }
         }
 

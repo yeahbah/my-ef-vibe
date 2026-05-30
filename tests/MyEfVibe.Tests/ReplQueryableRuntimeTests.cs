@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 
@@ -167,7 +168,7 @@ public sealed class ReplQueryableRuntimeTests
     [Fact]
     public void Count_uses_query_provider_execute_instead_of_client_enumeration()
     {
-        var query = new ExecuteOnlyQueryable<FakeRewriterUser>(expectedResult: 7);
+        var query = new ExecuteOnlyQueryable<FakeRewriterUser>(7);
 
         var count = ReplQueryableRuntime.Count(query);
 
@@ -179,7 +180,7 @@ public sealed class ReplQueryableRuntimeTests
     [Fact]
     public void Count_with_predicate_uses_query_provider_execute_instead_of_client_enumeration()
     {
-        var query = new ExecuteOnlyQueryable<FakeRewriterUser>(expectedResult: 3);
+        var query = new ExecuteOnlyQueryable<FakeRewriterUser>(3);
         Expression<Func<FakeRewriterUser, bool>> predicate = user => user.Id == 1;
 
         var count = ReplQueryableRuntime.Count<FakeRewriterUser>(query, predicate);
@@ -216,12 +217,20 @@ public sealed class ReplQueryableRuntimeTests
             throw new InvalidOperationException("Client-side enumeration should not be used.");
         }
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
 
-        public IQueryable CreateQuery(Expression expression) => new ExecuteOnlyQueryable<T>(_expectedResult);
+        public IQueryable CreateQuery(Expression expression)
+        {
+            return new ExecuteOnlyQueryable<T>(_expectedResult);
+        }
 
-        public IQueryable<TElement> CreateQuery<TElement>(Expression expression) =>
-            new ExecuteOnlyQueryable<TElement>(_expectedResult);
+        public IQueryable<TElement> CreateQuery<TElement>(Expression expression)
+        {
+            return new ExecuteOnlyQueryable<TElement>(_expectedResult);
+        }
 
         public object? Execute(Expression expression)
         {

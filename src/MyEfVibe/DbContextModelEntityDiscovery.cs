@@ -17,7 +17,9 @@ internal static class DbContextModelEntityDiscovery
             var model = TryGetModel(dbContext);
 
             if (model is null)
+            {
                 return names;
+            }
 
             var getEntityTypes = model.GetType()
                 .GetInterfaces()
@@ -25,29 +27,36 @@ internal static class DbContextModelEntityDiscovery
                 ?.GetMethod(
                     "GetEntityTypes",
                     BindingFlags.Public | BindingFlags.Instance,
-                    binder: null,
-                    types: Type.EmptyTypes,
-                    modifiers: null);
+                    null,
+                    Type.EmptyTypes,
+                    null);
 
             if (getEntityTypes?.Invoke(model, null) is not IEnumerable entityTypes)
+            {
                 return names;
+            }
 
             foreach (var entityType in entityTypes)
             {
                 if (entityType is null)
+                {
                     continue;
+                }
 
                 var clrType = entityType.GetType()
-                        .GetProperty("ClrType", BindingFlags.Public | BindingFlags.Instance)
-                        ?.GetValue(entityType) as Type
-                    ?? entityType.GetType()
-                        .GetInterfaces()
-                        .FirstOrDefault(iface => string.Equals(iface.FullName, IEntityTypeFullName, StringComparison.Ordinal))
-                        ?.GetProperty("ClrType", BindingFlags.Public | BindingFlags.Instance)
-                        ?.GetValue(entityType) as Type;
+                                  .GetProperty("ClrType", BindingFlags.Public | BindingFlags.Instance)
+                                  ?.GetValue(entityType) as Type
+                              ?? entityType.GetType()
+                                  .GetInterfaces()
+                                  .FirstOrDefault(iface =>
+                                      string.Equals(iface.FullName, IEntityTypeFullName, StringComparison.Ordinal))
+                                  ?.GetProperty("ClrType", BindingFlags.Public | BindingFlags.Instance)
+                                  ?.GetValue(entityType) as Type;
 
                 if (!string.IsNullOrWhiteSpace(clrType?.Name))
+                {
                     names.Add(clrType.Name);
+                }
             }
         }
         catch (TargetInvocationException)
@@ -69,7 +78,9 @@ internal static class DbContextModelEntityDiscovery
                 BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
 
             if (modelProperty is not null)
+            {
                 return modelProperty.GetValue(dbContext);
+            }
         }
 
         return null;

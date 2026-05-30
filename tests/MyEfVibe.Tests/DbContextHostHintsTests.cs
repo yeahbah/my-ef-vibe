@@ -56,7 +56,7 @@ public sealed class DbContextHostHintsTests
 
         DbContextHostHints.TryApplyPostgreSqlNamingHint(
             context,
-            startupProjectPath: string.Empty,
+            string.Empty,
             MyEfVibeProvider.Npgsql);
 
         Assert.Equal("PostgreSQL", context.GetDatabaseProvider());
@@ -64,9 +64,12 @@ public sealed class DbContextHostHintsTests
 
     private sealed class AdventureWorksStyleDbContext
     {
-        private string _databaseProvider = "SqlServer";
+        private readonly string _databaseProvider = "SqlServer";
 
-        internal string GetDatabaseProvider() => _databaseProvider;
+        internal string GetDatabaseProvider()
+        {
+            return _databaseProvider;
+        }
     }
 
     private sealed class TempDirectory : IDisposable
@@ -86,7 +89,7 @@ public sealed class DbContextHostHintsTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch
             {

@@ -11,11 +11,13 @@ internal static class LinqScanDismissalStore
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    internal static string GetPath(string sessionDirectory) =>
-        Path.Combine(SessionPaths.EnsureSessionDirectory(sessionDirectory), FileName);
+    internal static string GetPath(string sessionDirectory)
+    {
+        return Path.Combine(SessionPaths.EnsureSessionDirectory(sessionDirectory), FileName);
+    }
 
     internal static (IReadOnlyList<LinqScanFinding> Findings, int SkippedCount) FilterFindings(
         IReadOnlyList<LinqScanFinding> findings,
@@ -24,7 +26,9 @@ internal static class LinqScanDismissalStore
         var dismissedKeys = LoadDismissedKeys(sessionDirectory);
 
         if (dismissedKeys.Count == 0)
+        {
             return (findings, 0);
+        }
 
         var kept = new List<LinqScanFinding>(findings.Count);
         var skipped = 0;
@@ -75,14 +79,16 @@ internal static class LinqScanDismissalStore
     private static LinqScanDismissalsDocument LoadDocument(string path)
     {
         if (!File.Exists(path))
+        {
             return new LinqScanDismissalsDocument(1, []);
+        }
 
         try
         {
             var json = File.ReadAllText(path);
 
             return JsonSerializer.Deserialize<LinqScanDismissalsDocument>(json, JsonOptions)
-                ?? new LinqScanDismissalsDocument(1, []);
+                   ?? new LinqScanDismissalsDocument(1, []);
         }
         catch (JsonException)
         {
@@ -94,8 +100,10 @@ internal static class LinqScanDismissalStore
         }
     }
 
-    private static void SaveDocument(string path, LinqScanDismissalsDocument document) =>
+    private static void SaveDocument(string path, LinqScanDismissalsDocument document)
+    {
         File.WriteAllText(path, JsonSerializer.Serialize(document, JsonOptions));
+    }
 }
 
 internal sealed record LinqScanDismissalsDocument(int Version, List<LinqScanDismissalEntry> Dismissals);

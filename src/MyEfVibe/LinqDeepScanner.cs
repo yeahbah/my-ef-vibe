@@ -81,7 +81,7 @@ internal static class LinqDeepScanner
                 TranslatedSql = translation?.Sql,
                 SqlTranslationNote = translation?.Note,
                 QueryPlan = translation?.QueryPlan,
-                QueryPlanNote = translation?.QueryPlanNote,
+                QueryPlanNote = translation?.QueryPlanNote
             });
         }
 
@@ -90,13 +90,19 @@ internal static class LinqDeepScanner
             var siteKey = $"{site.FilePath}|{site.Line}";
 
             if (warningLines.Contains(siteKey))
+            {
                 continue;
+            }
 
             if (!sqlBySite.TryGetValue(siteKey, out var translation))
+            {
                 continue;
+            }
 
             if (string.IsNullOrWhiteSpace(translation.Sql) && string.IsNullOrWhiteSpace(translation.Note))
+            {
                 continue;
+            }
 
             var (ruleId, message) = ResolveQuerySiteRule(translation);
 
@@ -191,7 +197,9 @@ internal static class LinqDeepScanner
         }
 
         if (!string.IsNullOrWhiteSpace(translation.Sql))
+        {
             return ("query-site", "Queryable call site — translated SQL available.");
+        }
 
         return ("query-site", "Queryable call site — SQL translation failed.");
     }

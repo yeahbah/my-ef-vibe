@@ -15,16 +15,20 @@ internal static class ProjectReferenceWalker
         "TestResults",
         ".Trash",
         ".Trashes",
-        "Trash",
+        "Trash"
     };
 
     internal static IEnumerable<string> EnumerateCsprojFiles(string searchRootDirectory)
     {
         if (string.IsNullOrWhiteSpace(searchRootDirectory) || !Directory.Exists(searchRootDirectory))
+        {
             yield break;
+        }
 
         foreach (var projectFile in EnumerateProjectFiles(searchRootDirectory))
+        {
             yield return projectFile;
+        }
     }
 
     internal static bool ReferencesProject(string csprojPath, string targetProjectPath, int maxDepth = 8)
@@ -39,17 +43,23 @@ internal static class ProjectReferenceWalker
             var (current, depth) = queue.Dequeue();
 
             if (depth > maxDepth)
+            {
                 continue;
+            }
 
             foreach (var referencePath in CsprojInspector.GetProjectReferencePaths(current))
             {
                 var normalizedReference = Path.GetFullPath(referencePath);
 
                 if (string.Equals(normalizedReference, normalizedTarget, StringComparison.OrdinalIgnoreCase))
+                {
                     return true;
+                }
 
                 if (visited.Add(normalizedReference))
+                {
                     queue.Enqueue((normalizedReference, depth + 1));
+                }
             }
         }
 
@@ -64,15 +74,21 @@ internal static class ProjectReferenceWalker
         var referencers = new List<string>();
 
         if (!Directory.Exists(searchRootDirectory))
+        {
             return referencers;
+        }
 
         foreach (var candidate in EnumerateProjectFiles(searchRootDirectory))
         {
             if (string.Equals(candidate, normalizedTarget, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             if (ReferencesProject(candidate, normalizedTarget))
+            {
                 referencers.Add(candidate);
+            }
         }
 
         return referencers;
@@ -87,12 +103,16 @@ internal static class ProjectReferenceWalker
         foreach (var searchRoot in searchRootDirectories.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (string.IsNullOrWhiteSpace(searchRoot) || !Directory.Exists(searchRoot))
+            {
                 continue;
+            }
 
             foreach (var candidate in CollectProjectsReferencing(targetProjectPath, searchRoot))
             {
                 if (seen.Add(candidate))
+                {
                     yield return candidate;
+                }
             }
         }
     }
@@ -104,7 +124,9 @@ internal static class ProjectReferenceWalker
         while (!string.IsNullOrEmpty(directory))
         {
             if (Directory.EnumerateFiles(directory, "*.sln").Any())
+            {
                 return directory;
+            }
 
             directory = Directory.GetParent(directory)?.FullName;
         }
@@ -137,7 +159,9 @@ internal static class ProjectReferenceWalker
                 var directoryName = Path.GetFileName(childDirectory);
 
                 if (ExcludedDirectoryNames.Contains(directoryName))
+                {
                     continue;
+                }
 
                 pending.Push(childDirectory);
             }
@@ -154,12 +178,16 @@ internal static class ProjectReferenceWalker
             }
 
             foreach (var projectFile in projectFiles)
+            {
                 yield return Path.GetFullPath(projectFile);
+            }
         }
     }
 
     private static bool IsBenignEnumerationFailure(Exception failure)
-        => failure is UnauthorizedAccessException
-           or DirectoryNotFoundException
-           or IOException;
+    {
+        return failure is UnauthorizedAccessException
+            or DirectoryNotFoundException
+            or IOException;
+    }
 }

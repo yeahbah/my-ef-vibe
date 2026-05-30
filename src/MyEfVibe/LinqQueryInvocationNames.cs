@@ -38,6 +38,6 @@ internal static class LinqQueryInvocationNames
         "Any",
         "AnyAsync",
         "All",
-        "AllAsync",
+        "AllAsync"
     };
 }

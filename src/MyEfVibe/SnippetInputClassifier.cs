@@ -7,30 +7,42 @@ internal static class SnippetInputClassifier
         var trimmed = snippetSoFar.Trim();
 
         if (string.IsNullOrEmpty(trimmed))
+        {
             return true;
+        }
 
         if (HasUnbalancedDelimiters(trimmed))
+        {
             return true;
+        }
 
         if (EndsWithContinuationToken(trimmed))
+        {
             return true;
+        }
 
         return false;
     }
 
     internal static bool IsSubmitOnlyLine(string line)
-        => InputLineUtilities.TrimLineEnd(line).Trim() == ";";
+    {
+        return InputLineUtilities.TrimLineEnd(line).Trim() == ";";
+    }
 
     private static bool EndsWithContinuationToken(string line)
     {
         if (line.EndsWith("?.", StringComparison.Ordinal))
+        {
             return true;
+        }
 
         if (line.EndsWith(".", StringComparison.Ordinal) && !line.EndsWith("..", StringComparison.Ordinal))
         {
             // Avoid treating numeric literals like `3.` as member-access continuation.
             if (line.Length >= 2 && char.IsDigit(line[^2]))
+            {
                 return false;
+            }
 
             return true;
         }
@@ -38,7 +50,9 @@ internal static class SnippetInputClassifier
         foreach (var token in new[] { ",", "+", "-", "*", "/", "&&", "||", "=>", "=", "{", "(", "[" })
         {
             if (line.EndsWith(token, StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -71,7 +85,9 @@ internal static class SnippetInputClassifier
                 }
 
                 if (current == '"')
+                {
                     inString = false;
+                }
 
                 continue;
             }

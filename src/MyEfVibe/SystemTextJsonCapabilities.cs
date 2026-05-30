@@ -8,7 +8,9 @@ internal static class SystemTextJsonCapabilities
     internal const string AssemblySimpleName = "System.Text.Json";
 
     internal static bool IsCompatibleLoaded()
-        => TryGetLoaded(out var assembly) && IsCompatible(assembly);
+    {
+        return TryGetLoaded(out var assembly) && IsCompatible(assembly);
+    }
 
     internal static bool TryGetLoaded([NotNullWhen(true)] out Assembly? loadedAssembly)
     {
@@ -18,7 +20,9 @@ internal static class SystemTextJsonCapabilities
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
             if (!string.Equals(assembly.GetName().Name, AssemblySimpleName, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             fallback ??= assembly;
 
@@ -37,10 +41,14 @@ internal static class SystemTextJsonCapabilities
     internal static bool IsCompatible(Assembly assembly)
     {
         if (assembly.GetName().Version is { Major: < 5 })
+        {
             return false;
+        }
 
         if (IsSharedFrameworkAssembly(assembly))
+        {
             return true;
+        }
 
         return HasJsonSerializerOptionsWeb(assembly);
     }
@@ -48,7 +56,9 @@ internal static class SystemTextJsonCapabilities
     internal static bool IsSharedFrameworkAssembly(Assembly assembly)
     {
         if (string.IsNullOrEmpty(assembly.Location))
+        {
             return false;
+        }
 
         var normalized = assembly.Location.Replace('\\', Path.DirectorySeparatorChar);
 
@@ -64,15 +74,17 @@ internal static class SystemTextJsonCapabilities
     {
         var optionsType = assembly.GetType(
             "System.Text.Json.JsonSerializerOptions",
-            throwOnError: false,
-            ignoreCase: false);
+            false,
+            false);
 
         if (optionsType?.GetProperty("Web", BindingFlags.Public | BindingFlags.Static) is not null)
+        {
             return true;
+        }
 
         var qualifiedName = $"System.Text.Json.JsonSerializerOptions, {assembly.FullName}";
 
-        optionsType = Type.GetType(qualifiedName, throwOnError: false);
+        optionsType = Type.GetType(qualifiedName, false);
 
         return optionsType?.GetProperty("Web", BindingFlags.Public | BindingFlags.Static) is not null;
     }

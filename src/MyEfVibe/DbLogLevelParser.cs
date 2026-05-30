@@ -35,11 +35,13 @@ internal static class DbLogLevelParser
         }
     }
 
-    internal static string Format(DbLogLevel level) =>
-        level switch
+    internal static string Format(DbLogLevel level)
+    {
+        return level switch
         {
             DbLogLevel.Information => "information",
             DbLogLevel.Warning => "warning",
-            _ => level.ToString().ToLowerInvariant(),
+            _ => level.ToString().ToLowerInvariant()
         };
+    }
 }

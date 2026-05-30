@@ -12,10 +12,12 @@ internal static partial class DbContextClassDiscovery
     private static partial Regex DbContextClassDeclarationRegex();
 
     internal static IReadOnlyList<string> DiscoverDbContextTypeNames(IEnumerable<string> projectDirectories)
-        => DiscoverDbContextTypeAliases(projectDirectories)
+    {
+        return DiscoverDbContextTypeAliases(projectDirectories)
             .Keys
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
+    }
 
     internal static IReadOnlyDictionary<string, IReadOnlySet<string>> DiscoverDbContextTypeAliases(
         IEnumerable<string> projectDirectories)
@@ -25,7 +27,9 @@ internal static partial class DbContextClassDiscovery
         foreach (var projectDirectory in projectDirectories)
         {
             if (!Directory.Exists(projectDirectory))
+            {
                 continue;
+            }
 
             foreach (var sourcePath in LinqProjectSourceWalker.EnumerateSourceFiles(projectDirectory))
             {
@@ -58,7 +62,9 @@ internal static partial class DbContextClassDiscovery
         foreach (Match match in DbContextClassDeclarationRegex().Matches(text))
         {
             if (!match.Groups["Name"].Success)
+            {
                 continue;
+            }
 
             var name = match.Groups["Name"].Value;
             EnsureAliasSet(aliasesByName, name).Add(name);
@@ -75,7 +81,9 @@ internal static partial class DbContextClassDiscovery
         {
             if (typeDeclaration is not ClassDeclarationSyntax
                 || typeDeclaration.BaseList is null)
+            {
                 continue;
+            }
 
             var typeName = typeDeclaration.Identifier.Text;
             var baseTypeNames = typeDeclaration.BaseList.Types
@@ -87,7 +95,9 @@ internal static partial class DbContextClassDiscovery
 
             if (!baseTypeNames.Contains("DbContext", StringComparer.Ordinal)
                 && !aliasesByName.ContainsKey(typeName))
+            {
                 continue;
+            }
 
             var aliases = EnsureAliasSet(aliasesByName, typeName);
             aliases.Add(typeName);
@@ -95,7 +105,9 @@ internal static partial class DbContextClassDiscovery
             foreach (var baseTypeName in baseTypeNames)
             {
                 if (IsDbContextInterfaceAlias(baseTypeName, typeName))
+                {
                     aliases.Add(baseTypeName);
+                }
             }
         }
     }
@@ -113,11 +125,13 @@ internal static partial class DbContextClassDiscovery
         return aliases;
     }
 
-    private static bool IsDbContextInterfaceAlias(string typeName, string contextTypeName) =>
-        typeName.StartsWith('I')
-        && typeName.EndsWith("DbContext", StringComparison.Ordinal)
-        && !string.Equals(typeName, "IDbContext", StringComparison.Ordinal)
-        && !string.Equals(typeName, contextTypeName, StringComparison.Ordinal);
+    private static bool IsDbContextInterfaceAlias(string typeName, string contextTypeName)
+    {
+        return typeName.StartsWith('I')
+               && typeName.EndsWith("DbContext", StringComparison.Ordinal)
+               && !string.Equals(typeName, "IDbContext", StringComparison.Ordinal)
+               && !string.Equals(typeName, contextTypeName, StringComparison.Ordinal);
+    }
 
     private static bool TryGetSimpleTypeName(TypeSyntax typeSyntax, out string typeName)
     {

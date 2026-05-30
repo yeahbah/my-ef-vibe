@@ -21,13 +21,17 @@ internal static class LinqScanReviewPresenter
         body.AddRow("[grey]Message[/]", Markup.Escape(finding.Message));
 
         if (!string.IsNullOrWhiteSpace(finding.SavedNote))
+        {
             body.AddRow("[grey]Note[/]", $"[bold yellow]{Markup.Escape(finding.SavedNote)}[/]");
+        }
 
         body.AddRow("[grey]Fix[/]", Markup.Escape(finding.ResolvedRecommendation));
         body.AddRow("[grey]Code[/]", $"[dim]{Markup.Escape(finding.Code)}[/]");
 
         if (!string.IsNullOrWhiteSpace(finding.SqlTranslationNote) && string.IsNullOrWhiteSpace(finding.TranslatedSql))
+        {
             body.AddRow("[grey]SQL[/]", $"[yellow]{Markup.Escape(finding.SqlTranslationNote)}[/]");
+        }
 
         AnsiConsole.Write(
             new Panel(body)
@@ -35,21 +39,29 @@ internal static class LinqScanReviewPresenter
                 Header = new PanelHeader($"[bold]Finding {index + 1} of {total}[/]"),
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(Color.Grey),
-                Padding = new Padding(1, 0, 1, 0),
+                Padding = new Padding(1, 0, 1, 0)
             });
 
         if (!string.IsNullOrWhiteSpace(finding.TranslatedSql))
+        {
             CliUi.WriteSqlBlock("Translated SQL (ToQueryString)", finding.TranslatedSql);
+        }
 
         if (!string.IsNullOrWhiteSpace(finding.QueryPlan))
+        {
             CliUi.WriteSqlBlock("Query plan (EXPLAIN)", finding.QueryPlan);
+        }
         else if (!string.IsNullOrWhiteSpace(finding.QueryPlanNote)
                  && !string.IsNullOrWhiteSpace(finding.TranslatedSql))
+        {
             CliUi.WriteSqlBlock("Query plan", finding.QueryPlanNote);
+        }
 
         if (string.IsNullOrWhiteSpace(finding.TranslatedSql)
             && string.IsNullOrWhiteSpace(finding.QueryPlan))
+        {
             AnsiConsole.WriteLine();
+        }
     }
 
     internal static void WriteNavigationHint(string savedPath)
@@ -64,14 +76,16 @@ internal static class LinqScanReviewPresenter
         AnsiConsole.WriteLine();
     }
 
-    private static string FormatSeverityMarkup(LinqScanSeverity severity) =>
-        severity switch
+    private static string FormatSeverityMarkup(LinqScanSeverity severity)
+    {
+        return severity switch
         {
             LinqScanSeverity.Critical => "[bold red]critical[/]",
             LinqScanSeverity.Error => "[bold red]error[/]",
             LinqScanSeverity.Warning => "[bold yellow]warning[/]",
-            _ => "[dim cyan]info[/]",
+            _ => "[dim cyan]info[/]"
         };
+    }
 
     private static string TryToRelativePath(string rootDirectory, string absolutePath)
     {

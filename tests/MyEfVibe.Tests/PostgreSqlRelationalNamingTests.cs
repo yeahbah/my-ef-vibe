@@ -10,22 +10,27 @@ public sealed class PostgreSqlRelationalNamingTests
         var persistenceDll = FindPrebuiltPersistenceDll();
 
         if (persistenceDll is null)
+        {
             return;
+        }
 
         var outputDirectory = Path.GetDirectoryName(persistenceDll)!;
-        var efProject = "/home/adiaz/Projects/AdventureWorks/apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj";
+        var efProject =
+            "/home/adiaz/Projects/AdventureWorks/apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj";
 
         if (!File.Exists(efProject))
+        {
             return;
+        }
 
         var workspaceBuild = new WorkspaceBuildResult(
-            SessionDirectory: Path.Combine(Path.GetTempPath(), "efvibe-tests", Guid.NewGuid().ToString("N")),
-            ProjectPath: efProject,
-            StartupProjectPath: efProject,
-            OutputDirectory: outputDirectory,
-            PrimaryAssemblyDll: persistenceDll,
-            TargetFrameworkMoniker: "net10.0",
-            ProjectBuildOutput: new ProjectBuildOutput(outputDirectory));
+            Path.Combine(Path.GetTempPath(), "efvibe-tests", Guid.NewGuid().ToString("N")),
+            efProject,
+            efProject,
+            outputDirectory,
+            persistenceDll,
+            "net10.0",
+            new ProjectBuildOutput(outputDirectory));
 
         using var host = WorkspaceHost.Load(workspaceBuild);
 
@@ -34,7 +39,7 @@ public sealed class PostgreSqlRelationalNamingTests
             "AdventureWorksDbContext",
             "Host=localhost;Port=5432;Database=adventureworks;Username=postgres;Password=Your_strong_Password123!",
             MyEfVibeProvider.Npgsql,
-            allowInteractiveSelection: false);
+            false);
 
         var customizerType = EfVibeModelCustomizerEmitter.TryGetOrCreate(
             host,
@@ -82,11 +87,12 @@ public sealed class PostgreSqlRelationalNamingTests
         var relationalAssembly = AppDomain.CurrentDomain
             .GetAssemblies()
             .First(assembly =>
-                string.Equals(assembly.GetName().Name, "Microsoft.EntityFrameworkCore.Relational", StringComparison.Ordinal));
+                string.Equals(assembly.GetName().Name, "Microsoft.EntityFrameworkCore.Relational",
+                    StringComparison.Ordinal));
 
         var extensionsType = relationalAssembly.GetType(
             "Microsoft.EntityFrameworkCore.RelationalEntityTypeExtensions",
-            throwOnError: true)!;
+            true)!;
 
         var method = extensionsType
             .GetMethods(BindingFlags.Static | BindingFlags.Public)
@@ -102,10 +108,13 @@ public sealed class PostgreSqlRelationalNamingTests
         var root = Path.Combine(Path.GetTempPath(), "efvibe-integration");
 
         if (!Directory.Exists(root))
+        {
             return null;
+        }
 
         return Directory
             .EnumerateFiles(root, "AdventureWorks.Infrastructure.Persistence.dll", SearchOption.AllDirectories)
-            .FirstOrDefault(path => path.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+            .FirstOrDefault(path => path.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal));
     }
 }

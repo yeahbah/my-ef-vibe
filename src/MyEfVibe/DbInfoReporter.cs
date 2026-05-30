@@ -16,18 +16,22 @@ internal static class DbInfoReporter
         var rows = new List<(string Key, string Value)>
         {
             ("DbContext", contextType.FullName ?? contextType.Name),
-            ("EF project", FormatProjectPath(host.ProjectPath)),
+            ("EF project", FormatProjectPath(host.ProjectPath))
         };
 
         if (!string.Equals(host.ProjectPath, host.StartupProjectPath, StringComparison.OrdinalIgnoreCase))
+        {
             rows.Add(("Startup project", FormatProjectPath(host.StartupProjectPath)));
+        }
 
         rows.Add(("Session directory", host.SessionDirectory));
 
         var efVersion = TryGetEfCoreVersion();
 
         if (efVersion is not null)
+        {
             rows.Add(("EF Core", efVersion));
+        }
 
         var database = contextType.GetProperty("Database")?.GetValue(dbContext);
 
@@ -49,7 +53,9 @@ internal static class DbInfoReporter
         var commandTimeout = database.GetType().GetProperty("CommandTimeout")?.GetValue(database);
 
         if (commandTimeout is int timeoutSeconds)
+        {
             rows.Add(("Command timeout", timeoutSeconds <= 0 ? "default" : $"{timeoutSeconds}s"));
+        }
 
         var dbSetCount = CountDbSets(dbContext);
 
@@ -74,13 +80,15 @@ internal static class DbInfoReporter
         try
         {
             if (openedHere)
+            {
                 await dbConnection.OpenAsync(cancellationToken);
+            }
 
             rows.Add(("Connection state", dbConnection.State.ToString()));
             rows.Add(("Data source", NullIfEmpty(dbConnection.DataSource)));
             rows.Add(("Database", NullIfEmpty(dbConnection.Database)));
             rows.Add(("Server version", await TryGetServerVersionAsync(dbConnection, providerName, cancellationToken)
-                ?? "(unavailable)"));
+                                        ?? "(unavailable)"));
             rows.Add(("Connection string", NullIfEmpty(dbConnection.ConnectionString)));
         }
         catch (Exception failure)
@@ -90,7 +98,9 @@ internal static class DbInfoReporter
         finally
         {
             if (openedHere && dbConnection.State != ConnectionState.Closed)
+            {
                 await dbConnection.CloseAsync();
+            }
         }
 
         WritePanel(rows);
@@ -103,7 +113,9 @@ internal static class DbInfoReporter
         table.AddColumn("[grey]Value[/]");
 
         foreach (var (key, value) in rows)
+        {
             table.AddRow(Markup.Escape(key), Markup.Escape(value));
+        }
 
         AnsiConsole.Write(
             new Panel(table)
@@ -111,36 +123,50 @@ internal static class DbInfoReporter
                 Header = new PanelHeader("[bold]Database info[/]"),
                 Border = BoxBorder.Rounded,
                 BorderStyle = new Style(Color.Grey),
-                Padding = new Padding(1, 0, 1, 0),
+                Padding = new Padding(1, 0, 1, 0)
             });
 
         AnsiConsole.WriteLine();
     }
 
     private static string FormatProjectPath(string absolutePath)
-        => Path.GetFileName(absolutePath);
+    {
+        return Path.GetFileName(absolutePath);
+    }
 
     internal static string FormatProviderDisplay(string providerName)
     {
         if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
             return "SQL Server";
+        }
 
         if (providerName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+        {
             return "PostgreSQL";
+        }
 
         if (providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
             return "SQLite";
+        }
 
         if (providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase))
+        {
             return "Oracle";
+        }
 
         if (providerName.Contains("MariaDb", StringComparison.OrdinalIgnoreCase)
             || providerName.Contains("MariaDB", StringComparison.Ordinal))
+        {
             return "MariaDB";
+        }
 
         if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
             || providerName.Contains("MySQL", StringComparison.Ordinal))
+        {
             return "MySQL";
+        }
 
         return providerName;
     }
@@ -162,16 +188,22 @@ internal static class DbInfoReporter
         foreach (var property in dbContext.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!property.CanRead || property.GetIndexParameters().Length > 0)
+            {
                 continue;
+            }
 
             var propertyType = property.PropertyType;
 
             if (!propertyType.IsGenericType)
+            {
                 continue;
+            }
 
             if (propertyType.GetGenericTypeDefinition().FullName?
                     .StartsWith("Microsoft.EntityFrameworkCore.DbSet`1", StringComparison.Ordinal) != true)
+            {
                 continue;
+            }
 
             count++;
         }
@@ -193,14 +225,16 @@ internal static class DbInfoReporter
             _ when providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase) =>
                 "SELECT banner FROM v$version WHERE ROWNUM = 1",
             _ when providerName.Contains("MariaDb", StringComparison.OrdinalIgnoreCase)
-                || providerName.Contains("MariaDB", StringComparison.Ordinal)
-                || providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
-                || providerName.Contains("MySQL", StringComparison.Ordinal) => "SELECT VERSION()",
-            _ => null,
+                   || providerName.Contains("MariaDB", StringComparison.Ordinal)
+                   || providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
+                   || providerName.Contains("MySQL", StringComparison.Ordinal) => "SELECT VERSION()",
+            _ => null
         };
 
         if (sql is null)
+        {
             return null;
+        }
 
         try
         {
@@ -217,5 +251,7 @@ internal static class DbInfoReporter
     }
 
     private static string NullIfEmpty(string? value)
-        => string.IsNullOrWhiteSpace(value) ? "(empty)" : value;
+    {
+        return string.IsNullOrWhiteSpace(value) ? "(empty)" : value;
+    }
 }

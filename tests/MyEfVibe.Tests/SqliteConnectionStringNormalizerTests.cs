@@ -106,17 +106,17 @@ public sealed class SqliteConnectionStringNormalizerTests
         File.WriteAllText(
             Path.Combine(temp.Path, "appsettings.Development.json"),
             $$"""
-            {
-              "ConnectionStrings": {
-                "ApplicationDatabase": "{{developmentConnection}}"
+              {
+                "ConnectionStrings": {
+                  "ApplicationDatabase": "{{developmentConnection}}"
+                }
               }
-            }
-            """);
+              """);
 
         Assert.True(
             AppSettingsConnectionResolver.TryResolve(
                 startupProject,
-                efOutputDirectory: temp.Path,
+                temp.Path,
                 out var connectionString,
                 out _));
 
@@ -154,17 +154,17 @@ public sealed class SqliteConnectionStringNormalizerTests
         File.WriteAllText(
             Path.Combine(temp.Path, "appsettings.Development.json"),
             $$"""
-            {
-              "ConnectionStrings": {
-                "DefaultConnection": "Data Source={{developmentDatabase}}"
+              {
+                "ConnectionStrings": {
+                  "DefaultConnection": "Data Source={{developmentDatabase}}"
+                }
               }
-            }
-            """);
+              """);
 
         Assert.True(
             AppSettingsConnectionResolver.TryResolve(
                 startupProject,
-                efOutputDirectory: temp.Path,
+                temp.Path,
                 out var connectionString,
                 out var provider));
 
@@ -190,7 +190,7 @@ public sealed class SqliteConnectionStringNormalizerTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

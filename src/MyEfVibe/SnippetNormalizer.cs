@@ -3,29 +3,37 @@ namespace MyEfVibe;
 internal static class SnippetNormalizer
 {
     /// <summary>
-    /// Prepares REPL input for Roslyn scripting. Trailing <c>;</c> on a final expression is removed so the
-    /// script returns a value; statement forms (e.g. <c>var</c> declarations) keep their terminator.
+    ///     Prepares REPL input for Roslyn scripting. Trailing <c>;</c> on a final expression is removed so the
+    ///     script returns a value; statement forms (e.g. <c>var</c> declarations) keep their terminator.
     /// </summary>
     internal static string ForEvaluation(string snippet, Type? dbContextType = null)
     {
         var trimmed = snippet.Trim();
 
         if (string.IsNullOrEmpty(trimmed))
+        {
             return trimmed;
+        }
 
         if (dbContextType is not null && LooksLikeRepositorySnippet(trimmed))
+        {
             return RepositorySnippetAdapter.PrepareForEvaluation(trimmed, dbContextType);
+        }
 
         var lines = InputLineUtilities.SplitLines(trimmed);
         var lastNonEmptyIndex = IndexOfLastNonEmptyLine(lines);
 
         if (lastNonEmptyIndex < 0)
+        {
             return trimmed;
+        }
 
         if (lines.Length == 1)
+        {
             return RewriteBoundedEfQuery(
                 NormalizeFinalLine(ReplaceContextAliases(lines[0].TrimEnd())),
                 dbContextType);
+        }
 
         var normalized = new string[lines.Length];
 
@@ -65,17 +73,19 @@ internal static class SnippetNormalizer
     private static string RewriteBoundedEfQuery(string snippet, Type? dbContextType)
     {
         if (dbContextType is null)
+        {
             return snippet;
+        }
 
         var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(snippet, dbContextType)
-            ?? snippet;
+                        ?? snippet;
 
         rewritten = EfReplQueryableRewriter.TryCastDbSetRoots(rewritten, dbContextType)
-            ?? rewritten;
+                    ?? rewritten;
 
         return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten, dbContextType)
-            ?? EfReplQueryableRewriter.TryRewriteBareWhere(rewritten, dbContextType)
-            ?? rewritten;
+               ?? EfReplQueryableRewriter.TryRewriteBareWhere(rewritten, dbContextType)
+               ?? rewritten;
     }
 
     private static int IndexOfLastNonEmptyLine(string[] lines)
@@ -83,7 +93,9 @@ internal static class SnippetNormalizer
         for (var index = lines.Length - 1; index >= 0; index--)
         {
             if (!string.IsNullOrWhiteSpace(lines[index]))
+            {
                 return index;
+            }
         }
 
         return -1;
@@ -92,10 +104,14 @@ internal static class SnippetNormalizer
     private static string NormalizeFinalLine(string line)
     {
         if (!line.EndsWith(';'))
+        {
             return line;
+        }
 
         if (RequiresStatementTerminator(line))
+        {
             return line;
+        }
 
         return line[..^1].TrimEnd();
     }
@@ -105,10 +121,14 @@ internal static class SnippetNormalizer
         var text = line.TrimEnd(';').TrimEnd();
 
         if (string.IsNullOrEmpty(text))
+        {
             return true;
+        }
 
         if (line.Count(static character => character == ';') > 1)
+        {
             return true;
+        }
 
         ReadOnlySpan<string> statementPrefixes =
         [
@@ -143,51 +163,64 @@ internal static class SnippetNormalizer
             "struct ",
             "delegate ",
             "event ",
-            "#",
+            "#"
         ];
 
         foreach (var prefix in statementPrefixes)
         {
             if (text.StartsWith(prefix, StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
 
         if (text.StartsWith("using(", StringComparison.Ordinal) || text.StartsWith("using (", StringComparison.Ordinal))
+        {
             return true;
+        }
 
         // `int id = 1`, `string? name = null`, etc.
         if (LooksLikeTypeDeclaration(text))
+        {
             return true;
+        }
 
         return false;
     }
 
-    private static bool LooksLikeRepositorySnippet(string snippet) =>
-        snippet.Contains("await ", StringComparison.Ordinal)
-        || snippet.Contains("DbContext", StringComparison.Ordinal)
-        || snippet.Contains("dbContext", StringComparison.Ordinal)
-        || snippet.Contains("Async(", StringComparison.Ordinal)
-        || snippet.Contains("cancellationToken", StringComparison.OrdinalIgnoreCase)
-        || SqlTranslationProbe.ContainsEagerLoad(snippet)
-        || InputLineUtilities.SplitLines(snippet).Length > 1;
+    private static bool LooksLikeRepositorySnippet(string snippet)
+    {
+        return snippet.Contains("await ", StringComparison.Ordinal)
+               || snippet.Contains("DbContext", StringComparison.Ordinal)
+               || snippet.Contains("dbContext", StringComparison.Ordinal)
+               || snippet.Contains("Async(", StringComparison.Ordinal)
+               || snippet.Contains("cancellationToken", StringComparison.OrdinalIgnoreCase)
+               || SqlTranslationProbe.ContainsEagerLoad(snippet)
+               || InputLineUtilities.SplitLines(snippet).Length > 1;
+    }
 
     private static bool LooksLikeTypeDeclaration(string text)
     {
         var equalsIndex = text.IndexOf('=');
 
         if (equalsIndex <= 0)
+        {
             return false;
+        }
 
         var left = text[..equalsIndex].Trim();
 
         if (left.Length == 0)
+        {
             return false;
+        }
 
         if (left is "var" or "dynamic")
+        {
             return true;
+        }
 
         // Heuristic: type name followed by identifier (`int id`, `List<int> items`).
         return char.IsLetter(left[0]) && left.Contains(' ');
     }
-
 }

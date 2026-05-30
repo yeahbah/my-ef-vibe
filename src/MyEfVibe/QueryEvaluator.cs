@@ -30,7 +30,7 @@ internal static class QueryEvaluator
                 ResultAnalyzer.Analyze(result);
 
             var executedSql = sqlCapture?.Commands.Select(EfSqlCapture.FormatEntry).ToArray()
-                ?? Array.Empty<string>();
+                              ?? Array.Empty<string>();
 
             ExecutedSqlWarningRules.AddExecutedSqlWarnings(snippet, executedSql, warnings);
 
@@ -46,7 +46,9 @@ internal static class QueryEvaluator
                     cancellationToken);
 
                 if (!string.IsNullOrWhiteSpace(translatedSql))
+                {
                     warnings.Add(BuildTranslatedSqlWarning(result));
+                }
             }
 
             var metrics = new EvaluationMetrics(
@@ -96,7 +98,9 @@ internal static class QueryEvaluator
                     cancellationToken);
 
                 if (probeSql is string literal && !string.IsNullOrWhiteSpace(literal))
+                {
                     return literal;
+                }
             }
             catch
             {
@@ -104,17 +108,21 @@ internal static class QueryEvaluator
             }
         }
 
-        if (result is System.Linq.IQueryable
+        if (result is IQueryable
             && RelationalQueryableSqlFormatter.TryGetSql(result, inspectionAssemblies, out var queryString))
+        {
             return queryString;
+        }
 
         return null;
     }
 
-    private static string BuildTranslatedSqlWarning(object? result) =>
-        result is System.Linq.IQueryable
+    private static string BuildTranslatedSqlWarning(object? result)
+    {
+        return result is IQueryable
             ? "Query not executed; showing translated SQL from ToQueryString()."
             : "Executed SQL was not captured from the database log; showing translated SQL from ToQueryString() (provider LIMIT/TOP may differ at runtime).";
+    }
 
     private static Exception UnwrapEvaluationException(Exception failure)
     {
@@ -142,15 +150,17 @@ internal static class QueryEvaluator
         for (var current = failure; current is not null; current = current.InnerException)
         {
             var line = string.IsNullOrWhiteSpace(current.Message)
-                || string.Equals(
-                    current.Message,
-                    "Exception has been thrown by the target of an invocation.",
-                    StringComparison.Ordinal)
+                       || string.Equals(
+                           current.Message,
+                           "Exception has been thrown by the target of an invocation.",
+                           StringComparison.Ordinal)
                 ? $"{current.GetType().Name}"
                 : $"{current.GetType().Name}: {current.Message}";
 
             if (!seen.Add(line))
+            {
                 continue;
+            }
 
             lines.Add(line);
         }

@@ -24,9 +24,11 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
             "CursorPaginationPg", "src", "Cursor.Pagination", "bin", "Debug", "net9.0", "CursorPagination.dll"));
 
         if (!File.Exists(assemblyPath))
+        {
             return;
+        }
 
-        var contextType = Assembly.LoadFrom(assemblyPath).GetType("CursorPagination.Data.AppDbContext", throwOnError: true)!;
+        var contextType = Assembly.LoadFrom(assemblyPath).GetType("CursorPagination.Data.AppDbContext", true)!;
 
         var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls("db.Users.First()", contextType);
 
@@ -61,8 +63,8 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statement,
-            representativeEntityTypeName: "FakeRewriterUser",
-            dbContextType: typeof(FakeRewriterDbContext));
+            "FakeRewriterUser",
+            typeof(FakeRewriterDbContext));
 
         Assert.NotNull(probe);
 
@@ -111,16 +113,16 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     public void TryCreateProbeExpression_UserNotesGetUser_ProducesTranslatableProbe()
     {
         const string statement = """
-            await db.Users
-                .AsNoTracking()
-                .FirstOrDefaultAsync(u => u.Id == note.UserId)
-            """;
+                                 await db.Users
+                                     .AsNoTracking()
+                                     .FirstOrDefaultAsync(u => u.Id == note.UserId)
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statement,
-            representativeEntityTypeName: "User",
-            dbContextType: typeof(FakeGuidNoteDbContext),
-            queryEntityTypeName: typeof(FakeGuidUser).FullName);
+            "User",
+            typeof(FakeGuidNoteDbContext),
+            typeof(FakeGuidUser).FullName);
 
         Assert.NotNull(probe);
         Assert.Contains("Guid.Empty", probe, StringComparison.Ordinal);
@@ -143,7 +145,8 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
         var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
 
         Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
-        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.OrderBy<global::System.String, global::System.String>(", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.OrderBy<global::System.String, global::System.String>(",
+            normalized, StringComparison.Ordinal);
         Assert.Contains("x => x)", normalized, StringComparison.Ordinal);
     }
 
@@ -157,7 +160,9 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
 
         Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
         Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.OrderBy<", normalized, StringComparison.Ordinal);
-        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Select(global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)", normalized, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::MyEfVibe.ReplQueryableRuntime.Select(global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)",
+            normalized, StringComparison.Ordinal);
         Assert.Contains("x => new { x.Id, x.Name }", normalized, StringComparison.Ordinal);
         Assert.Contains("x => x.Name", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("Take(db.Users, 10).Select(", normalized, StringComparison.Ordinal);
@@ -173,7 +178,8 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
 
         Assert.Contains("ReplQueryableRuntime.OrderBy<", normalized, StringComparison.Ordinal);
         Assert.Contains("FakeRewriterUser, global::System.String>", normalized, StringComparison.Ordinal);
-        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)", normalized,
+            StringComparison.Ordinal);
         Assert.Contains("x => x.Name", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("AsNoTracking", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("Enumerable", normalized, StringComparison.Ordinal);

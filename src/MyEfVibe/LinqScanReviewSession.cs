@@ -2,21 +2,22 @@ namespace MyEfVibe;
 
 internal sealed class LinqScanReviewSession
 {
-    private IReadOnlyList<LinqScanFinding> _findings = Array.Empty<LinqScanFinding>();
     private string _displayRoot = string.Empty;
-    private string _sessionDirectory = string.Empty;
+    private IReadOnlyList<LinqScanFinding> _findings = Array.Empty<LinqScanFinding>();
+
     private LinqScanMode _mode = LinqScanMode.Lite;
+    private string _sessionDirectory = string.Empty;
 
     internal bool IsActive { get; private set; }
 
     internal int Count => _findings.Count;
 
-    internal int CurrentIndex => _index;
+    internal int CurrentIndex { get; private set; }
 
-    private int _index;
-
-    internal string? GetActivePrompt() =>
-        IsActive ? CliUi.ScanReviewPrompt(_index + 1, Count) : null;
+    internal string? GetActivePrompt()
+    {
+        return IsActive ? CliUi.ScanReviewPrompt(CurrentIndex + 1, Count) : null;
+    }
 
     internal void Begin(
         LinqLiteScanResult result,
@@ -31,18 +32,24 @@ internal sealed class LinqScanReviewSession
         _mode = mode;
         var savedPath = LinqScanSessionFile.Save(sessionDirectory, result, _displayRoot, mode, deepStats);
         _findings = result.Findings;
-        _index = 0;
+        CurrentIndex = 0;
         IsActive = _findings.Count > 0;
 
         if (_mode == LinqScanMode.Deep)
+        {
             LinqScanPresenter.WriteDeepSummary(result, _displayRoot, savedPath, deepStats, dismissedSkippedCount);
+        }
         else
+        {
             LinqScanPresenter.WriteLiteSummary(result, _displayRoot, savedPath, dismissedSkippedCount);
+        }
 
         if (_findings.Count == 0)
+        {
             return;
+        }
 
-        LinqScanReviewPresenter.Show(_findings[_index], _index, _findings.Count, _displayRoot);
+        LinqScanReviewPresenter.Show(_findings[CurrentIndex], CurrentIndex, _findings.Count, _displayRoot);
         LinqScanReviewPresenter.WriteNavigationHint(savedPath);
     }
 
@@ -55,7 +62,9 @@ internal sealed class LinqScanReviewSession
         }
 
         if (_findings.Count == 0)
+        {
             return false;
+        }
 
         if (string.IsNullOrWhiteSpace(note))
         {
@@ -63,12 +72,12 @@ internal sealed class LinqScanReviewSession
             return true;
         }
 
-        var finding = _findings[_index];
+        var finding = _findings[CurrentIndex];
         LinqScanNoteStore.SaveNote(_sessionDirectory, finding, note);
 
         var updated = finding with { SavedNote = note.Trim() };
         var list = _findings.ToList();
-        list[_index] = updated;
+        list[CurrentIndex] = updated;
         _findings = list;
 
         CliUi.WriteSuccess("Note saved — it will appear on this finding in future scans.");
@@ -86,13 +95,15 @@ internal sealed class LinqScanReviewSession
         }
 
         if (_findings.Count == 0)
+        {
             return false;
+        }
 
-        var finding = _findings[_index];
+        var finding = _findings[CurrentIndex];
         LinqScanDismissalStore.Dismiss(_sessionDirectory, finding, note);
 
         var remaining = _findings.ToList();
-        remaining.RemoveAt(_index);
+        remaining.RemoveAt(CurrentIndex);
         _findings = remaining;
 
         if (_findings.Count == 0)
@@ -102,8 +113,10 @@ internal sealed class LinqScanReviewSession
             return true;
         }
 
-        if (_index >= _findings.Count)
-            _index = _findings.Count - 1;
+        if (CurrentIndex >= _findings.Count)
+        {
+            CurrentIndex = _findings.Count - 1;
+        }
 
         var message = string.IsNullOrWhiteSpace(note)
             ? "Finding dismissed — it will be skipped in future scans."
@@ -118,15 +131,17 @@ internal sealed class LinqScanReviewSession
     internal bool TryNext()
     {
         if (!IsActive)
+        {
             return false;
+        }
 
-        if (_index >= _findings.Count - 1)
+        if (CurrentIndex >= _findings.Count - 1)
         {
             CliUi.WriteWarning("Queue complete — you are at the last finding.");
             return true;
         }
 
-        _index++;
+        CurrentIndex++;
         ShowCurrent();
 
         return true;
@@ -135,15 +150,17 @@ internal sealed class LinqScanReviewSession
     internal bool TryPrevious()
     {
         if (!IsActive)
+        {
             return false;
+        }
 
-        if (_index <= 0)
+        if (CurrentIndex <= 0)
         {
             CliUi.WriteWarning("Already at the first finding.");
             return true;
         }
 
-        _index--;
+        CurrentIndex--;
         ShowCurrent();
 
         return true;
@@ -157,7 +174,7 @@ internal sealed class LinqScanReviewSession
             return;
         }
 
-        _index = 0;
+        CurrentIndex = 0;
         ShowCurrent();
         CliUi.WriteSuccess("Review queue restarted at the first finding.");
     }
@@ -174,6 +191,8 @@ internal sealed class LinqScanReviewSession
         CliUi.WriteSuccess("Scan review ended.");
     }
 
-    private void ShowCurrent() =>
-        LinqScanReviewPresenter.Show(_findings[_index], _index, _findings.Count, _displayRoot);
+    private void ShowCurrent()
+    {
+        LinqScanReviewPresenter.Show(_findings[CurrentIndex], CurrentIndex, _findings.Count, _displayRoot);
+    }
 }

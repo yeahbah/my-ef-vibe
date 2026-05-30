@@ -1,5 +1,3 @@
-using System.Reflection;
-
 namespace MyEfVibe;
 
 internal sealed record LinqSqlTranslationResult(
@@ -80,7 +78,7 @@ internal static class LinqDeepSqlTranslator
             if (!RelationalQueryableSqlFormatter.TryGetSql(queryable, inspectionAssemblies, out var sql))
             {
                 if (queryable is not null
-                    && !typeof(System.Linq.IQueryable).IsAssignableFrom(queryable.GetType()))
+                    && !typeof(IQueryable).IsAssignableFrom(queryable.GetType()))
                 {
                     return new LinqSqlTranslationResult(
                         null,
@@ -101,7 +99,9 @@ internal static class LinqDeepSqlTranslator
         catch (Exception failure)
         {
             if (TryCreateUnmappedEntityNote(failure, includedModelEntities, out var unmappedNote))
+            {
                 return new LinqSqlTranslationResult(null, unmappedNote);
+            }
 
             return new LinqSqlTranslationResult(null, TruncateNote(failure.Message));
         }
@@ -136,31 +136,41 @@ internal static class LinqDeepSqlTranslator
         note = string.Empty;
 
         if (includedModelEntities.Count == 0)
+        {
             return false;
+        }
 
         var message = failure.Message;
 
         if (!message.Contains("not included in the model", StringComparison.OrdinalIgnoreCase)
             && !message.Contains("Cannot create a DbSet for", StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
         const string prefix = "Cannot create a DbSet for '";
 
         var start = message.IndexOf(prefix, StringComparison.Ordinal);
 
         if (start < 0)
+        {
             return false;
+        }
 
         start += prefix.Length;
         var end = message.IndexOf('\'', start);
 
         if (end <= start)
+        {
             return false;
+        }
 
         var entityType = message[start..end];
 
         if (includedModelEntities.Contains(entityType))
+        {
             return false;
+        }
 
         note =
             $"{entityType} is not included in the model for this DbContext"

@@ -12,14 +12,18 @@ internal static class LinqDeepExpressionAdapter
         var normalized = NormalizeStatement(statementOrExpression);
 
         if (string.IsNullOrWhiteSpace(normalized))
+        {
             return null;
+        }
 
         normalized = ReplaceContextAliases(normalized, contextInstanceIdentifiers);
 
         var probe = SqlTranslationProbe.TryCreateProbeExpression(normalized);
 
         if (probe is null)
+        {
             return null;
+        }
 
         var stubContext = new ProbeStubContext(
             dbContextType,
@@ -31,7 +35,9 @@ internal static class LinqDeepExpressionAdapter
 
         if (string.IsNullOrWhiteSpace(representativeEntityTypeName)
             || !OpenGenericProbeBinder.ContainsOpenGenericTypeParameter(probe))
+        {
             return probe;
+        }
 
         return OpenGenericProbeBinder.Bind(probe, representativeEntityTypeName);
     }
@@ -44,10 +50,14 @@ internal static class LinqDeepExpressionAdapter
         trimmed = StripAssignmentRhs(trimmed);
 
         if (trimmed.StartsWith("return ", StringComparison.Ordinal))
+        {
             trimmed = trimmed["return ".Length..].Trim();
+        }
 
         if (trimmed.StartsWith("await ", StringComparison.Ordinal))
+        {
             trimmed = trimmed["await ".Length..].Trim();
+        }
 
         trimmed = StripNullCoalescingSuffix(trimmed);
 
@@ -61,15 +71,21 @@ internal static class LinqDeepExpressionAdapter
             var prefix = $"{keyword} (";
 
             if (!trimmed.StartsWith(prefix, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             var openParenIndex = trimmed.IndexOf('(');
 
             if (openParenIndex < 0)
+            {
                 return trimmed;
+            }
 
             if (!SqlTranslationProbe.TryExtractParenthesizedContent(trimmed, openParenIndex, out var inner))
+            {
                 return trimmed;
+            }
 
             return inner.Trim();
         }
@@ -89,7 +105,9 @@ internal static class LinqDeepExpressionAdapter
             if (inString != '\0')
             {
                 if (character == inString && trimmed[index - 1] != '\\')
+                {
                     inString = '\0';
+                }
 
                 continue;
             }
@@ -126,17 +144,23 @@ internal static class LinqDeepExpressionAdapter
     private static string StripAssignmentRhs(string trimmed)
     {
         if (!trimmed.StartsWith("var ", StringComparison.Ordinal))
+        {
             return trimmed;
+        }
 
         var equalsIndex = ProbeScriptFormatter.FindVarDeclarationEqualsIndex(trimmed);
 
         if (equalsIndex < 0)
+        {
             return trimmed;
+        }
 
         var rhs = trimmed[(equalsIndex + 1)..].Trim();
 
         if (rhs.StartsWith("await ", StringComparison.Ordinal))
+        {
             rhs = rhs["await ".Length..].Trim();
+        }
 
         return rhs;
     }
@@ -153,8 +177,9 @@ internal static class LinqDeepExpressionAdapter
         }
     }
 
-    private static string ReplaceContextAliasesFallback(string code) =>
-        code
+    private static string ReplaceContextAliasesFallback(string code)
+    {
+        return code
             .Replace("this.dbContext.", "db.", StringComparison.Ordinal)
             .Replace("this.DbContext.", "db.", StringComparison.Ordinal)
             .Replace("this._dbContext.", "db.", StringComparison.Ordinal)
@@ -166,4 +191,5 @@ internal static class LinqDeepExpressionAdapter
             .Replace("_context.", "db.", StringComparison.Ordinal)
             .Replace("applicationDbContext.", "db.", StringComparison.Ordinal)
             .Replace("_applicationDbContext.", "db.", StringComparison.Ordinal);
+    }
 }

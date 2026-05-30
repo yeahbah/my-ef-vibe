@@ -32,9 +32,11 @@ internal sealed record WorkspaceBuildResult(
                 asmNameLogical,
                 targetFrameworkMoniker,
                 out var dll))
+        {
             throw new WorkspaceException(
                 $"Could not find `{asmNameLogical}.dll` after build for `{targetFrameworkMoniker}`."
                 + $" Checked isolated build output `{projectBuildOutput.BaseOutputPath}`.");
+        }
 
         var outputDirectory =
             Path.GetDirectoryName(dll)!;
@@ -46,19 +48,22 @@ internal sealed record WorkspaceBuildResult(
                 startupProject.FullName,
                 StringComparison.OrdinalIgnoreCase)
             && startupBuildOutput is not null
-            && TryLocateStartupOutput(startupProject.FullName, targetFrameworkMoniker, startupBuildOutput, out var locatedStartupOutput))
+            && TryLocateStartupOutput(startupProject.FullName, targetFrameworkMoniker, startupBuildOutput,
+                out var locatedStartupOutput))
+        {
             startupOutputDirectory = locatedStartupOutput;
+        }
 
         return new WorkspaceBuildResult(
-            SessionDirectory: Path.GetFullPath(sessionDirectory.TrimEnd(Path.DirectorySeparatorChar)),
-            ProjectPath: csprojFile.FullName,
-            StartupProjectPath: startupProject.FullName,
-            OutputDirectory: outputDirectory,
-            PrimaryAssemblyDll: dll,
-            TargetFrameworkMoniker: targetFrameworkMoniker,
-            ProjectBuildOutput: projectBuildOutput,
-            StartupBuildOutput: startupBuildOutput,
-            StartupOutputDirectory: startupOutputDirectory);
+            Path.GetFullPath(sessionDirectory.TrimEnd(Path.DirectorySeparatorChar)),
+            csprojFile.FullName,
+            startupProject.FullName,
+            outputDirectory,
+            dll,
+            targetFrameworkMoniker,
+            projectBuildOutput,
+            startupBuildOutput,
+            startupOutputDirectory);
     }
 
     internal static bool TryLocateStartupOutput(
@@ -75,7 +80,9 @@ internal sealed record WorkspaceBuildResult(
                 startupAssemblyName,
                 targetFrameworkMoniker,
                 out var startupDll))
+        {
             return false;
+        }
 
         outputDirectory = Path.GetDirectoryName(startupDll);
 
@@ -95,7 +102,9 @@ internal sealed record WorkspaceBuildResult(
             var configurationRoot = Path.Combine(binRoot, configuration);
 
             if (!Directory.Exists(configurationRoot))
+            {
                 continue;
+            }
 
             var candidate = Path.Combine(configurationRoot, tfm, $"{assemblyName}.dll");
 
@@ -119,13 +128,13 @@ internal static class TfmRankingScore
         var monikerFolderName = Path.GetFileName(tfmAbsolutePath.TrimEnd(Path.DirectorySeparatorChar));
 
         if (!monikerFolderName.StartsWith("net", StringComparison.OrdinalIgnoreCase))
+        {
             return decimal.Zero;
+        }
 
         return decimal.TryParse(monikerFolderName.AsSpan()[3..], NumberStyles.AllowDecimalPoint,
-                CultureInfo.InvariantCulture, out var parsedNetMonikerVersion)
+            CultureInfo.InvariantCulture, out var parsedNetMonikerVersion)
             ? parsedNetMonikerVersion
             : decimal.Zero;
-
     }
-
 }

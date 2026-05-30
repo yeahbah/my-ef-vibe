@@ -13,7 +13,7 @@ internal static class HostRuntimeIdentifier
             Architecture.X64 => "x64",
             Architecture.Arm => "arm",
             Architecture.Arm64 => "arm64",
-            _ => "x64",
+            _ => "x64"
         };
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -44,7 +44,9 @@ internal static class HostRuntimeIdentifier
         for (var index = 0; index < fallbacks.Count; index++)
         {
             if (string.Equals(fallbacks[index], runtimeIdentifier, StringComparison.OrdinalIgnoreCase))
+            {
                 return index;
+            }
         }
 
         return int.MaxValue;

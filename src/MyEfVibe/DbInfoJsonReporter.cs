@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -9,7 +10,7 @@ internal static class DbInfoJsonReporter
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false,
+        WriteIndented = false
     };
 
     internal static async Task WriteAsync(
@@ -33,14 +34,18 @@ internal static class DbInfoJsonReporter
         rows.Add(new DbInfoJsonEntry { Key = "EF project", Value = host.ProjectPath });
 
         if (!string.Equals(host.ProjectPath, host.StartupProjectPath, StringComparison.OrdinalIgnoreCase))
+        {
             rows.Add(new DbInfoJsonEntry { Key = "Startup project", Value = host.StartupProjectPath });
+        }
 
         rows.Add(new DbInfoJsonEntry { Key = "Session directory", Value = host.SessionDirectory });
 
         var efVersion = TryGetEfCoreVersion();
 
         if (efVersion is not null)
+        {
             rows.Add(new DbInfoJsonEntry { Key = "EF Core", Value = efVersion });
+        }
 
         var database = contextType.GetProperty("Database")?.GetValue(dbContext);
 
@@ -51,7 +56,7 @@ internal static class DbInfoJsonReporter
             return new DbInfoJsonPayload
             {
                 DbContext = contextType.Name,
-                Entries = rows.ToArray(),
+                Entries = rows.ToArray()
             };
         }
 
@@ -59,7 +64,8 @@ internal static class DbInfoJsonReporter
 
         if (!string.IsNullOrWhiteSpace(providerName))
         {
-            rows.Add(new DbInfoJsonEntry { Key = "Provider", Value = DbInfoReporter.FormatProviderDisplay(providerName) });
+            rows.Add(new DbInfoJsonEntry
+                { Key = "Provider", Value = DbInfoReporter.FormatProviderDisplay(providerName) });
             rows.Add(new DbInfoJsonEntry { Key = "Provider name", Value = providerName });
         }
 
@@ -68,20 +74,20 @@ internal static class DbInfoJsonReporter
         rows.Add(new DbInfoJsonEntry
         {
             Key = "Command timeout",
-            Value = timeoutSeconds <= 0 ? "default" : $"{timeoutSeconds}s",
+            Value = timeoutSeconds <= 0 ? "default" : $"{timeoutSeconds}s"
         });
 
         rows.Add(new DbInfoJsonEntry
         {
             Key = "DbSets",
-            Value = SchemaBrowser.GetDbSets(dbContext).Count.ToString(),
+            Value = SchemaBrowser.GetDbSets(dbContext).Count.ToString()
         });
 
         if (RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
                 host.EnumerateLoadedAssemblies(),
                 out var connection)
-            && connection is System.Data.Common.DbConnection dbConnection)
+            && connection is DbConnection dbConnection)
         {
             try
             {
@@ -92,9 +98,10 @@ internal static class DbInfoJsonReporter
                 {
                     Key = "Server version",
                     Value = await DbInfoReporter.TryGetServerVersionAsync(dbConnection, providerName, cancellationToken)
-                        ?? "(unknown)",
+                            ?? "(unknown)"
                 });
-                rows.Add(new DbInfoJsonEntry { Key = "Connection string", Value = NullIfEmpty(dbConnection.ConnectionString) });
+                rows.Add(new DbInfoJsonEntry
+                    { Key = "Connection string", Value = NullIfEmpty(dbConnection.ConnectionString) });
             }
             catch (Exception failure)
             {
@@ -109,12 +116,14 @@ internal static class DbInfoJsonReporter
         return new DbInfoJsonPayload
         {
             DbContext = contextType.Name,
-            Entries = rows.ToArray(),
+            Entries = rows.ToArray()
         };
     }
 
-    private static string? NullIfEmpty(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value;
+    private static string? NullIfEmpty(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
 
     private static string? TryGetEfCoreVersion()
     {

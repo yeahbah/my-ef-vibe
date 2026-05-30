@@ -3,9 +3,10 @@ namespace MyEfVibe;
 internal static class LinqProjectSourceWalker
 {
     /// <summary>
-    /// Projects whose <c>.cs</c> sources are included in <c>:scan lite</c> / <c>:scan deep</c>.
-    /// Includes the EF project graph (<c>-p</c>), the startup graph (<c>-s</c>), and any other projects in the solution that reference <c>-p</c>
-    /// (e.g. Application when API → Application → Persistence).
+    ///     Projects whose <c>.cs</c> sources are included in <c>:scan lite</c> / <c>:scan deep</c>.
+    ///     Includes the EF project graph (<c>-p</c>), the startup graph (<c>-s</c>), and any other projects in the solution
+    ///     that reference <c>-p</c>
+    ///     (e.g. Application when API → Application → Persistence).
     /// </summary>
     internal static IReadOnlyList<string> CollectScanProjectPaths(
         string efProjectPath,
@@ -19,24 +20,30 @@ internal static class LinqProjectSourceWalker
             foreach (var path in CollectProjectPathsFromEntry(entryCsprojPath))
             {
                 if (seen.Add(path))
+                {
                     merged.Add(path);
+                }
             }
         }
 
         MergeGraph(efProjectPath);
 
         if (!string.Equals(efProjectPath, startupProjectPath, StringComparison.OrdinalIgnoreCase))
+        {
             MergeGraph(startupProjectPath);
+        }
 
         var solutionDirectory = ProjectReferenceWalker.TryFindSolutionDirectory(efProjectPath)
-            ?? ProjectReferenceWalker.TryFindSolutionDirectory(startupProjectPath);
+                                ?? ProjectReferenceWalker.TryFindSolutionDirectory(startupProjectPath);
 
         if (!string.IsNullOrEmpty(solutionDirectory))
         {
             foreach (var referencer in ProjectReferenceWalker.CollectProjectsReferencing(
                          efProjectPath,
                          solutionDirectory))
+            {
                 MergeGraph(referencer);
+            }
         }
 
         return merged;
@@ -54,17 +61,23 @@ internal static class LinqProjectSourceWalker
             var current = queue.Dequeue();
 
             if (!visited.Add(current))
+            {
                 continue;
+            }
 
             if (CsprojInspector.IsTestProject(current))
+            {
                 continue;
+            }
 
             discovered.Add(current);
 
             foreach (var referencePath in CsprojInspector.GetProjectReferencePaths(current))
             {
                 if (visited.Contains(referencePath))
+                {
                     continue;
+                }
 
                 queue.Enqueue(referencePath);
             }
@@ -73,13 +86,17 @@ internal static class LinqProjectSourceWalker
         return discovered;
     }
 
-    internal static IEnumerable<string> EnumerateSourceFiles(string projectDirectory) =>
-        Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
+    internal static IEnumerable<string> EnumerateSourceFiles(string projectDirectory)
+    {
+        return Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
             .Where(static path => !IsUnderBuildArtifacts(path));
+    }
 
-    internal static bool IsUnderBuildArtifacts(string absolutePath) =>
-        absolutePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+    internal static bool IsUnderBuildArtifacts(string absolutePath)
+    {
+        return absolutePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             .Any(static segment =>
                 string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
+    }
 }

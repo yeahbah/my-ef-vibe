@@ -9,7 +9,7 @@ internal static class AboutJsonReporter
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false,
+        WriteIndented = false
     };
 
     internal static void Write()
@@ -17,8 +17,9 @@ internal static class AboutJsonReporter
         Console.WriteLine(JsonSerializer.Serialize(Build(), SerializerOptions));
     }
 
-    internal static AboutJsonPayload Build() =>
-        new()
+    internal static AboutJsonPayload Build()
+    {
+        return new AboutJsonPayload
         {
             ToolVersion = ToolInfo.GetVersion(),
             Command = AppMetadata.CommandName,
@@ -29,8 +30,9 @@ internal static class AboutJsonReporter
             Website = AppMetadata.WebsiteUrl,
             Repository = AppMetadata.RepositoryUrl,
             NuGet = AppMetadata.NuGetUrl,
-            Runtime = AppMetadata.GetRuntimeDescription(),
+            Runtime = AppMetadata.GetRuntimeDescription()
         };
+    }
 
     internal sealed class AboutJsonPayload
     {

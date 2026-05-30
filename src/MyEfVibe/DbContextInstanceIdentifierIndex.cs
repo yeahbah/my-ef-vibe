@@ -5,12 +5,12 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace MyEfVibe;
 
 /// <summary>
-/// Discovers field, property, and parameter names typed as the selected (or other) DbContext types in a source file.
+///     Discovers field, property, and parameter names typed as the selected (or other) DbContext types in a source file.
 /// </summary>
 internal sealed class DbContextInstanceIdentifierIndex
 {
-    private readonly HashSet<string> _selectedIdentifiers;
     private readonly HashSet<string> _otherIdentifiers;
+    private readonly HashSet<string> _selectedIdentifiers;
 
     private DbContextInstanceIdentifierIndex(
         HashSet<string> selectedIdentifiers,
@@ -48,7 +48,9 @@ internal sealed class DbContextInstanceIdentifierIndex
         foreach (var typeDeclaration in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
         {
             foreach (var parameter in typeDeclaration.ParameterList?.Parameters ?? [])
+            {
                 AddIdentifierForType(parameter.Type, parameter.Identifier.Text, scope, selected, other);
+            }
 
             foreach (var member in typeDeclaration.Members)
             {
@@ -56,7 +58,10 @@ internal sealed class DbContextInstanceIdentifierIndex
                 {
                     case FieldDeclarationSyntax field:
                         foreach (var variable in field.Declaration.Variables)
-                            AddIdentifierForType(field.Declaration.Type, variable.Identifier.Text, scope, selected, other);
+                        {
+                            AddIdentifierForType(field.Declaration.Type, variable.Identifier.Text, scope, selected,
+                                other);
+                        }
 
                         break;
 
@@ -70,7 +75,9 @@ internal sealed class DbContextInstanceIdentifierIndex
         foreach (var method in root.DescendantNodes().OfType<BaseMethodDeclarationSyntax>())
         {
             foreach (var parameter in method.ParameterList?.Parameters ?? [])
+            {
                 AddIdentifierForType(parameter.Type, parameter.Identifier.Text, scope, selected, other);
+            }
         }
 
         return new DbContextInstanceIdentifierIndex(selected, other);
@@ -81,7 +88,9 @@ internal sealed class DbContextInstanceIdentifierIndex
         foreach (var identifier in _selectedIdentifiers)
         {
             if (StatementContainsInstanceAccess(statement, identifier))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -92,7 +101,9 @@ internal sealed class DbContextInstanceIdentifierIndex
         foreach (var identifier in _otherIdentifiers)
         {
             if (StatementContainsInstanceAccess(statement, identifier))
+            {
                 return true;
+            }
         }
 
         return false;
@@ -103,7 +114,9 @@ internal sealed class DbContextInstanceIdentifierIndex
         yield return "db.";
 
         foreach (var identifier in _selectedIdentifiers)
+        {
             yield return $"{identifier}.";
+        }
     }
 
     private static void AddIdentifierForType(
@@ -114,10 +127,14 @@ internal sealed class DbContextInstanceIdentifierIndex
         HashSet<string> other)
     {
         if (string.IsNullOrWhiteSpace(identifier))
+        {
             return;
+        }
 
         if (!DbContextTypeNameSyntax.TryGetSimpleTypeName(typeSyntax, out var typeName))
+        {
             return;
+        }
 
         switch (DbContextTypeNameSyntax.Classify(typeName, scope))
         {
@@ -131,7 +148,9 @@ internal sealed class DbContextInstanceIdentifierIndex
         }
     }
 
-    private static bool StatementContainsInstanceAccess(string statement, string identifier) =>
-        statement.Contains($"{identifier}.", StringComparison.Ordinal)
-        || statement.Contains($"this.{identifier}.", StringComparison.Ordinal);
+    private static bool StatementContainsInstanceAccess(string statement, string identifier)
+    {
+        return statement.Contains($"{identifier}.", StringComparison.Ordinal)
+               || statement.Contains($"this.{identifier}.", StringComparison.Ordinal);
+    }
 }

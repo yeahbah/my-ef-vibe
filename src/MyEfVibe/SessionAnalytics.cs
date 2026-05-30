@@ -13,6 +13,10 @@ internal sealed class SessionAnalytics
 
     internal EvaluationMetrics? CompareBaseline { get; private set; }
 
+    internal IReadOnlyList<EvaluationMetrics> Evaluations => _evaluations;
+
+    internal IReadOnlyList<object?> ExportRows => _exportRows;
+
     internal void Record(EvaluationMetrics metrics, object? result, IReadOnlyList<object?> exportRows)
     {
         _evaluations.Add(metrics);
@@ -22,14 +26,18 @@ internal sealed class SessionAnalytics
         _exportRows.Clear();
 
         foreach (var row in exportRows)
+        {
             _exportRows.Add(row);
+        }
     }
 
-    internal void SetCompareBaseline() => CompareBaseline = LastMetrics;
+    internal void SetCompareBaseline()
+    {
+        CompareBaseline = LastMetrics;
+    }
 
-    internal IReadOnlyList<EvaluationMetrics> Evaluations => _evaluations;
-
-    internal IReadOnlyList<object?> ExportRows => _exportRows;
-
-    internal void ClearCompareBaseline() => CompareBaseline = null;
+    internal void ClearCompareBaseline()
+    {
+        CompareBaseline = null;
+    }
 }

@@ -23,7 +23,7 @@ public sealed class LinqScanFindingDtoTests
             "code",
             "n-plus-one",
             "loop query",
-            Severity: null);
+            null);
 
         var finding = dto.ToFinding();
 

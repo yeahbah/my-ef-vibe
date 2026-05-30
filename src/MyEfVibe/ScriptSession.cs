@@ -11,24 +11,14 @@ namespace MyEfVibe;
 
 internal sealed class ScriptSession
 {
-    private readonly ScriptOptions _options;
+    private readonly InteractiveAssemblyLoader _assemblyLoader;
     private readonly object _globals;
     private readonly Type _globalsType;
-    private readonly Type _dbContextType;
     private readonly ImmutableArray<string> _importNamespaces;
-    private readonly InteractiveAssemblyLoader _assemblyLoader;
+    private readonly ScriptOptions _options;
     private readonly List<string> _submissionHistory = new();
     private Script? _script;
     private ScriptState? _state;
-
-    internal ImmutableArray<MetadataReference> MetadataReferences { get; }
-
-    internal Type DbContextType => _dbContextType;
-
-    internal object DbContext => _globalsType.GetProperty("db")!.GetValue(_globals)!;
-
-    internal CSharpCompilationOptions CompilationOptions { get; } =
-        new(OutputKind.DynamicallyLinkedLibrary);
 
     internal ScriptSession(
         Type dbContextType,
@@ -37,7 +27,7 @@ internal sealed class ScriptSession
         InteractiveAssemblyLoader assemblyLoader)
     {
         _assemblyLoader = assemblyLoader;
-        _dbContextType = dbContextType;
+        DbContextType = dbContextType;
         _globalsType = typeof(ScriptGlobals<>).MakeGenericType(dbContextType);
         _globals = Activator.CreateInstance(_globalsType)!;
         _globalsType.GetProperty("db")!.SetValue(_globals, dbContextInstance);
@@ -47,7 +37,9 @@ internal sealed class ScriptSession
         var metadataReferences = ImmutableArray.CreateBuilder<MetadataReference>(referencePaths.Length);
 
         foreach (var path in referencePaths)
+        {
             metadataReferences.Add(MetadataReference.CreateFromFile(path));
+        }
 
         MetadataReferences = metadataReferences.ToImmutable();
 
@@ -64,7 +56,7 @@ internal sealed class ScriptSession
             "System.Threading",
             "System.Threading.Tasks",
             "Microsoft.EntityFrameworkCore",
-            "Microsoft.EntityFrameworkCore.Infrastructure",
+            "Microsoft.EntityFrameworkCore.Infrastructure"
         };
 
         importNamespaces.AddRange(
@@ -79,6 +71,15 @@ internal sealed class ScriptSession
             .WithImports(_importNamespaces);
     }
 
+    internal ImmutableArray<MetadataReference> MetadataReferences { get; }
+
+    internal Type DbContextType { get; }
+
+    internal object DbContext => _globalsType.GetProperty("db")!.GetValue(_globals)!;
+
+    internal CSharpCompilationOptions CompilationOptions { get; } =
+        new(OutputKind.DynamicallyLinkedLibrary);
+
     internal (string source, int position, int currentLineStart) CreateCompletionSource(
         string currentLine,
         int cursorInLine)
@@ -88,7 +89,9 @@ internal sealed class ScriptSession
         var builder = new StringBuilder();
 
         foreach (var importNamespace in _importNamespaces)
+        {
             builder.AppendLine($"using {importNamespace};");
+        }
 
         builder.AppendLine();
         builder.AppendLine("internal static class __MyEfVibeCompletionHost");
@@ -96,7 +99,7 @@ internal sealed class ScriptSession
         builder.AppendLine("    internal static void __Complete()");
         builder.AppendLine("    {");
 
-        var dbContextTypeName = _dbContextType.FullName!;
+        var dbContextTypeName = DbContextType.FullName!;
 
         builder.Append(submissionIndent);
         builder.AppendLine($"{dbContextTypeName} db = null!;");
@@ -134,10 +137,12 @@ internal sealed class ScriptSession
 
     internal async Task<object?> EvaluateAsync(string code, CancellationToken cancellationToken = default)
     {
-        var trimmed = SnippetNormalizer.ForEvaluation(code, _dbContextType);
+        var trimmed = SnippetNormalizer.ForEvaluation(code, DbContextType);
 
         if (string.IsNullOrEmpty(trimmed))
+        {
             return null;
+        }
 
         try
         {
@@ -169,9 +174,11 @@ internal sealed class ScriptSession
         }
 
         if (_state.Exception is not null)
+        {
             throw _state.Exception is Exception concrete
                 ? concrete
                 : new Exception(_state.Exception.ToString());
+        }
 
         RecordSubmission(trimmed);
 
@@ -179,17 +186,19 @@ internal sealed class ScriptSession
     }
 
     /// <summary>
-    /// Evaluates a one-off expression without advancing REPL submission state or history.
-    /// Used for SQL translation probes before the user's query runs.
+    ///     Evaluates a one-off expression without advancing REPL submission state or history.
+    ///     Used for SQL translation probes before the user's query runs.
     /// </summary>
     internal async Task<object?> EvaluateProbeAsync(string code, CancellationToken cancellationToken = default)
     {
         var trimmed = SnippetNormalizer.ForEvaluation(
             ProbeScriptFormatter.ToScriptExpression(code),
-            _dbContextType);
+            DbContextType);
 
         if (string.IsNullOrEmpty(trimmed))
+        {
             return null;
+        }
 
         var script = CSharpScript.Create(trimmed, _options, _globalsType, _assemblyLoader);
 
@@ -212,9 +221,11 @@ internal sealed class ScriptSession
         }
 
         if (state.Exception is not null)
+        {
             throw state.Exception is Exception concrete
                 ? concrete
                 : new Exception(state.Exception.ToString());
+        }
 
         return state.ReturnValue;
     }
@@ -224,7 +235,9 @@ internal sealed class ScriptSession
         var normalized = snippet.Trim();
 
         if (string.IsNullOrWhiteSpace(normalized))
+        {
             return;
+        }
 
         _submissionHistory.Add(normalized);
     }
@@ -243,20 +256,26 @@ internal sealed class ScriptSession
         foreach (var assemblyPath in workspaceAssemblyPaths)
         {
             if (!File.Exists(assemblyPath))
+            {
                 continue;
+            }
 
             if (assemblyPath.Contains("Microsoft.", StringComparison.OrdinalIgnoreCase)
                 || assemblyPath.Contains("System.Linq.Dynamic", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             try
             {
-                var assembly = System.Reflection.Assembly.LoadFrom(assemblyPath);
+                var assembly = Assembly.LoadFrom(assemblyPath);
 
                 foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(assembly))
                 {
                     if (!string.IsNullOrWhiteSpace(exported.Namespace))
+                    {
                         namespaces.Add(exported.Namespace);
+                    }
                 }
             }
             catch

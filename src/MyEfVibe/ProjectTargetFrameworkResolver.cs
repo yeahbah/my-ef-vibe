@@ -9,7 +9,10 @@ internal static partial class ProjectTargetFrameworkResolver
         var monikers = CsprojReader.ReadTargetFrameworkMonikers(csprojAbsolutePath);
 
         if (monikers.Length == 0)
-            return NormalizeMoniker(explicitFrameworkOrNull ?? HostRuntimeFramework.PreferredOutputFolderName() ?? "net8.0");
+        {
+            return NormalizeMoniker(explicitFrameworkOrNull ??
+                                    HostRuntimeFramework.PreferredOutputFolderName() ?? "net8.0");
+        }
 
         if (!string.IsNullOrWhiteSpace(explicitFrameworkOrNull))
         {
@@ -33,10 +36,14 @@ internal static partial class ProjectTargetFrameworkResolver
 
         if (!string.IsNullOrEmpty(hostMoniker)
             && monikers.Any(moniker => string.Equals(moniker, hostMoniker, StringComparison.OrdinalIgnoreCase)))
+        {
             return monikers.First(moniker => string.Equals(moniker, hostMoniker, StringComparison.OrdinalIgnoreCase));
+        }
 
         if (monikers.Length == 1)
+        {
             return monikers[0];
+        }
 
         return monikers
             .OrderByDescending(static moniker => TfmRankingScore.DescendingScore(
@@ -49,15 +56,21 @@ internal static partial class ProjectTargetFrameworkResolver
         var trimmed = raw.Trim();
 
         if (string.IsNullOrEmpty(trimmed))
+        {
             return trimmed;
+        }
 
         if (!trimmed.StartsWith("net", StringComparison.OrdinalIgnoreCase))
+        {
             trimmed = "net" + trimmed;
+        }
 
         var majorOnly = MajorOnlyMonikerRegex().Match(trimmed);
 
         if (majorOnly.Success)
+        {
             return FormattableString.Invariant($"net{majorOnly.Groups[1].Value}.0");
+        }
 
         return trimmed;
     }

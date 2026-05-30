@@ -9,7 +9,7 @@ internal static class DescribeJsonReporter
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false,
+        WriteIndented = false
     };
 
     internal static void Write(object dbContext, string entityName)
@@ -25,7 +25,7 @@ internal static class DescribeJsonReporter
             return new DescribeJsonPayload
             {
                 Success = false,
-                Error = "Entity name is required.",
+                Error = "Entity name is required."
             };
         }
 
@@ -36,7 +36,7 @@ internal static class DescribeJsonReporter
             return new DescribeJsonPayload
             {
                 Success = false,
-                Error = "No DbSet properties found on this context.",
+                Error = "No DbSet properties found on this context."
             };
         }
 
@@ -49,7 +49,7 @@ internal static class DescribeJsonReporter
                     Error = $"Entity `{entityName}` was not found.",
                     KnownEntities = dbSets
                         .Select(static entry => $"{entry.DbSetName} · {entry.EntityType.Name}")
-                        .ToArray(),
+                        .ToArray()
                 };
 
             case EntityDescriptor.EntityResolveResult.Ambiguous:
@@ -59,7 +59,7 @@ internal static class DescribeJsonReporter
                     Error = $"Multiple entities match `{entityName}`. Use a DbSet name or full type name.",
                     KnownEntities = resolved.AmbiguousMatches!
                         .Select(static entry => $"{entry.DbSetName} · {entry.EntityType.Name}")
-                        .ToArray(),
+                        .ToArray()
                 };
 
             case EntityDescriptor.EntityResolveResult.Found:
@@ -79,7 +79,7 @@ internal static class DescribeJsonReporter
                 Name = member.Name,
                 Type = member.TypeDisplay,
                 Nullable = member.Nullable,
-                Notes = string.IsNullOrWhiteSpace(member.Notes) ? null : member.Notes,
+                Notes = string.IsNullOrWhiteSpace(member.Notes) ? null : member.Notes
             })
             .ToArray();
 
@@ -89,7 +89,7 @@ internal static class DescribeJsonReporter
             DbSet = match.DbSetName,
             EntityType = entityType.Name,
             EntityTypeFullName = entityType.FullName,
-            Members = members,
+            Members = members
         };
     }
 

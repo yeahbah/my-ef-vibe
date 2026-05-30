@@ -14,7 +14,9 @@ public sealed class WorkspaceDepsManifestNuGetFallbackTests
             "npgsql.entityframeworkcore.postgresql");
 
         if (!Directory.Exists(packageRoot))
+        {
             return;
+        }
 
         using var tempDirectory = new TempDirectory();
         var entryDll = Path.Combine(tempDirectory.Path, "Test.Workspace.dll");
@@ -52,31 +54,31 @@ public sealed class WorkspaceDepsManifestNuGetFallbackTests
                     {
                         runtime = new Dictionary<string, object>
                         {
-                            ["lib/net10.0/Microsoft.EntityFrameworkCore.dll"] = new { },
-                        },
+                            ["lib/net10.0/Microsoft.EntityFrameworkCore.dll"] = new { }
+                        }
                     },
                     ["Microsoft.EntityFrameworkCore.SqlServer/10.0.7"] = new
                     {
                         runtime = new Dictionary<string, object>
                         {
-                            ["lib/net10.0/Microsoft.EntityFrameworkCore.SqlServer.dll"] = new { },
-                        },
-                    },
-                },
+                            ["lib/net10.0/Microsoft.EntityFrameworkCore.SqlServer.dll"] = new { }
+                        }
+                    }
+                }
             },
             libraries = new Dictionary<string, object>
             {
                 ["Microsoft.EntityFrameworkCore/10.0.7"] = new
                 {
                     type = "package",
-                    path = "microsoft.entityframeworkcore/10.0.7",
+                    path = "microsoft.entityframeworkcore/10.0.7"
                 },
                 ["Microsoft.EntityFrameworkCore.SqlServer/10.0.7"] = new
                 {
                     type = "package",
-                    path = "microsoft.entityframeworkcore.sqlserver/10.0.7",
-                },
-            },
+                    path = "microsoft.entityframeworkcore.sqlserver/10.0.7"
+                }
+            }
         };
 
         return JsonSerializer.Serialize(document);
@@ -96,7 +98,7 @@ public sealed class WorkspaceDepsManifestNuGetFallbackTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

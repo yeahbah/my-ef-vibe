@@ -5,7 +5,9 @@ internal static class ArtifactResolver
     internal static IReadOnlyList<string> CollectReferencePaths(string workspaceOutputDirectory)
     {
         if (!Directory.Exists(workspaceOutputDirectory))
+        {
             return Array.Empty<string>();
+        }
 
         return Directory.EnumerateFiles(workspaceOutputDirectory, "*.dll", SearchOption.TopDirectoryOnly)
             .Where(static path => !IsHostToolBinary(path))

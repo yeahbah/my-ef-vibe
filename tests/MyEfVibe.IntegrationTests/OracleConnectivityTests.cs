@@ -10,20 +10,21 @@ public sealed class OracleConnectivityTests
         var persistenceDll = FindPrebuiltDll("AdventureWorks.Infrastructure.Persistence.dll");
         var startupDll = FindPrebuiltDll("AdventureWorks.API.dll");
 
-        Skip.If(persistenceDll is null || startupDll is null, "No pre-built AdventureWorks output under /tmp/efvibe-integration.");
+        Skip.If(persistenceDll is null || startupDll is null,
+            "No pre-built AdventureWorks output under /tmp/efvibe-integration.");
 
         var scenario = IntegrationScenarioCatalog.Require("oracle");
         var outputDirectory = Path.GetDirectoryName(persistenceDll)!;
         var startupOutputDirectory = Path.GetDirectoryName(startupDll)!;
 
         var workspaceBuild = new WorkspaceBuildResult(
-            SessionDirectory: Path.Combine(Path.GetTempPath(), "efvibe-integration-smoke", Guid.NewGuid().ToString("N")),
-            ProjectPath: scenario.EfProjectPath,
-            StartupProjectPath: scenario.StartupProjectPath,
-            OutputDirectory: outputDirectory,
-            PrimaryAssemblyDll: persistenceDll,
-            TargetFrameworkMoniker: scenario.Framework,
-            ProjectBuildOutput: new ProjectBuildOutput(outputDirectory),
+            Path.Combine(Path.GetTempPath(), "efvibe-integration-smoke", Guid.NewGuid().ToString("N")),
+            scenario.EfProjectPath,
+            scenario.StartupProjectPath,
+            outputDirectory,
+            persistenceDll,
+            scenario.Framework,
+            new ProjectBuildOutput(outputDirectory),
             StartupOutputDirectory: startupOutputDirectory);
 
         using var host = WorkspaceHost.Load(workspaceBuild);
@@ -33,7 +34,7 @@ public sealed class OracleConnectivityTests
             scenario.Context,
             scenario.ConnectionString,
             ProviderParser.ParseOrNull(scenario.Provider),
-            allowInteractiveSelection: false);
+            false);
 
         var scriptSession = new ScriptSession(
             dbContext.GetType(),
@@ -55,20 +56,21 @@ public sealed class OracleConnectivityTests
         var persistenceDll = FindPrebuiltDll("AdventureWorks.Infrastructure.Persistence.dll");
         var startupDll = FindPrebuiltDll("AdventureWorks.API.dll");
 
-        Skip.If(persistenceDll is null || startupDll is null, "No pre-built AdventureWorks output under /tmp/efvibe-integration.");
+        Skip.If(persistenceDll is null || startupDll is null,
+            "No pre-built AdventureWorks output under /tmp/efvibe-integration.");
 
         var scenario = IntegrationScenarioCatalog.Require("oracle");
         var outputDirectory = Path.GetDirectoryName(persistenceDll)!;
         var startupOutputDirectory = Path.GetDirectoryName(startupDll)!;
 
         var workspaceBuild = new WorkspaceBuildResult(
-            SessionDirectory: Path.Combine(Path.GetTempPath(), "efvibe-integration-smoke", Guid.NewGuid().ToString("N")),
-            ProjectPath: scenario.EfProjectPath,
-            StartupProjectPath: scenario.StartupProjectPath,
-            OutputDirectory: outputDirectory,
-            PrimaryAssemblyDll: persistenceDll,
-            TargetFrameworkMoniker: scenario.Framework,
-            ProjectBuildOutput: new ProjectBuildOutput(outputDirectory),
+            Path.Combine(Path.GetTempPath(), "efvibe-integration-smoke", Guid.NewGuid().ToString("N")),
+            scenario.EfProjectPath,
+            scenario.StartupProjectPath,
+            outputDirectory,
+            persistenceDll,
+            scenario.Framework,
+            new ProjectBuildOutput(outputDirectory),
             StartupOutputDirectory: startupOutputDirectory);
 
         using var host = WorkspaceHost.Load(workspaceBuild);
@@ -78,7 +80,7 @@ public sealed class OracleConnectivityTests
             scenario.Context,
             scenario.ConnectionString,
             ProviderParser.ParseOrNull(scenario.Provider),
-            allowInteractiveSelection: false);
+            false);
 
         var scriptSession = new ScriptSession(
             dbContext.GetType(),
@@ -102,10 +104,13 @@ public sealed class OracleConnectivityTests
         var root = Path.Combine(Path.GetTempPath(), "efvibe-integration");
 
         if (!Directory.Exists(root))
+        {
             return null;
+        }
 
         return Directory
             .EnumerateFiles(root, fileName, SearchOption.AllDirectories)
-            .FirstOrDefault(path => path.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+            .FirstOrDefault(path => path.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal));
     }
 }

@@ -6,7 +6,7 @@ internal enum DbContextTypeClassification
 {
     None,
     Selected,
-    Other,
+    Other
 }
 
 internal static class DbContextTypeNameSyntax
@@ -42,16 +42,24 @@ internal static class DbContextTypeNameSyntax
     internal static DbContextTypeClassification Classify(string typeName, DbContextScanScope scope)
     {
         if (string.IsNullOrWhiteSpace(typeName))
+        {
             return DbContextTypeClassification.None;
+        }
 
         if (scope.IsSelectedContextType(typeName))
+        {
             return DbContextTypeClassification.Selected;
+        }
 
         if (scope.OtherContextTypeNames.Contains(typeName))
+        {
             return DbContextTypeClassification.Other;
+        }
 
         if (string.Equals(typeName, "DbContext", StringComparison.Ordinal) && !scope.HasMultipleContexts)
+        {
             return DbContextTypeClassification.Selected;
+        }
 
         return DbContextTypeClassification.None;
     }

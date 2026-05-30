@@ -9,7 +9,7 @@ internal static class TablesJsonReporter
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false,
+        WriteIndented = false
     };
 
     internal static void Write(object dbContext)
@@ -25,14 +25,14 @@ internal static class TablesJsonReporter
             {
                 DbSet = entry.DbSet,
                 EntityType = entry.EntityType,
-                EntityTypeFullName = entry.EntityTypeFullName,
+                EntityTypeFullName = entry.EntityTypeFullName
             })
             .ToArray();
 
         return new TablesJsonPayload
         {
             DbContext = dbContext.GetType().Name,
-            Tables = tables,
+            Tables = tables
         };
     }
 

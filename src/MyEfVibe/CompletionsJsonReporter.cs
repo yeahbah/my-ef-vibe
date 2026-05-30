@@ -34,7 +34,7 @@ internal static class CompletionsService
         "ToList",
         "ToListAsync",
         "ToArray",
-        "ToArrayAsync",
+        "ToArrayAsync"
     ];
 
     internal static IReadOnlyList<CompletionJsonItem> GetCompletions(object dbContext, string prefix)
@@ -49,13 +49,15 @@ internal static class CompletionsService
                     Label = entry.DbSet,
                     InsertText = entry.DbSet,
                     Kind = "property",
-                    Detail = entry.EntityType,
+                    Detail = entry.EntityType
                 })
                 .ToArray();
         }
 
         if (!prefix.StartsWith("db.", StringComparison.OrdinalIgnoreCase))
+        {
             return Array.Empty<CompletionJsonItem>();
+        }
 
         var remainder = prefix[3..];
         var dotIndex = remainder.IndexOf('.');
@@ -69,7 +71,7 @@ internal static class CompletionsService
                     Label = entry.DbSet,
                     InsertText = entry.DbSet,
                     Kind = "property",
-                    Detail = entry.EntityType,
+                    Detail = entry.EntityType
                 })
                 .ToArray();
         }
@@ -82,7 +84,7 @@ internal static class CompletionsService
             {
                 Label = member,
                 InsertText = member,
-                Kind = "method",
+                Kind = "method"
             })
             .ToArray();
     }
@@ -94,7 +96,7 @@ internal static class CompletionsJsonReporter
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false,
+        WriteIndented = false
     };
 
     internal static void Write(object dbContext, string prefix)
@@ -102,7 +104,7 @@ internal static class CompletionsJsonReporter
         var payload = new CompletionsJsonPayload
         {
             Prefix = prefix,
-            Items = CompletionsService.GetCompletions(dbContext, prefix),
+            Items = CompletionsService.GetCompletions(dbContext, prefix)
         };
 
         Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));

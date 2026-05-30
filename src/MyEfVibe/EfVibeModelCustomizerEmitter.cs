@@ -5,8 +5,8 @@ using System.Reflection.Emit;
 namespace MyEfVibe;
 
 /// <summary>
-/// Emits an <c>IModelCustomizer</c> implementation against the workspace EF Core assembly so
-/// provider-specific relational naming applies after <c>OnModelCreating</c>.
+///     Emits an <c>IModelCustomizer</c> implementation against the workspace EF Core assembly so
+///     provider-specific relational naming applies after <c>OnModelCreating</c>.
 /// </summary>
 internal static class EfVibeModelCustomizerEmitter
 {
@@ -17,7 +17,9 @@ internal static class EfVibeModelCustomizerEmitter
         var efAssembly = host.LoadAssembly("Microsoft.EntityFrameworkCore");
 
         if (efAssembly is null)
+        {
             return null;
+        }
 
         var applierTypeName = afterBaseMethod.DeclaringType?.FullName
                               ?? afterBaseMethod.DeclaringType?.Name
@@ -32,20 +34,20 @@ internal static class EfVibeModelCustomizerEmitter
     {
         var modelCustomizerType = efAssembly.GetType(
             "Microsoft.EntityFrameworkCore.Infrastructure.ModelCustomizer",
-            throwOnError: false);
+            false);
 
         var depsType = efAssembly.GetType(
             "Microsoft.EntityFrameworkCore.Infrastructure.ModelCustomizerDependencies",
-            throwOnError: false);
+            false);
 
-        var modelBuilderType = efAssembly.GetType("Microsoft.EntityFrameworkCore.ModelBuilder", throwOnError: false);
-        var dbContextType = efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContext", throwOnError: false);
+        var modelBuilderType = efAssembly.GetType("Microsoft.EntityFrameworkCore.ModelBuilder", false);
+        var dbContextType = efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContext", false);
         var baseCustomize = modelCustomizerType?.GetMethod(
             "Customize",
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            binder: null,
-            types: [modelBuilderType!, dbContextType!],
-            modifiers: null);
+            null,
+            [modelBuilderType!, dbContextType!],
+            null);
 
         var baseCtor = modelCustomizerType?.GetConstructor([depsType!]);
 
@@ -55,7 +57,9 @@ internal static class EfVibeModelCustomizerEmitter
             || dbContextType is null
             || baseCustomize is null
             || baseCtor is null)
+        {
             return null;
+        }
 
         var assemblyName = new AssemblyName(
             $"MyEfVibe.ModelCustomizer_{afterBaseMethod.DeclaringType!.Name}_{efAssembly.GetName().Version}");
@@ -79,7 +83,8 @@ internal static class EfVibeModelCustomizerEmitter
 
         var overrideBuilder = typeBuilder.DefineMethod(
             "Customize",
-            MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot | MethodAttributes.HideBySig,
+            MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.ReuseSlot |
+            MethodAttributes.HideBySig,
             baseCustomize.ReturnType,
             [modelBuilderType, dbContextType]);
 

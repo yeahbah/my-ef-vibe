@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace MyEfVibe.Tests;
 
 public sealed class BusinessEntityAddressProbeTests
@@ -6,19 +8,19 @@ public sealed class BusinessEntityAddressProbeTests
     public void TryCreateProbeExpression_MultiIncludeWithWhere_PreparesTypedTerminalScript()
     {
         const string statement = """
-            return await DbContext.BusinessEntityAddresses
-                .AsNoTracking()
-                .Include(bea => bea.Address)
-                .Include(bea => bea.BusinessEntity)
-                .Where(bea => bea.BusinessEntityId == businessEntityId)
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                                 return await DbContext.BusinessEntityAddresses
+                                     .AsNoTracking()
+                                     .Include(bea => bea.Address)
+                                     .Include(bea => bea.BusinessEntity)
+                                     .Where(bea => bea.BusinessEntityId == businessEntityId)
+                                     .FirstOrDefaultAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statement,
-            representativeEntityTypeName: nameof(FakeBusinessEntityAddress),
-            dbContextType: typeof(FakeAddressBookDbContext),
-            queryEntityTypeName: nameof(FakeBusinessEntityAddress));
+            nameof(FakeBusinessEntityAddress),
+            typeof(FakeAddressBookDbContext),
+            nameof(FakeBusinessEntityAddress));
 
         Assert.NotNull(probe);
         Assert.DoesNotContain(".Take(1)", probe, StringComparison.Ordinal);
@@ -37,12 +39,12 @@ public sealed class BusinessEntityAddressProbeTests
     public void TryCreateProbeExpression_DualInclude_cartesian_shape_preserves_include_probe()
     {
         const string statement = """
-            return await DbContext.BusinessEntityAddresses
-                .AsNoTracking()
-                .Include(bea => bea.Address)
-                .Include(bea => bea.BusinessEntity)
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                                 return await DbContext.BusinessEntityAddresses
+                                     .AsNoTracking()
+                                     .Include(bea => bea.Address)
+                                     .Include(bea => bea.BusinessEntity)
+                                     .FirstOrDefaultAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statement,
@@ -68,9 +70,9 @@ public sealed class BusinessEntityAddressProbeTests
     }
 }
 
-public sealed class FakeAddressBookDbContext : Microsoft.EntityFrameworkCore.DbContext
+public sealed class FakeAddressBookDbContext : DbContext
 {
-    public Microsoft.EntityFrameworkCore.DbSet<FakeBusinessEntityAddress> BusinessEntityAddresses =>
+    public DbSet<FakeBusinessEntityAddress> BusinessEntityAddresses =>
         Set<FakeBusinessEntityAddress>();
 }
 

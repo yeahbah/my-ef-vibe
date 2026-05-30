@@ -6,23 +6,23 @@ public sealed class LinqDeepExpressionAdapterTests
     public void TryCreateProbeExpression_EmployeeIncludeGraph_PreparesTranslatableScript()
     {
         const string statement = """
-            return await DbContext.Employees
-                .AsNoTracking()
-                .Include(e => e.PersonBusinessEntity)
-                .Include(e => e.EmployeeDepartmentHistory)
-                    .ThenInclude(dh => dh.Department)
-                .Include(e => e.EmployeeDepartmentHistory)
-                    .ThenInclude(dh => dh.Shift)
-                .Include(e => e.EmployeePayHistory)
-                .Where(e => e.BusinessEntityId == businessEntityId)
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                                 return await DbContext.Employees
+                                     .AsNoTracking()
+                                     .Include(e => e.PersonBusinessEntity)
+                                     .Include(e => e.EmployeeDepartmentHistory)
+                                         .ThenInclude(dh => dh.Department)
+                                     .Include(e => e.EmployeeDepartmentHistory)
+                                         .ThenInclude(dh => dh.Shift)
+                                     .Include(e => e.EmployeePayHistory)
+                                     .Where(e => e.BusinessEntityId == businessEntityId)
+                                     .FirstOrDefaultAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statement,
-            representativeEntityTypeName: nameof(FakeEmployee),
-            dbContextType: typeof(FakeAdventureWorksDbContext),
-            queryEntityTypeName: nameof(FakeEmployee));
+            nameof(FakeEmployee),
+            typeof(FakeAdventureWorksDbContext),
+            nameof(FakeEmployee));
 
         Assert.NotNull(probe);
         Assert.DoesNotContain("AsNoTracking", probe, StringComparison.Ordinal);
@@ -42,14 +42,14 @@ public sealed class LinqDeepExpressionAdapterTests
     public void TryCreateProbeExpression_MultilineIncludeWithLambdas_DoesNotCorruptProbe()
     {
         const string statement = """
-            return await DbContext.Employees
-                    .Include(e => e.EmployeeDepartmentHistory)
-                        .ThenInclude(dh => dh.Department)
-                    .Include(e => e.EmployeeDepartmentHistory)
-                        .ThenInclude(dh => dh.Shift)
-                    .Where(e => e.BusinessEntityId == businessEntityId)
-                    .FirstOrDefaultAsync(cancellationToken);
-            """;
+                                 return await DbContext.Employees
+                                         .Include(e => e.EmployeeDepartmentHistory)
+                                             .ThenInclude(dh => dh.Department)
+                                         .Include(e => e.EmployeeDepartmentHistory)
+                                             .ThenInclude(dh => dh.Shift)
+                                         .Where(e => e.BusinessEntityId == businessEntityId)
+                                         .FirstOrDefaultAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statement);
 
@@ -105,13 +105,13 @@ public sealed class LinqDeepExpressionAdapterTests
     public void TryCreateProbeExpression_EntraObjectIdRowguid_CompilesAsScript()
     {
         const string statement = """
-            return await DbContext.BusinessEntities
-                .AsNoTracking()
-                .Where(be => be.Rowguid == entraObjectId && be.IsEntraUser == true)
-                .SelectMany(be => be.Persons)
-                .Include(p => p.BusinessEntity)
-                .FirstOrDefaultAsync(cancellationToken);
-            """;
+                                 return await DbContext.BusinessEntities
+                                     .AsNoTracking()
+                                     .Where(be => be.Rowguid == entraObjectId && be.IsEntraUser == true)
+                                     .SelectMany(be => be.Persons)
+                                     .Include(p => p.BusinessEntity)
+                                     .FirstOrDefaultAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statement);
 
@@ -124,18 +124,19 @@ public sealed class LinqDeepExpressionAdapterTests
     public void TryCreateProbeExpression_BusinessEntityIdsContains_CompilesAsScript()
     {
         const string statement = """
-            return await DbContext.BusinessEntityContacts
-                .Include(x => x.ContactType)
-                .Include(x => x.Person)
-                .ThenInclude(x => x.PersonType)
-                .Where(x => businessEntityIds.Contains(x.BusinessEntityId))
-                .ToListAsync(cancellationToken);
-            """;
+                                 return await DbContext.BusinessEntityContacts
+                                     .Include(x => x.ContactType)
+                                     .Include(x => x.Person)
+                                     .ThenInclude(x => x.PersonType)
+                                     .Where(x => businessEntityIds.Contains(x.BusinessEntityId))
+                                     .ToListAsync(cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statement);
 
         Assert.NotNull(probe);
-        Assert.Contains("new int[] { 0 }.Contains(x.BusinessEntityId)", ProbeTestHelper.CollapseWhitespace(probe), StringComparison.Ordinal);
+        Assert.Contains("new int[] { 0 }.Contains(x.BusinessEntityId)", ProbeTestHelper.CollapseWhitespace(probe),
+            StringComparison.Ordinal);
         ProbeTestHelper.AssertParsesAsScript(probe);
     }
 
@@ -143,20 +144,20 @@ public sealed class LinqDeepExpressionAdapterTests
     public void TryCreateProbeExpression_VarAssignmentWithAnonymousType_CompilesAndStubsParameters()
     {
         const string statement = """
-            var raw = await DbContext.ProductReviews
-                .AsNoTracking()
-                .Where(x => x.ProductId == productId)
-                .GroupBy(x => x.Rating)
-                .Select(g => new { Rating = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Rating, x => x.Count, cancellationToken);
-            """;
+                                 var raw = await DbContext.ProductReviews
+                                     .AsNoTracking()
+                                     .Where(x => x.ProductId == productId)
+                                     .GroupBy(x => x.Rating)
+                                     .Select(g => new { Rating = g.Key, Count = g.Count() })
+                                     .ToDictionaryAsync(x => x.Rating, x => x.Count, cancellationToken);
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(statement);
 
         Assert.NotNull(probe);
         Assert.True(
             probe.Contains("ProductId == 0", StringComparison.Ordinal)
-                || probe.Contains("ProductId==0", StringComparison.Ordinal),
+            || probe.Contains("ProductId==0", StringComparison.Ordinal),
             $"Probe: {probe}");
         Assert.DoesNotContain("productId", probe, StringComparison.Ordinal);
         Assert.DoesNotContain("cancellationToken", probe, StringComparison.Ordinal);
@@ -168,17 +169,17 @@ public sealed class LinqDeepExpressionAdapterTests
     public void TryCreateProbeExpression_SelectUsernameWithNullCoalesce_StripsTerminalAndCoalesce()
     {
         const string statement = """
-            var username = await db.Users
-                .Where(u => u.Id == note.UserId)
-                .Select(u => u.Username)
-                .FirstOrDefaultAsync() ?? "Unknown";
-            """;
+                                 var username = await db.Users
+                                     .Where(u => u.Id == note.UserId)
+                                     .Select(u => u.Username)
+                                     .FirstOrDefaultAsync() ?? "Unknown";
+                                 """;
 
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statement,
-            representativeEntityTypeName: "User",
-            dbContextType: typeof(FakeGuidNoteDbContext),
-            queryEntityTypeName: typeof(FakeGuidUser).FullName);
+            "User",
+            typeof(FakeGuidNoteDbContext),
+            typeof(FakeGuidUser).FullName);
 
         Assert.NotNull(probe);
         Assert.DoesNotContain("FirstOrDefaultAsync", probe, StringComparison.Ordinal);

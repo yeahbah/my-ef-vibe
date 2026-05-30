@@ -2,6 +2,8 @@ namespace MyEfVibe.Tests;
 
 public sealed class DesignTimeFactoryWorkingDirectoryTests
 {
+    private static string FactoryAssemblyName => typeof(DesignTimeFactoryMarker).Assembly.GetName().Name!;
+
     [Fact]
     public void ResolveDesignTimeFactoryWorkingDirectory_uses_ef_project_when_factory_assembly_matches_project()
     {
@@ -64,8 +66,6 @@ public sealed class DesignTimeFactoryWorkingDirectoryTests
         Assert.Equal(Path.GetDirectoryName(projectPath), workingDirectory);
     }
 
-    private static string FactoryAssemblyName => typeof(DesignTimeFactoryMarker).Assembly.GetName().Name!;
-
     private static string WriteProject(string root, string relativePath, string assemblyName)
     {
         var projectPath = Path.Combine(root, relativePath);
@@ -73,12 +73,12 @@ public sealed class DesignTimeFactoryWorkingDirectoryTests
         File.WriteAllText(
             projectPath,
             $$"""
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <AssemblyName>{{assemblyName}}</AssemblyName>
-              </PropertyGroup>
-            </Project>
-            """);
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <AssemblyName>{{assemblyName}}</AssemblyName>
+                </PropertyGroup>
+              </Project>
+              """);
 
         return projectPath;
     }
@@ -101,7 +101,7 @@ public sealed class DesignTimeFactoryWorkingDirectoryTests
         {
             try
             {
-                Directory.Delete(Path, recursive: true);
+                Directory.Delete(Path, true);
             }
             catch (IOException)
             {

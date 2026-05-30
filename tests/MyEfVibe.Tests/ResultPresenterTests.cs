@@ -35,6 +35,9 @@ public sealed class ResultPresenterTests
             throw new InvalidOperationException("Deferred query should not be enumerated by presentation.");
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 }
