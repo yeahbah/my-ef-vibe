@@ -19,7 +19,6 @@ internal static class QueryResultWriter
 
         host.EnsureEntityFrameworkRelationalLoaded();
         host.EnsureAspNetCoreSharedFrameworkLoaded();
-
         try
         {
             var (result, metrics) = await QueryEvaluator.EvaluateAsync(
@@ -33,7 +32,6 @@ internal static class QueryResultWriter
             var (_, _, _, _, _, exportRows) = ResultAnalyzer.Analyze(result);
 
             analytics.Record(metrics, result, exportRows);
-
             if (outputFormat == CliOutputFormat.Json)
             {
                 QueryPlanResult? planResult = null;

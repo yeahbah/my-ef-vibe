@@ -71,17 +71,17 @@ internal static class Program
             return 0;
         }
 
-        if (!TryParseOutputFormat(options.Format, out var outputFormat, out var formatError))
+        var parseOutputResult = TryParseOutputFormat(options.Format);
+        if (parseOutputResult.ErrorMessage is not null)
         {
-            CliUi.WriteError(formatError!);
+            CliUi.WriteError(parseOutputResult.ErrorMessage);
             return 1;
         }
 
-        var quietOutput = options.NoBanner || outputFormat == CliOutputFormat.Json;
-
+        var quietOutput = options.NoBanner || parseOutputResult.Format == CliOutputFormat.Json;
         var dbLogSettings = new DbLogSettings
         {
-            Enabled = options.NoDbLog ? false : options.DbLog,
+            Enabled = options is { NoDbLog: false, DbLog: true },
             Verbose = options.DbLogVerbose
         };
 
@@ -92,7 +92,6 @@ internal static class Program
         }
 
         var parsedProvider = ProviderParser.ParseOrNull(options.Provider);
-
         if (!string.IsNullOrWhiteSpace(options.ConnectionString) && parsedProvider is null)
         {
             CliUi.WriteError(
@@ -101,10 +100,8 @@ internal static class Program
         }
 
         var oneShotExpression = CliPathHelper.ResolveOneShotExpression(options.Expression, options.ExpressionParts);
-
         var workspace = CliPathHelper.ResolveWorkspace(options.Workspace);
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
-
         var project = CliPathHelper.ToFileInfo(options.Project);
         var startup = CliPathHelper.ToFileInfo(options.StartupProject);
         var searchDirectory = ProjectPathResolver.ResolveSearchDirectory(
@@ -115,7 +112,6 @@ internal static class Program
         FileInfo resolvedProject;
         FileInfo resolvedStartup;
         WorkspaceBuildResult workspaceBuild;
-
         try
         {
             resolvedProject = WorkspaceProjectLocator.ResolveProject(
@@ -173,7 +169,7 @@ internal static class Program
         {
             if (quietOutput)
             {
-                Console.Error.WriteLine(workspaceFailure.Message);
+                await Console.Error.WriteLineAsync(workspaceFailure.Message);
             }
             else
             {
@@ -198,7 +194,6 @@ internal static class Program
         var allowInteractiveSelection = string.IsNullOrWhiteSpace(oneShotExpression) && !headlessJsonOutput;
 
         Type dbContextType;
-
         try
         {
             dbContextType = DbContextActivator.ResolveContextType(
@@ -279,7 +274,7 @@ internal static class Program
                 host,
                 dbLogSettings,
                 oneShotExpression,
-                outputFormat,
+                parseOutputResult.Format,
                 options.WithPlan);
         }
 
@@ -290,31 +285,23 @@ internal static class Program
         return 0;
     }
 
-    private static bool TryParseOutputFormat(string? formatRaw, out CliOutputFormat format, out string? error)
+    private static (CliOutputFormat Format, string? ErrorMessage) TryParseOutputFormat(string? formatRaw)
     {
         if (string.IsNullOrWhiteSpace(formatRaw))
         {
-            format = CliOutputFormat.Text;
-            error = null;
-            return true;
+            return (CliOutputFormat.Text, null);
         }
 
         if (string.Equals(formatRaw, "json", StringComparison.OrdinalIgnoreCase))
         {
-            format = CliOutputFormat.Json;
-            error = null;
-            return true;
+            return (CliOutputFormat.Json, null);
         }
-
+        
         if (string.Equals(formatRaw, "text", StringComparison.OrdinalIgnoreCase))
         {
-            format = CliOutputFormat.Text;
-            error = null;
-            return true;
+            return (CliOutputFormat.Text, null);
         }
-
-        format = CliOutputFormat.Text;
-        error = $"Unknown output format '{formatRaw}'. Use text or json.";
-        return false;
+        
+        return (CliOutputFormat.Text, $"Unknown output format '{formatRaw}'. Use text or json.");
     }
 }

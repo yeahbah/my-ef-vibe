@@ -10,36 +10,35 @@ internal enum ResultKind
     Object
 }
 
-internal sealed record EvaluationMetrics(
-    string Snippet,
-    long TotalMilliseconds,
-    long? DatabaseMilliseconds,
-    int SqlCommandCount,
-    string? TranslatedSql,
-    IReadOnlyList<string> ExecutedSql,
-    ResultKind ResultKind,
-    string ResultTypeName,
-    int? RowCount,
-    bool IsMaterialized,
-    long? EstimatedBytes,
-    IReadOnlyList<string> Warnings,
-    bool Succeeded)
+internal sealed record EvaluationMetrics
 {
     internal static EvaluationMetrics Failed(string snippet, long totalMilliseconds, string message)
     {
-        return new EvaluationMetrics(
-            snippet,
-            totalMilliseconds,
-            null,
-            0,
-            null,
-            Array.Empty<string>(),
-            ResultKind.Object,
-            "error",
-            null,
-            false,
-            null,
-            new[] { message },
-            false);
+        return new EvaluationMetrics
+        {
+            Snippet = snippet,
+            TotalMilliseconds = totalMilliseconds,
+            Warnings = [message],
+            Succeeded = false,
+            ResultKind = ResultKind.Object,
+            ResultTypeName = "error",
+            SqlCommandCount = 0,
+            IsMaterialized = false,
+            ExecutedSql = []
+        };
     }
+
+    public string Snippet { get; init; }
+    public long TotalMilliseconds { get; init; }
+    public long? DatabaseMilliseconds { get; init; }
+    public int SqlCommandCount { get; init; }
+    public string? TranslatedSql { get; init; }
+    public IReadOnlyList<string> ExecutedSql { get; init; } = [];
+    public ResultKind ResultKind { get; init; }
+    public string ResultTypeName { get; init; }
+    public bool IsMaterialized { get; init; }
+    public long? EstimatedBytes { get; init; }
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public bool Succeeded { get; init; }
+    public int? RowCount { get; init; }
 }

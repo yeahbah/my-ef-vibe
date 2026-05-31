@@ -36,11 +36,9 @@ internal sealed class QueryRepl
     internal async Task RunAsync(CancellationToken cancellationToken = default)
     {
         WriteBanner();
-
         while (!cancellationToken.IsCancellationRequested)
         {
             string? snippet;
-
             try
             {
                 snippet = await ReadSnippetAsync(cancellationToken);
@@ -62,16 +60,13 @@ internal sealed class QueryRepl
             }
 
             var trimmedSnippet = snippet.Trim();
-
             var (handled, shouldExit) = await TryHandleReplCommandAsync(trimmedSnippet, cancellationToken);
-
             if (handled)
             {
                 if (shouldExit)
                 {
                     break;
                 }
-
                 continue;
             }
 
@@ -84,11 +79,8 @@ internal sealed class QueryRepl
     private async Task<string?> ReadSnippetAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        string? firstLine;
-
-        firstLine = _lineReader.ReadLine(_scanReview.GetActivePrompt() ?? CliUi.PrimaryPrompt);
-
+        
+        var firstLine = _lineReader.ReadLine(_scanReview.GetActivePrompt() ?? CliUi.PrimaryPrompt);
         if (firstLine is null)
         {
             return null;
@@ -100,7 +92,6 @@ internal sealed class QueryRepl
         }
 
         var trimmedFirst = firstLine.Trim();
-
         if (trimmedFirst.StartsWith(':'))
         {
             return trimmedFirst;
@@ -123,7 +114,6 @@ internal sealed class QueryRepl
         }
 
         var submitSeen = false;
-
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -135,7 +125,6 @@ internal sealed class QueryRepl
             }
 
             string? continuation;
-
             try
             {
                 continuation = _lineReader.ReadLine(CliUi.ContinuationPrompt);
@@ -153,7 +142,6 @@ internal sealed class QueryRepl
             if (SnippetInputClassifier.IsSubmitOnlyLine(continuation))
             {
                 submitSeen = true;
-
                 break;
             }
 
@@ -161,7 +149,6 @@ internal sealed class QueryRepl
             {
                 buffer.Add(NormalizeInputLine(continuation));
                 submitSeen = true;
-
                 break;
             }
 
@@ -177,11 +164,10 @@ internal sealed class QueryRepl
             {
                 CliUi.WriteWarning("Input incomplete — end with `;` to run.");
             }
-
             return string.Empty;
         }
 
-        return JoinSnippetLines(buffer);
+        return await Task.FromResult(JoinSnippetLines(buffer));
     }
 
     private static bool EndsWithSubmitSemicolon(string line)
@@ -220,7 +206,6 @@ internal sealed class QueryRepl
         }
 
         var command = line[1..].Trim();
-
         switch (command.ToLowerInvariant())
         {
             case "":
@@ -254,6 +239,7 @@ internal sealed class QueryRepl
                 }
 
                 CliUi.WriteWarning($"Unknown command `:{command}`. Type :help.");
+                _lineReader.RecordSubmission(line);
                 return (true, false);
         }
     }

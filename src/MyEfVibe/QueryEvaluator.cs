@@ -19,11 +19,9 @@ internal static class QueryEvaluator
         using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance, dbLogSettings);
 
         var stopwatch = Stopwatch.StartNew();
-
         try
         {
             var result = await session.EvaluateAsync(normalizedSnippet, cancellationToken);
-
             stopwatch.Stop();
 
             var (kind, typeName, rowCount, isMaterialized, estimatedBytes, exportRows) =
@@ -51,27 +49,28 @@ internal static class QueryEvaluator
                 }
             }
 
-            var metrics = new EvaluationMetrics(
-                normalizedSnippet,
-                stopwatch.ElapsedMilliseconds,
-                sqlCapture is { HasEntries: true } ? sqlCapture.TotalDatabaseMilliseconds : null,
-                sqlCapture?.Commands.Count ?? 0,
-                translatedSql,
-                executedSql,
-                kind,
-                typeName,
-                rowCount,
-                isMaterialized,
-                estimatedBytes,
-                warnings,
-                true);
+            var metrics = new EvaluationMetrics
+            {
+                ExecutedSql = executedSql,
+                TranslatedSql = translatedSql,
+                ResultKind = kind,
+                ResultTypeName = typeName,
+                IsMaterialized = isMaterialized,
+                EstimatedBytes = estimatedBytes,
+                Warnings = warnings,
+                Succeeded = true,   
+                Snippet = normalizedSnippet,
+                TotalMilliseconds = stopwatch.ElapsedMilliseconds,
+                DatabaseMilliseconds = sqlCapture is { HasEntries: true } ? sqlCapture.TotalDatabaseMilliseconds : null,
+                SqlCommandCount = sqlCapture?.Commands.Count ?? 0,
+                RowCount = rowCount,
+            };
 
             return (result, metrics);
         }
         catch (Exception failure)
         {
             stopwatch.Stop();
-
             var message = failure is TypeInitializationException or ReflectionTypeLoadException
                 ? DescribeExceptionChain(failure)
                 : DescribeExceptionChain(UnwrapEvaluationException(failure));

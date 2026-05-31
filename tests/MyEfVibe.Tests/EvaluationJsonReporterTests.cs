@@ -5,20 +5,22 @@ public sealed class EvaluationJsonReporterTests
     [Fact]
     public void BuildSuccess_IncludesExecutedSqlAndMetrics()
     {
-        var metrics = new EvaluationMetrics(
-            "db.Products.Count()",
-            12,
-            5,
-            1,
-            null,
-            new[] { "SELECT COUNT(*) FROM Products" },
-            ResultKind.Scalar,
-            "Int32",
-            1,
-            true,
-            8,
-            Array.Empty<string>(),
-            true);
+        var metrics = new EvaluationMetrics
+        {
+            Snippet = "db.Products.Count()",
+            TotalMilliseconds = 12,
+            DatabaseMilliseconds = 5,
+            SqlCommandCount = 1,
+            TranslatedSql = null,
+            ExecutedSql = ["SELECT COUNT(*) FROM Products"],
+            ResultKind = ResultKind.Scalar,
+            ResultTypeName = "Int32",
+            RowCount = 1,
+            IsMaterialized = true,
+            EstimatedBytes = 8,
+            Warnings = Array.Empty<string>(),
+            Succeeded = true,
+        };
 
         var payload = EvaluationJsonReporter.BuildSuccess(42, metrics);
 
@@ -45,8 +47,23 @@ public sealed class EvaluationJsonReporterTests
     [Fact]
     public void BuildSuccess_UsesTranslatedSqlWhenNoExecutedSql()
     {
-        var metrics = new EvaluationMetrics(
-            "db.Products.Take(1)",
+        var metrics = new EvaluationMetrics
+        {
+            Snippet = "db.Products.Take(1)",
+            TotalMilliseconds = 8,
+            DatabaseMilliseconds = null,
+            SqlCommandCount = 0,
+            TranslatedSql = null,
+            ExecutedSql = ["SELECT \"p\".\"Id\" FROM \"Products\" AS \"p\" LIMIT 1"],
+            ResultKind = ResultKind.Queryable,
+            ResultTypeName = "IQueryable<Product>",
+            RowCount = 1,
+            IsMaterialized = true,
+            EstimatedBytes = 8,
+            Warnings = Array.Empty<string>(),
+            Succeeded = true,  
+        };
+        
             8,
             null,
             0,

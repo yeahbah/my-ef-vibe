@@ -67,7 +67,7 @@ internal static class ResultAnalyzer
             return (kind, FormatType(type), count, true, bytes, rows);
         }
 
-        return (ResultKind.Object, FormatType(type), 1, true, EstimateSize(value), new[] { value });
+        return (ResultKind.Object, FormatType(type), 1, true, EstimateSize(value), [value]);
     }
 
     private static string FormatType(Type type)
