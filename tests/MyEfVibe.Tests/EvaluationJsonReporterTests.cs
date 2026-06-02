@@ -57,26 +57,12 @@ public sealed class EvaluationJsonReporterTests
             ExecutedSql = ["SELECT \"p\".\"Id\" FROM \"Products\" AS \"p\" LIMIT 1"],
             ResultKind = ResultKind.Queryable,
             ResultTypeName = "IQueryable<Product>",
-            RowCount = 1,
-            IsMaterialized = true,
+            RowCount = null,
+            IsMaterialized = false,
             EstimatedBytes = 8,
-            Warnings = Array.Empty<string>(),
+            Warnings = [],
             Succeeded = true,  
         };
-        
-            8,
-            null,
-            0,
-            "SELECT \"p\".\"Id\" FROM \"Products\" AS \"p\" LIMIT 1",
-            Array.Empty<string>(),
-            ResultKind.Queryable,
-            "IQueryable<Product>",
-            null,
-            false,
-            null,
-            Array.Empty<string>(),
-            true);
-
         var payload = EvaluationJsonReporter.BuildSuccess(null, metrics);
 
         Assert.True(payload.Success);

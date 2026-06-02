@@ -17,7 +17,7 @@ internal static class AboutJsonReporter
         Console.WriteLine(JsonSerializer.Serialize(Build(), SerializerOptions));
     }
 
-    internal static AboutJsonPayload Build()
+    private static AboutJsonPayload Build()
     {
         return new AboutJsonPayload
         {
@@ -34,7 +34,7 @@ internal static class AboutJsonReporter
         };
     }
 
-    internal sealed class AboutJsonPayload
+    private sealed record AboutJsonPayload
     {
         public string ToolVersion { get; init; } = string.Empty;
 

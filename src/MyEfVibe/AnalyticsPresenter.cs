@@ -40,7 +40,7 @@ internal static class AnalyticsPresenter
         }
     }
 
-    internal static void WriteSql(EvaluationMetrics metrics, DbLogSettings dbLogSettings, bool useSpectre)
+    private static void WriteSql(EvaluationMetrics metrics, DbLogSettings dbLogSettings, bool useSpectre)
     {
         if (metrics.ExecutedSql.Count == 0 && string.IsNullOrWhiteSpace(metrics.TranslatedSql))
         {
@@ -97,7 +97,7 @@ internal static class AnalyticsPresenter
         AnsiConsole.MarkupLine($"[grey]{Markup.Escape(FormatFooter(metrics))}[/]");
     }
 
-    internal static string FormatFooter(EvaluationMetrics metrics)
+    private static string FormatFooter(EvaluationMetrics metrics)
     {
         var parts = new List<string> { $"{metrics.TotalMilliseconds} ms" };
 

@@ -138,7 +138,6 @@ internal sealed class ScriptSession
     internal async Task<object?> EvaluateAsync(string code, CancellationToken cancellationToken = default)
     {
         var trimmed = SnippetNormalizer.ForEvaluation(code, DbContextType);
-
         if (string.IsNullOrEmpty(trimmed))
         {
             return null;
