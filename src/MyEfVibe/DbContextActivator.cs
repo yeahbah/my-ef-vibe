@@ -113,19 +113,6 @@ internal static class DbContextActivator
             return designTimeInstance;
         }
 
-        if (TryCreateUsingParameterlessConstructor(selectedDbContextType, out var parameterlessInstance))
-        {
-            if (provider.HasValue)
-            {
-                DbContextHostHints.TryApplyPostgreSqlNamingHint(
-                    parameterlessInstance,
-                    host.StartupProjectPath,
-                    provider.Value);
-            }
-
-            return parameterlessInstance;
-        }
-
         var resolvedConnectionFromConfiguration = false;
 
         if (string.IsNullOrWhiteSpace(connectionString)
@@ -161,6 +148,20 @@ internal static class DbContextActivator
                 provider.Value);
 
             return optionsInstance;
+        }
+
+        if (!resolvedConnectionFromConfiguration
+            && TryCreateUsingParameterlessConstructor(selectedDbContextType, out var parameterlessInstance))
+        {
+            if (provider.HasValue)
+            {
+                DbContextHostHints.TryApplyPostgreSqlNamingHint(
+                    parameterlessInstance,
+                    host.StartupProjectPath,
+                    provider.Value);
+            }
+
+            return parameterlessInstance;
         }
 
         var failureMessage =

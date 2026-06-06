@@ -92,7 +92,7 @@ internal static class QueryEvaluator
         {
             try
             {
-                var probeSql = await session.EvaluateAsync(
+                var probeSql = await session.EvaluateProbeAsync(
                     $"{probeExpression}.ToQueryString()",
                     cancellationToken);
 
