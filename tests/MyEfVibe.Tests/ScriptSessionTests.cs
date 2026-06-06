@@ -42,14 +42,15 @@ public sealed class ScriptSessionTests
         Assert.DoesNotContain("db.Users.Where", source, StringComparison.Ordinal);
     }
 
-    private sealed class ProbeHistoryDbContext(DbContextOptions<ProbeHistoryDbContext> options)
-        : DbContext(options)
-    {
-        public DbSet<ProbeHistoryUser> Users => Set<ProbeHistoryUser>();
-    }
+}
 
-    private sealed class ProbeHistoryUser
-    {
-        public int Id { get; set; }
-    }
+public sealed class ProbeHistoryDbContext(DbContextOptions<ProbeHistoryDbContext> options)
+    : DbContext(options)
+{
+    public DbSet<ProbeHistoryUser> Users => Set<ProbeHistoryUser>();
+}
+
+public sealed class ProbeHistoryUser
+{
+    public int Id { get; set; }
 }
