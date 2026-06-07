@@ -118,6 +118,7 @@ internal static class DbContextActivator
         if (string.IsNullOrWhiteSpace(connectionString)
             && AppSettingsConnectionResolver.TryResolve(
                 host.StartupProjectPath,
+                host.ProjectPath,
                 host.OutputDirectory,
                 out var fromConfiguration,
                 out var inferredProvider))
@@ -197,7 +198,7 @@ internal static class DbContextActivator
             else if (!provider.HasValue)
             {
                 failureMessage +=
-                    ", but the database provider could not be inferred. Pass `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).";
+                    ", but the database provider could not be determined from the `-p` project. Add an EF provider package reference (for example `Microsoft.EntityFrameworkCore.SqlServer`) or pass `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).";
             }
             else
             {

@@ -3,115 +3,11 @@ namespace MyEfVibe.Tests;
 public sealed class AppSettingsConnectionResolverTests
 {
     [Fact]
-    public void InferProvider_mysql_connection_string_without_dlls_is_mysql_not_sqlserver()
-    {
-        using var temp = new TempDirectory();
-
-        var provider = AppSettingsConnectionResolver.InferProvider(
-            temp.Path,
-            "Server=localhost;Port=3306;Database=AdventureWorks2019;User=root;Password=secret;");
-
-        Assert.Equal(MyEfVibeProvider.MySql, provider);
-    }
-
-    [Fact]
-    public void InferProvider_mysql_deps_json_without_provider_dlls_is_mysql()
-    {
-        using var temp = new TempDirectory();
-
-        File.WriteAllText(
-            Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.deps.json"),
-            """
-            {
-              "targets": {
-                ".NETCoreApp,Version=v10.0": {
-                  "AdventureWorks.Infrastructure.Persistence/1.0.0": {
-                    "dependencies": {
-                      "MySql.EntityFrameworkCore": "10.0.7"
-                    }
-                  },
-                  "MySql.EntityFrameworkCore/10.0.7": {}
-                }
-              }
-            }
-            """);
-
-        var provider = AppSettingsConnectionResolver.InferProvider(
-            temp.Path,
-            "Server=localhost;Port=3306;Database=AdventureWorks2019;User=root;Password=secret;");
-
-        Assert.Equal(MyEfVibeProvider.MySql, provider);
-    }
-
-    [Fact]
-    public void InferProvider_sqlserver_connection_string_still_sqlserver()
-    {
-        using var temp = new TempDirectory();
-
-        var provider = AppSettingsConnectionResolver.InferProvider(
-            temp.Path,
-            "Data Source=localhost,1533;Initial Catalog=WideWorldImporters;TrustServerCertificate=Yes");
-
-        Assert.Equal(MyEfVibeProvider.SqlServer, provider);
-    }
-
-    [Fact]
-    public void InferProvider_sqlserver_data_source_with_user_id_is_not_oracle()
-    {
-        using var temp = new TempDirectory();
-
-        var provider = AppSettingsConnectionResolver.InferProvider(
-            temp.Path,
-            "Data Source=localhost,1533;User ID=wwi;Password=secret;Initial Catalog=WideWorldImporters;TrustServerCertificate=Yes");
-
-        Assert.Equal(MyEfVibeProvider.SqlServer, provider);
-    }
-
-    [Fact]
-    public void InferProvider_oracle_connection_string_is_oracle_not_sqlserver()
-    {
-        using var temp = new TempDirectory();
-
-        var provider = AppSettingsConnectionResolver.InferProvider(
-            temp.Path,
-            "User Id=adventureworks;Password=secret;Data Source=localhost:1521/FREEPDB1;");
-
-        Assert.Equal(MyEfVibeProvider.Oracle, provider);
-    }
-
-    [Fact]
-    public void InferProvider_sqlserver_adventureworks_format_beats_mysql_deps_json()
-    {
-        using var temp = new TempDirectory();
-
-        File.WriteAllText(
-            Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.deps.json"),
-            """
-            {
-              "targets": {
-                ".NETCoreApp,Version=v10.0": {
-                  "AdventureWorks.Infrastructure.Persistence/1.0.0": {
-                    "dependencies": {
-                      "MySql.EntityFrameworkCore": "10.0.7"
-                    }
-                  },
-                  "MySql.EntityFrameworkCore/10.0.7": {}
-                }
-              }
-            }
-            """);
-
-        var provider = AppSettingsConnectionResolver.InferProvider(
-            temp.Path,
-            "Server=localhost,1433;Database=AdventureWorks;User Id=sa;Password=AdventureWorks_2022;Encrypt=false;TrustServerCertificate=true");
-
-        Assert.Equal(MyEfVibeProvider.SqlServer, provider);
-    }
-
-    [Fact]
     public void TryResolve_adventureworks_mysql_appsettings()
     {
         using var temp = new TempDirectory();
+        var efProject = Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.csproj");
+        WriteProjectWithProvider(efProject, "MySql.EntityFrameworkCore");
         var startupProject = Path.Combine(temp.Path, "AdventureWorks.API.csproj");
         File.WriteAllText(startupProject, "<Project Sdk=\"Microsoft.NET.Sdk\" />");
 
@@ -125,26 +21,10 @@ public sealed class AppSettingsConnectionResolverTests
             }
             """);
 
-        File.WriteAllText(
-            Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.deps.json"),
-            """
-            {
-              "targets": {
-                ".NETCoreApp,Version=v10.0": {
-                  "AdventureWorks.Infrastructure.Persistence/1.0.0": {
-                    "dependencies": {
-                      "MySql.EntityFrameworkCore": "10.0.7"
-                    }
-                  },
-                  "MySql.EntityFrameworkCore/10.0.7": {}
-                }
-              }
-            }
-            """);
-
         Assert.True(
             AppSettingsConnectionResolver.TryResolve(
                 startupProject,
+                efProject,
                 Path.Combine(temp.Path),
                 out var connectionString,
                 out var provider));
@@ -157,6 +37,8 @@ public sealed class AppSettingsConnectionResolverTests
     public void TryResolve_adventureworks_oracle_appsettings()
     {
         using var temp = new TempDirectory();
+        var efProject = Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.csproj");
+        WriteProjectWithProvider(efProject, "Oracle.EntityFrameworkCore");
         var startupProject = Path.Combine(temp.Path, "AdventureWorks.API.csproj");
         File.WriteAllText(startupProject, "<Project Sdk=\"Microsoft.NET.Sdk\" />");
 
@@ -173,6 +55,7 @@ public sealed class AppSettingsConnectionResolverTests
         Assert.True(
             AppSettingsConnectionResolver.TryResolve(
                 startupProject,
+                efProject,
                 Path.Combine(temp.Path),
                 out var connectionString,
                 out var provider));
@@ -186,6 +69,8 @@ public sealed class AppSettingsConnectionResolverTests
     {
         using var environment = new EnvironmentVariableScope("ASPNETCORE_ENVIRONMENT", "Oracle");
         using var temp = new TempDirectory();
+        var efProject = Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.csproj");
+        WriteProjectWithProvider(efProject, "Microsoft.EntityFrameworkCore.SqlServer");
         var startupProject = Path.Combine(temp.Path, "AdventureWorks.API.csproj");
         File.WriteAllText(startupProject, "<Project Sdk=\"Microsoft.NET.Sdk\" />");
 
@@ -215,12 +100,47 @@ public sealed class AppSettingsConnectionResolverTests
         Assert.True(
             AppSettingsConnectionResolver.TryResolve(
                 startupProject,
+                efProject,
                 Path.Combine(temp.Path),
                 out var connectionString,
                 out var provider));
 
         Assert.Contains("FREEPDB1", connectionString, StringComparison.Ordinal);
         Assert.Equal(MyEfVibeProvider.Oracle, provider);
+    }
+
+    [Fact]
+    public void ResolveProvider_prefers_appsettings_override_over_ef_project_package()
+    {
+        using var temp = new TempDirectory();
+        var efProject = Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.csproj");
+        WriteProjectWithProvider(efProject, "Microsoft.EntityFrameworkCore.SqlServer");
+        var startupProject = Path.Combine(temp.Path, "AdventureWorks.API.csproj");
+        File.WriteAllText(startupProject, "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        File.WriteAllText(
+            Path.Combine(temp.Path, "appsettings.json"),
+            """
+            {
+              "EntityFrameworkCoreSettings": { "DatabaseProvider": "PostgreSQL" }
+            }
+            """);
+
+        var provider = AppSettingsConnectionResolver.ResolveProvider(startupProject, efProject);
+
+        Assert.Equal(MyEfVibeProvider.Npgsql, provider);
+    }
+
+    private static void WriteProjectWithProvider(string csprojPath, string packageId)
+    {
+        File.WriteAllText(
+            csprojPath,
+            $$"""
+              <Project Sdk="Microsoft.NET.Sdk">
+                <ItemGroup>
+                  <PackageReference Include="{{packageId}}" Version="10.0.7" />
+                </ItemGroup>
+              </Project>
+              """);
     }
 
     private sealed class TempDirectory : IDisposable

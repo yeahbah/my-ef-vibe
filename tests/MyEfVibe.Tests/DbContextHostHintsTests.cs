@@ -42,6 +42,7 @@ public sealed class DbContextHostHintsTests
         Assert.True(
             AppSettingsConnectionResolver.TryResolve(
                 startupProject,
+                startupProject,
                 temp.Path,
                 out _,
                 out var provider));

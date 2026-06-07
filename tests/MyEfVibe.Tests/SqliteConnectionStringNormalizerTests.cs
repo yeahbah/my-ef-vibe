@@ -19,6 +19,9 @@ public sealed class SqliteConnectionStringNormalizerTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
               </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
+              </ItemGroup>
             </Project>
             """);
 
@@ -44,6 +47,9 @@ public sealed class SqliteConnectionStringNormalizerTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
               </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
+              </ItemGroup>
             </Project>
             """);
 
@@ -87,6 +93,9 @@ public sealed class SqliteConnectionStringNormalizerTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
               </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
+              </ItemGroup>
             </Project>
             """);
 
@@ -116,6 +125,7 @@ public sealed class SqliteConnectionStringNormalizerTests
         Assert.True(
             AppSettingsConnectionResolver.TryResolve(
                 startupProject,
+                startupProject,
                 temp.Path,
                 out var connectionString,
                 out _));
@@ -135,6 +145,9 @@ public sealed class SqliteConnectionStringNormalizerTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
               </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
+              </ItemGroup>
             </Project>
             """);
 
@@ -163,6 +176,7 @@ public sealed class SqliteConnectionStringNormalizerTests
 
         Assert.True(
             AppSettingsConnectionResolver.TryResolve(
+                startupProject,
                 startupProject,
                 temp.Path,
                 out var connectionString,

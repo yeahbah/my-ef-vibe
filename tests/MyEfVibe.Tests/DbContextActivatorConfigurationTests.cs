@@ -82,10 +82,5 @@ public sealed class ConfigurationFallbackProbeDbContext : DbContext
         ParameterlessConstructorCalls++;
     }
 
-    public ConfigurationFallbackProbeDbContext(DbContextOptions<ConfigurationFallbackProbeDbContext> options)
-        : base(options)
-    {
-    }
-
     public static int ParameterlessConstructorCalls { get; set; }
 }

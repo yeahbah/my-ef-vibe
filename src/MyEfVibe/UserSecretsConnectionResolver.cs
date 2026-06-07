@@ -4,14 +4,9 @@ namespace MyEfVibe;
 
 internal static class UserSecretsConnectionResolver
 {
-    internal static bool TryResolve(
-        string projectPath,
-        string outputDirectory,
-        out string connectionString,
-        out MyEfVibeProvider? provider)
+    internal static bool TryResolve(string projectPath, out string connectionString)
     {
         connectionString = string.Empty;
-        provider = null;
 
         if (!CsprojInspector.TryGetUserSecretsId(projectPath, out var userSecretsId))
         {
@@ -24,8 +19,6 @@ internal static class UserSecretsConnectionResolver
         {
             return false;
         }
-
-        provider = AppSettingsConnectionResolver.InferProvider(outputDirectory, connectionString);
 
         return !string.IsNullOrWhiteSpace(connectionString);
     }

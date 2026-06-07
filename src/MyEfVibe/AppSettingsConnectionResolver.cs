@@ -6,6 +6,7 @@ internal static class AppSettingsConnectionResolver
 {
     internal static bool TryResolve(
         string startupProjectPath,
+        string efProjectPath,
         string efOutputDirectory,
         out string connectionString,
         out MyEfVibeProvider? provider)
@@ -28,12 +29,9 @@ internal static class AppSettingsConnectionResolver
 
         if (UserSecretsConnectionResolver.TryResolve(
                 startupProjectPath,
-                efOutputDirectory,
-                out var secretsConnectionString,
-                out var secretsProvider))
+                out var secretsConnectionString))
         {
             connectionString = secretsConnectionString;
-            provider = secretsProvider;
         }
 
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -41,20 +39,23 @@ internal static class AppSettingsConnectionResolver
             return false;
         }
 
-        provider ??= MapDatabaseProviderName(TryReadDatabaseProviderName(startupProjectPath));
-        provider ??= InferProvider(efOutputDirectory, connectionString);
+        provider = ResolveProvider(startupProjectPath, efProjectPath);
 
-        if (provider == MyEfVibeProvider.Sqlite
-            || SqliteConnectionStringNormalizer.LooksLikeSqliteConnection(connectionString))
+        if (provider == MyEfVibeProvider.Sqlite)
         {
             connectionString = SqliteConnectionStringNormalizer.Normalize(
                 connectionString,
                 startupProjectPath,
                 efOutputDirectory);
-            provider ??= MyEfVibeProvider.Sqlite;
         }
 
         return true;
+    }
+
+    internal static MyEfVibeProvider? ResolveProvider(string startupProjectPath, string efProjectPath)
+    {
+        return MapDatabaseProviderName(TryReadDatabaseProviderName(startupProjectPath))
+               ?? CsprojInspector.TryReadEntityFrameworkProvider(efProjectPath);
     }
 
     internal static string? TryReadDatabaseProviderName(string startupProjectPath)
@@ -129,7 +130,7 @@ internal static class AppSettingsConnectionResolver
         }
     }
 
-    private static MyEfVibeProvider? MapDatabaseProviderName(string? databaseProvider)
+    internal static MyEfVibeProvider? MapDatabaseProviderName(string? databaseProvider)
     {
         if (string.IsNullOrWhiteSpace(databaseProvider))
         {
@@ -326,188 +327,5 @@ internal static class AppSettingsConnectionResolver
         }
 
         return false;
-    }
-
-    internal static MyEfVibeProvider? InferProvider(string outputDirectory, string connectionString)
-    {
-        var fromConnection = InferProviderFromConnectionString(connectionString);
-
-        if (fromConnection.HasValue)
-        {
-            return fromConnection;
-        }
-
-        if (!Directory.Exists(outputDirectory))
-        {
-            return null;
-        }
-
-        return TryInferProviderFromDepsJson(outputDirectory, connectionString)
-               ?? TryInferProviderFromOutputDlls(outputDirectory, connectionString);
-    }
-
-    private static MyEfVibeProvider? TryInferProviderFromOutputDlls(
-        string outputDirectory,
-        string connectionString)
-    {
-        if (Directory.EnumerateFiles(outputDirectory, "Npgsql*.dll").Any())
-        {
-            return MyEfVibeProvider.Npgsql;
-        }
-
-        if (Directory.EnumerateFiles(outputDirectory, "Pomelo.EntityFrameworkCore.MySql*.dll").Any()
-            || Directory.EnumerateFiles(outputDirectory, "MySql.EntityFrameworkCore*.dll").Any())
-        {
-            return LooksLikeMariaDbConnection(connectionString)
-                ? MyEfVibeProvider.MariaDb
-                : MyEfVibeProvider.MySql;
-        }
-
-        if (Directory.EnumerateFiles(outputDirectory, "Microsoft.Data.SqlClient*.dll").Any()
-            || Directory.EnumerateFiles(outputDirectory, "Microsoft.EntityFrameworkCore.SqlServer*.dll").Any())
-        {
-            return MyEfVibeProvider.SqlServer;
-        }
-
-        if (Directory.EnumerateFiles(outputDirectory, "Microsoft.EntityFrameworkCore.Sqlite*.dll").Any())
-        {
-            return MyEfVibeProvider.Sqlite;
-        }
-
-        if (Directory.EnumerateFiles(outputDirectory, "Oracle.EntityFrameworkCore*.dll").Any()
-            || Directory.EnumerateFiles(outputDirectory, "Oracle.ManagedDataAccess*.dll").Any())
-        {
-            return MyEfVibeProvider.Oracle;
-        }
-
-        return null;
-    }
-
-    private static MyEfVibeProvider? TryInferProviderFromDepsJson(
-        string outputDirectory,
-        string connectionString)
-    {
-        foreach (var depsPath in Directory.EnumerateFiles(outputDirectory, "*.deps.json"))
-        {
-            string text;
-
-            try
-            {
-                text = File.ReadAllText(depsPath);
-            }
-            catch (IOException)
-            {
-                continue;
-            }
-
-            if (DepsReferencesPackage(text, "Pomelo.EntityFrameworkCore.MySql")
-                || DepsReferencesPackage(text, "MySql.EntityFrameworkCore"))
-            {
-                return LooksLikeMariaDbConnection(connectionString)
-                    ? MyEfVibeProvider.MariaDb
-                    : MyEfVibeProvider.MySql;
-            }
-
-            if (DepsReferencesPackage(text, "Microsoft.EntityFrameworkCore.SqlServer"))
-            {
-                return MyEfVibeProvider.SqlServer;
-            }
-
-            if (DepsReferencesPackage(text, "Npgsql.EntityFrameworkCore.PostgreSQL"))
-            {
-                return MyEfVibeProvider.Npgsql;
-            }
-
-            if (DepsReferencesPackage(text, "Microsoft.EntityFrameworkCore.Sqlite"))
-            {
-                return MyEfVibeProvider.Sqlite;
-            }
-
-            if (DepsReferencesPackage(text, "Oracle.EntityFrameworkCore"))
-            {
-                return MyEfVibeProvider.Oracle;
-            }
-        }
-
-        return null;
-    }
-
-    private static bool DepsReferencesPackage(string depsJson, string packageName)
-    {
-        return depsJson.Contains($"\"{packageName}/", StringComparison.Ordinal);
-    }
-
-    private static MyEfVibeProvider? InferProviderFromConnectionString(string connectionString)
-    {
-        if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase)
-            || connectionString.Contains("Username=", StringComparison.OrdinalIgnoreCase))
-        {
-            return MyEfVibeProvider.Npgsql;
-        }
-
-        if (connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
-            && connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase))
-        {
-            return MyEfVibeProvider.Sqlite;
-        }
-
-        if (LooksLikeMySqlConnection(connectionString))
-        {
-            return LooksLikeMariaDbConnection(connectionString)
-                ? MyEfVibeProvider.MariaDb
-                : MyEfVibeProvider.MySql;
-        }
-
-        if (LooksLikeSqlServerConnection(connectionString))
-        {
-            return MyEfVibeProvider.SqlServer;
-        }
-
-        if (LooksLikeOracleConnection(connectionString))
-        {
-            return MyEfVibeProvider.Oracle;
-        }
-
-        return null;
-    }
-
-    internal static bool LooksLikeSqlServerConnection(string connectionString)
-    {
-        return connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase)
-               || connectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase)
-               || connectionString.Contains("Integrated Security=", StringComparison.OrdinalIgnoreCase)
-               || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
-                   && connectionString.Contains(",1433", StringComparison.OrdinalIgnoreCase));
-    }
-
-    internal static bool LooksLikeMySqlConnection(string connectionString)
-    {
-        return connectionString.Contains("Port=3306", StringComparison.OrdinalIgnoreCase)
-               || connectionString.Contains("Uid=", StringComparison.OrdinalIgnoreCase)
-               || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
-                   && ContainsMySqlUserKey(connectionString));
-    }
-
-    internal static bool LooksLikeOracleConnection(string connectionString)
-    {
-        return connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
-               && (connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
-                   || connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool ContainsMySqlUserKey(string connectionString)
-    {
-        if (connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase)
-            || connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return connectionString.Contains("User=", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool LooksLikeMariaDbConnection(string connectionString)
-    {
-        return connectionString.Contains("mariadb", StringComparison.OrdinalIgnoreCase);
     }
 }
