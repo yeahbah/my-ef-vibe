@@ -458,14 +458,14 @@ internal static class AppSettingsConnectionResolver
                 : MyEfVibeProvider.MySql;
         }
 
-        if (LooksLikeOracleConnection(connectionString))
-        {
-            return MyEfVibeProvider.Oracle;
-        }
-
         if (LooksLikeSqlServerConnection(connectionString))
         {
             return MyEfVibeProvider.SqlServer;
+        }
+
+        if (LooksLikeOracleConnection(connectionString))
+        {
+            return MyEfVibeProvider.Oracle;
         }
 
         return null;
@@ -475,8 +475,6 @@ internal static class AppSettingsConnectionResolver
     {
         return connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase)
                || connectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase)
-               || connectionString.Contains("User ID=", StringComparison.OrdinalIgnoreCase)
-               || connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase)
                || connectionString.Contains("Integrated Security=", StringComparison.OrdinalIgnoreCase)
                || (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
                    && connectionString.Contains(",1433", StringComparison.OrdinalIgnoreCase));

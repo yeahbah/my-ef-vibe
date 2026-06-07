@@ -56,6 +56,18 @@ public sealed class AppSettingsConnectionResolverTests
     }
 
     [Fact]
+    public void InferProvider_sqlserver_data_source_with_user_id_is_not_oracle()
+    {
+        using var temp = new TempDirectory();
+
+        var provider = AppSettingsConnectionResolver.InferProvider(
+            temp.Path,
+            "Data Source=localhost,1533;User ID=wwi;Password=secret;Initial Catalog=WideWorldImporters;TrustServerCertificate=Yes");
+
+        Assert.Equal(MyEfVibeProvider.SqlServer, provider);
+    }
+
+    [Fact]
     public void InferProvider_oracle_connection_string_is_oracle_not_sqlserver()
     {
         using var temp = new TempDirectory();
