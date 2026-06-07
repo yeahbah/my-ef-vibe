@@ -10,15 +10,18 @@ internal static class CsprojReader
         var xmlns = dom.Root!.Name.Namespace;
 
         foreach (var group in dom.Descendants(xmlns + "PropertyGroup"))
-        foreach (var assemblyNameLeaf in group.Elements(xmlns + "AssemblyName"))
         {
-            var trimmedAssemblyNameLeaf = assemblyNameLeaf.Value.Trim();
-
-            if (!string.IsNullOrEmpty(trimmedAssemblyNameLeaf))
+            foreach (var assemblyNameLeaf in group.Elements(xmlns + "AssemblyName"))
             {
-                return trimmedAssemblyNameLeaf;
-            }
+                var trimmedAssemblyNameLeaf = assemblyNameLeaf.Value.Trim();
+
+                if (!string.IsNullOrEmpty(trimmedAssemblyNameLeaf))
+                {
+                    return trimmedAssemblyNameLeaf;
+                }
+            }    
         }
+        
 
         return Path.GetFileNameWithoutExtension(csprojAbsolutePath);
     }
@@ -43,8 +46,8 @@ internal static class CsprojReader
 
             foreach (var leaf in group.Elements(xmlns + "TargetFrameworks"))
             {
-                foreach (var value in leaf.Value.Split(';',
-                             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                var entries = leaf.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var value in entries)
                 {
                     if (!string.IsNullOrEmpty(value))
                     {

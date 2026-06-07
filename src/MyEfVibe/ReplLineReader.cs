@@ -353,10 +353,9 @@ internal sealed class ReplLineReader
 
         if (commonPrefix.Length > partial.Length)
         {
-            var extension = commonPrefix[partial.Length..];
             var merged = matches[0] with
             {
-                InsertText = extension,
+                InsertText = commonPrefix,
                 ReplaceStart = cursor - partial.Length,
                 ReplaceLength = partial.Length
             };

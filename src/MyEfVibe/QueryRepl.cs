@@ -29,7 +29,7 @@ internal sealed class QueryRepl
         _contextTypeName = dbContext.GetType().Name;
         _projectLabel = projectLabel;
         _dbLogSettings = dbLogSettings;
-        _lineReader = new ReplLineReader(_history, new ReplCompletionService(), _scanReview);
+        _lineReader = new ReplLineReader(_history, new ReplCompletionService(session), _scanReview);
         _commands = new ReplCommandHandler(session, host, dbContext, dbLogSettings, _analytics, _history, _scanReview);
     }
 
