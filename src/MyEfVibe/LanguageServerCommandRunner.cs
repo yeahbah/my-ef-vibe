@@ -19,9 +19,6 @@ internal sealed class LanguageServerCliOptions
     [Option("connection-string|cs", HelpText = "Connection string for manual DbContextOptions construction.")]
     public string? ConnectionString { get; set; }
 
-    [Option("provider", HelpText = "Provider with --connection-string.")]
-    public string? Provider { get; set; }
-
     [Option('f', "framework", HelpText = "Target framework moniker (e.g. net8.0).")]
     public string? Framework { get; set; }
 }
@@ -38,7 +35,6 @@ internal static class LanguageServerCommandRunner
             CliPathHelper.ToFileInfo(options.StartupProject),
             options.Context,
             options.ConnectionString,
-            options.Provider,
             false,
             true,
             null,

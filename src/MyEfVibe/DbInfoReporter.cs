@@ -73,10 +73,15 @@ internal static class DbInfoReporter
         if (!RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
                 host.EnumerateLoadedAssemblies(),
-                out var connection)
+                out var connection,
+                out var connectionFailure)
             || connection is not DbConnection dbConnection)
         {
-            rows.Add(("Connection", "(not relational or unavailable)"));
+            rows.Add((
+                string.IsNullOrWhiteSpace(connectionFailure) ? "Connection" : "Connection error",
+                string.IsNullOrWhiteSpace(connectionFailure)
+                    ? "(not relational or unavailable)"
+                    : connectionFailure));
             WritePanel(rows);
             return;
         }

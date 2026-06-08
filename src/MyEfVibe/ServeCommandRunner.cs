@@ -18,7 +18,6 @@ internal static class ServeCommandRunner
             CliPathHelper.ToFileInfo(options.StartupProject),
             options.Context,
             options.ConnectionString,
-            options.Provider,
             options.DbLog,
             options.NoDbLog,
             options.DbLogLevel,

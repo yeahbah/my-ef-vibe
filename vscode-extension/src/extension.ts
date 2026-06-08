@@ -80,7 +80,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           || event.affectsConfiguration('efvibe.dotnetFramework')
           || event.affectsConfiguration('efvibe.dbLog')
           || event.affectsConfiguration('efvibe.connectionString')
-          || event.affectsConfiguration('efvibe.provider')
           || event.affectsConfiguration('efvibe.useDaemon')) {
           invalidateEfvibeDaemon();
           invalidateCompletionCache();

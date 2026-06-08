@@ -51,6 +51,12 @@ internal static class DbContextActivator
             providerDescriptor ??= ProviderDescriptor.TryFromKnownProvider(MyEfVibeProvider.Sqlite);
         }
 
+        if (!string.IsNullOrWhiteSpace(connectionString) && providerDescriptor is null)
+        {
+            providerDescriptor = EntityFrameworkProviderDiscovery.TryDiscoverFromProject(host.ProjectPath);
+            provider ??= providerDescriptor?.KnownProvider;
+        }
+
         if (providerDescriptor is not null)
         {
             host.EnsureProviderDependenciesLoaded(providerDescriptor);
@@ -60,8 +66,8 @@ internal static class DbContextActivator
 
         List<string>? designTimeFactoryErrors = null;
 
-        // When the caller passes an explicit connection string and provider (integration tests,
-        // --connection-string/--provider), build DbContextOptions first so provider naming customizers
+        // When the caller passes an explicit connection string (and optional provider override in tests),
+        // build DbContextOptions first so provider naming customizers
         // are registered before any design-time factory or appsettings-based construction path.
         if (!string.IsNullOrWhiteSpace(connectionString)
             && providerDescriptor is not null
@@ -162,9 +168,7 @@ internal static class DbContextActivator
             + $"{Environment.NewLine}"
             + " - Add a public parameterless constructor on the DbContext."
             + $"{Environment.NewLine}"
-            + " - Pass `--connection-string` together with `--provider` ("
-            + ProviderParser.ProviderHelpText
-            + ") to build `DbContextOptions<TContext>` (optional packages such as NetTopologySuite are applied when referenced)."
+            + " - Pass `--connection-string` to build `DbContextOptions<TContext>` when the EF provider is discovered from `-p` (optional packages such as NetTopologySuite are applied when referenced)."
             + $"{Environment.NewLine}"
             + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.";
 
@@ -197,9 +201,7 @@ internal static class DbContextActivator
                 else
                 {
                     failureMessage +=
-                        ", but the database provider could not be determined from the `-p` project. Add an EF provider package reference (for example `Microsoft.EntityFrameworkCore.SqlServer`) or pass `--provider` ("
-                        + ProviderParser.ProviderHelpText
-                        + ").";
+                        ", but the database provider could not be determined from the `-p` project. Add an EF provider package reference (for example `Microsoft.EntityFrameworkCore.SqlServer`).";
                 }
             }
             else

@@ -40,10 +40,6 @@ internal sealed class ScanCliOptions
     [Option("no-banner", HelpText = "Suppress build/status banners (recommended with --json).")]
     public bool NoBanner { get; set; }
 
-    [Option("connection-string|cs", HelpText = "Connection string for deep scan (requires --provider).")]
+    [Option("connection-string|cs", HelpText = "Connection string for deep scan.")]
     public string? ConnectionString { get; set; }
-
-    [Option("provider",
-        HelpText = "Provider with --connection-string: alias or EF package id (for example Microsoft.EntityFrameworkCore.SqlServer).")]
-    public string? Provider { get; set; }
 }

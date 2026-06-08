@@ -93,10 +93,14 @@ internal static class DbInfoJsonReporter
             Value = SchemaBrowser.GetDbSets(dbContext).Count.ToString()
         });
 
+        host.EnsureEntityFrameworkRelationalLoaded();
+        host.EnsureAspNetCoreSharedFrameworkLoaded();
+
         if (RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
                 host.EnumerateLoadedAssemblies(),
-                out var connection)
+                out var connection,
+                out var connectionFailure)
             && connection is DbConnection dbConnection)
         {
             try
@@ -120,7 +124,13 @@ internal static class DbInfoJsonReporter
         }
         else
         {
-            rows.Add(new DbInfoJsonEntry { Key = "Connection", Value = "(not relational or unavailable)" });
+            rows.Add(new DbInfoJsonEntry
+            {
+                Key = string.IsNullOrWhiteSpace(connectionFailure) ? "Connection" : "Connection error",
+                Value = string.IsNullOrWhiteSpace(connectionFailure)
+                    ? "(not relational or unavailable)"
+                    : connectionFailure
+            });
         }
 
         return new DbInfoJsonPayload

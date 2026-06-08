@@ -95,7 +95,7 @@ public sealed class EntityFrameworkProviderDiscoveryTests
         Assert.NotNull(message);
         Assert.Contains("Microsoft.EntityFrameworkCore.SqlServer", message, StringComparison.Ordinal);
         Assert.Contains("Npgsql.EntityFrameworkCore.PostgreSQL", message, StringComparison.Ordinal);
-        Assert.Contains("--provider", message, StringComparison.Ordinal);
+        Assert.Contains("Reference only one provider", message, StringComparison.Ordinal);
     }
 
     [Fact]

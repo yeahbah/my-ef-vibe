@@ -669,7 +669,6 @@ internal sealed class EfvibeToolWindowControl : UserControl
                     $"Startup project: {settings.StartupProject.IfBlank("(auto)")}{Environment.NewLine}" +
                     $"DbContext: {settings.Context.IfBlank("(auto)")}{Environment.NewLine}" +
                     $"Workspace root: {settings.WorkspaceRoot.IfBlank("(default)")}{Environment.NewLine}" +
-                    $"Provider: {settings.Provider.IfBlank("(from project)")}{Environment.NewLine}" +
                     $"Tool path: {settings.ToolPath.IfBlank("(PATH/local tool)")}{Environment.NewLine}" +
                     $"Framework: {settings.DotnetFramework.IfBlank("(default)")}{Environment.NewLine}" +
                     Environment.NewLine +

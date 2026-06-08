@@ -30,7 +30,7 @@ internal static class EntityFrameworkProviderDiscovery
 
         return "Multiple EF provider packages were found on `-p`: "
                + listed
-               + ". Reference only one provider in the EF project or pass `--provider` with a provider alias or package id.";
+               + ". Reference only one provider in the EF project.";
     }
 
     internal static bool TryDescribeAmbiguousProviders(

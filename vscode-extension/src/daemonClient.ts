@@ -34,7 +34,6 @@ function settingsKey(settings: EfvibeSettings, searchDirectory: string, cwd: str
     startupProject: settings.startupProject,
     context: settings.context,
     connectionString: settings.connectionString,
-    provider: settings.provider,
     toolPath: settings.toolPath,
     dbLog: settings.dbLog,
     dotnetFramework: settings.dotnetFramework,

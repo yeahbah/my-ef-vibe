@@ -91,24 +91,6 @@ internal static class Program
             dbLogSettings.Level = parsedLevel;
         }
 
-        ProviderDescriptor? parsedProvider = null;
-
-        if (!string.IsNullOrWhiteSpace(options.Provider))
-        {
-            if (!ProviderParser.TryParseDescriptor(options.Provider, out parsedProvider, out var providerError))
-            {
-                CliUi.WriteError(providerError!);
-                return 3;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(options.ConnectionString) && parsedProvider is null)
-        {
-            CliUi.WriteError(
-                "`--connection-string` requires `--provider`. " + ProviderParser.ProviderHelpText);
-            return 3;
-        }
-
         var oneShotExpression = CliPathHelper.ResolveOneShotExpression(options.Expression, options.ExpressionParts);
         var workspace = CliPathHelper.ResolveWorkspace(options.Workspace);
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
@@ -237,7 +219,7 @@ internal static class Program
                 host,
                 options.Context,
                 options.ConnectionString,
-                parsedProvider,
+                null,
                 allowInteractiveSelection);
         }
         catch (InvalidOperationException resolutionFailure)

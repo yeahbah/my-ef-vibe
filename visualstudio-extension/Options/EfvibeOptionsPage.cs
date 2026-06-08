@@ -30,11 +30,6 @@ public sealed class EfvibeOptionsPage : DialogPage
     [Description("Optional connection string passed to efvibe --connection-string.")]
     public string ConnectionString { get; set; } = string.Empty;
 
-    [Category("Connection")]
-    [DisplayName("Provider")]
-    [Description("Optional provider override: alias (sqlserver, npgsql, sqlite, oracle, mysql, mariadb) or EF package id (for example FirebirdSql.EntityFrameworkCore.Firebird). Leave empty to auto-discover from the EF project. Required with connection string.")]
-    public string Provider { get; set; } = string.Empty;
-
     [Category("CLI")]
     [DisplayName("Tool path")]
     [Description("Optional full path to efvibe/myefvibe. Empty uses local dotnet tool manifest or global efvibe on PATH.")]

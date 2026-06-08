@@ -9,7 +9,6 @@ internal sealed class EfvibeSettings
     public string StartupProject { get; set; } = string.Empty;
     public string Context { get; set; } = string.Empty;
     public string ConnectionString { get; set; } = string.Empty;
-    public string Provider { get; set; } = string.Empty;
     public string ToolPath { get; set; } = string.Empty;
     public string DotnetFramework { get; set; } = string.Empty;
     public bool DbLog { get; set; } = true;
@@ -25,7 +24,6 @@ internal sealed class EfvibeSettings
             StartupProject = PathResolver.ResolvePath(options.StartupProject, solutionDirectory),
             Context = options.Context?.Trim() ?? string.Empty,
             ConnectionString = options.ConnectionString?.Trim() ?? string.Empty,
-            Provider = options.Provider?.Trim() ?? string.Empty,
             ToolPath = PathResolver.ResolvePath(options.ToolPath, solutionDirectory),
             DotnetFramework = options.DotnetFramework?.Trim() ?? string.Empty,
             DbLog = options.DbLog,

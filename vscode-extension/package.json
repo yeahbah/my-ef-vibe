@@ -360,11 +360,6 @@
           "default": "",
           "markdownDescription": "Optional connection string passed to `efvibe --connection-string`."
         },
-        "efvibe.provider": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Optional `--provider` override: alias (`sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb`) or EF package id (for example `FirebirdSql.EntityFrameworkCore.Firebird`). Required when `efvibe.connectionString` is set. Leave empty to auto-discover the provider from `efvibe.project` `PackageReference` entries."
-        },
         "efvibe.toolPath": {
           "type": "string",
           "default": "",

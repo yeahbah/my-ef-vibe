@@ -59,7 +59,7 @@ public sealed class DbContextActivatorAmbiguityTests
         Assert.Contains("Configuration was read from the startup project", failure.Message, StringComparison.Ordinal);
         Assert.Contains("Microsoft.EntityFrameworkCore.SqlServer", failure.Message, StringComparison.Ordinal);
         Assert.Contains("Npgsql.EntityFrameworkCore.PostgreSQL", failure.Message, StringComparison.Ordinal);
-        Assert.Contains("--provider", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Reference only one provider", failure.Message, StringComparison.Ordinal);
     }
 
     private sealed class TempDirectory : IDisposable

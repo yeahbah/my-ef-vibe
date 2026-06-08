@@ -860,7 +860,6 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             appendLine("Startup project: ${settings.startupProject.ifBlank { "(auto)" }}")
             appendLine("DbContext: ${settings.context.ifBlank { "(auto)" }}")
             appendLine("Workspace root: ${settings.workspaceRoot.ifBlank { "(default)" }}")
-            appendLine("Provider: ${settings.provider.ifBlank { "(from project)" }}")
             appendLine("Tool path: ${settings.toolPath.ifBlank { "(PATH/local tool)" }}")
             appendLine("Framework: ${settings.dotnetFramework.ifBlank { "(default)" }}")
             appendLine("Database log: ${settings.dbLog}")
