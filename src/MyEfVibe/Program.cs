@@ -91,11 +91,21 @@ internal static class Program
             dbLogSettings.Level = parsedLevel;
         }
 
-        var parsedProvider = ProviderParser.ParseOrNull(options.Provider);
+        ProviderDescriptor? parsedProvider = null;
+
+        if (!string.IsNullOrWhiteSpace(options.Provider))
+        {
+            if (!ProviderParser.TryParseDescriptor(options.Provider, out parsedProvider, out var providerError))
+            {
+                CliUi.WriteError(providerError!);
+                return 3;
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(options.ConnectionString) && parsedProvider is null)
         {
             CliUi.WriteError(
-                "`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
+                "`--connection-string` requires `--provider`. " + ProviderParser.ProviderHelpText);
             return 3;
         }
 

@@ -363,16 +363,7 @@
         "efvibe.provider": {
           "type": "string",
           "default": "",
-          "enum": [
-            "",
-            "sqlserver",
-            "npgsql",
-            "sqlite",
-            "oracle",
-            "mysql",
-            "mariadb"
-          ],
-          "markdownDescription": "Database provider when using `efvibe.connectionString`."
+          "markdownDescription": "Optional `--provider` override: alias (`sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb`) or EF package id (for example `Microsoft.EntityFrameworkCore.SqlServer`). Required when `efvibe.connectionString` is set. Leave empty to discover the provider from the EF project (`efvibe.project`)."
         },
         "efvibe.toolPath": {
           "type": "string",

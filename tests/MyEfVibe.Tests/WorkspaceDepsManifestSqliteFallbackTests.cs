@@ -37,6 +37,8 @@ public sealed class WorkspaceDepsManifestSqliteFallbackTests
         var manifest = WorkspaceDepsManifest.TryLoad(entryDll);
 
         Assert.NotNull(manifest);
+        manifest!.RegisterDiscoveredProvider(
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Sqlite));
 
         foreach (var assemblyName in new[]
                  {

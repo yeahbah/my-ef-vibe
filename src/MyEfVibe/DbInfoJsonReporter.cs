@@ -69,6 +69,16 @@ internal static class DbInfoJsonReporter
             rows.Add(new DbInfoJsonEntry { Key = "Provider name", Value = providerName });
         }
 
+        if (host.ActiveProviderDescriptor is { } providerDescriptor)
+        {
+            rows.Add(new DbInfoJsonEntry { Key = "EF provider package", Value = providerDescriptor.PackageId });
+            rows.Add(new DbInfoJsonEntry
+            {
+                Key = "Feature tier",
+                Value = providerDescriptor.ResolveFeatureTier(dbContext).Describe()
+            });
+        }
+
         var commandTimeout = database.GetType().GetProperty("CommandTimeout")?.GetValue(database);
         var timeoutSeconds = commandTimeout is int timeout ? timeout : 0;
         rows.Add(new DbInfoJsonEntry

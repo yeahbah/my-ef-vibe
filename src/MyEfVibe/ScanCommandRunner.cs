@@ -63,12 +63,21 @@ internal static class ScanCommandRunner
             return 2;
         }
 
-        var parsedProvider = ProviderParser.ParseOrNull(providerRaw);
+        ProviderDescriptor? parsedProvider = null;
+
+        if (!string.IsNullOrWhiteSpace(providerRaw))
+        {
+            if (!ProviderParser.TryParseDescriptor(providerRaw, out parsedProvider, out var providerError))
+            {
+                CliUi.WriteError(providerError!);
+                return 3;
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
         {
             CliUi.WriteError(
-                "`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
+                "`--connection-string` requires `--provider`. " + ProviderParser.ProviderHelpText);
             return 3;
         }
 

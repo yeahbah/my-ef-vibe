@@ -19,7 +19,7 @@ public sealed class DbContextProviderOverrideTests
             host,
             "AdventureWorksDbContext",
             "Host=localhost;Port=5432;Database=adventureworks;Username=postgres;Password=Your_strong_Password123!",
-            MyEfVibeProvider.Npgsql,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Npgsql),
             false);
 
         var providerName = dbContext.GetType()

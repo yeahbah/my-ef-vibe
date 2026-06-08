@@ -3,6 +3,31 @@ namespace MyEfVibe.Tests;
 public sealed class CsprojInspectorProviderTests
 {
     [Fact]
+    public void TryReadEntityFrameworkProviderDescriptor_discovers_unknown_relational_provider_package()
+    {
+        using var temp = new TempDirectory();
+        var project = Path.Combine(temp.Path, "App.csproj");
+        WriteProjectWithProvider(project, "FirebirdSql.EntityFrameworkCore.Firebird");
+
+        var descriptor = CsprojInspector.TryReadEntityFrameworkProviderDescriptor(project);
+
+        Assert.NotNull(descriptor);
+        Assert.Equal("FirebirdSql.EntityFrameworkCore.Firebird", descriptor!.PackageId);
+        Assert.Null(descriptor.KnownProvider);
+        Assert.Null(descriptor.ExtensionMethodName);
+    }
+
+    [Fact]
+    public void TryReadEntityFrameworkProviderDescriptor_returns_null_for_ef_design_package()
+    {
+        using var temp = new TempDirectory();
+        var project = Path.Combine(temp.Path, "App.csproj");
+        WriteProjectWithProvider(project, "Microsoft.EntityFrameworkCore.Design");
+
+        Assert.Null(CsprojInspector.TryReadEntityFrameworkProviderDescriptor(project));
+    }
+
+    [Fact]
     public void TryReadEntityFrameworkProvider_reads_sqlserver_package_reference()
     {
         using var temp = new TempDirectory();

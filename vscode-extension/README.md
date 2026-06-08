@@ -67,6 +67,7 @@ Supported command cells:
 | Setting | Description |
 |---------|-------------|
 | `efvibe.project` / `efvibe.startupProject` / `efvibe.context` | EF project, config host, DbContext type name |
+| `efvibe.connectionString` / `efvibe.provider` | Optional override; provider is alias or EF package id (required with connection string). Leave provider empty to discover from `-p`. |
 | `efvibe.resultDestination` | `panel` (default), `output`, or `terminal` |
 | `efvibe.useDaemon` | `true` (default): workspace commands use `efvibe serve` (eval, tables, describe, DbInfo, scan, completions) |
 | `efvibe.dbLog` | Show executed SQL (default `true`) |

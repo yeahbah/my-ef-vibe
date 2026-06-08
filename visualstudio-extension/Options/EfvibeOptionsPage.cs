@@ -17,7 +17,7 @@ public sealed class EfvibeOptionsPage : DialogPage
 
     [Category("Project")]
     [DisplayName("Startup project")]
-    [Description("Startup project for appsettings, user secrets, and provider configuration. Relative paths resolve from the solution directory.")]
+    [Description("Startup project for appsettings and user secrets. Relative paths resolve from the solution directory.")]
     public string StartupProject { get; set; } = string.Empty;
 
     [Category("Project")]
@@ -32,7 +32,7 @@ public sealed class EfvibeOptionsPage : DialogPage
 
     [Category("Connection")]
     [DisplayName("Provider")]
-    [Description("Provider with connection string: sqlserver, npgsql, sqlite, oracle, mysql, or mariadb.")]
+    [Description("Optional provider override: alias (sqlserver, npgsql, sqlite, oracle, mysql, mariadb) or EF package id. Leave empty to discover from the EF project. Required with connection string.")]
     public string Provider { get; set; } = string.Empty;
 
     [Category("CLI")]

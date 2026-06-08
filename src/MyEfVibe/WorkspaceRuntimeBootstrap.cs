@@ -28,11 +28,19 @@ internal static class WorkspaceRuntimeBootstrap
             dbLogSettings.Level = parsedLevel;
         }
 
-        var parsedProvider = ProviderParser.ParseOrNull(providerRaw);
+        ProviderDescriptor? parsedProvider = null;
+
+        if (!string.IsNullOrWhiteSpace(providerRaw))
+        {
+            if (!ProviderParser.TryParseDescriptor(providerRaw, out parsedProvider, out var providerError))
+            {
+                return (null, 3, providerError);
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
         {
-            return (null, 3, "`--connection-string` requires `--provider`.");
+            return (null, 3, "`--connection-string` requires `--provider`. " + ProviderParser.ProviderHelpText);
         }
 
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);

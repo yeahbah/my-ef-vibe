@@ -26,7 +26,7 @@ Open **Tools > Options > My EF Vibe > General** and set:
 | Tool path | Explicit `efvibe` or `myefvibe` executable |
 | Target framework | `efvibe --framework` |
 | Connection string | `efvibe --connection-string` |
-| Provider | `efvibe --provider` |
+| Provider | `efvibe --provider` — alias or EF package id; optional when the EF project references one provider |
 
 Relative paths resolve from the active solution directory. The extension also supports `$(SolutionDir)` and `${workspaceFolder}` placeholders.
 

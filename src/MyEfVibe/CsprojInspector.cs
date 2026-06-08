@@ -14,17 +14,6 @@ internal static class CsprojInspector
         "Oracle.EntityFrameworkCore"
     ];
 
-    private static readonly (string PackageId, MyEfVibeProvider Provider)[] KnownEntityFrameworkProviderPackages =
-    [
-        ("Microsoft.EntityFrameworkCore.SqlServer", MyEfVibeProvider.SqlServer),
-        ("Npgsql.EntityFrameworkCore.PostgreSQL", MyEfVibeProvider.Npgsql),
-        ("Microsoft.EntityFrameworkCore.Sqlite", MyEfVibeProvider.Sqlite),
-        ("Oracle.EntityFrameworkCore", MyEfVibeProvider.Oracle),
-        ("MariaDB.EntityFrameworkCore", MyEfVibeProvider.MariaDb),
-        ("Pomelo.EntityFrameworkCore.MySql", MyEfVibeProvider.MySql),
-        ("MySql.EntityFrameworkCore", MyEfVibeProvider.MySql)
-    ];
-
     internal static bool HasEfCorePackageReference(string csprojAbsolutePath)
     {
         foreach (var packageId in EnumeratePackageReferenceIds(csprojAbsolutePath))
@@ -39,20 +28,14 @@ internal static class CsprojInspector
         return false;
     }
 
+    internal static ProviderDescriptor? TryReadEntityFrameworkProviderDescriptor(string csprojAbsolutePath)
+    {
+        return EntityFrameworkProviderDiscovery.TryDiscoverFromProject(csprojAbsolutePath);
+    }
+
     internal static MyEfVibeProvider? TryReadEntityFrameworkProvider(string csprojAbsolutePath)
     {
-        if (string.IsNullOrWhiteSpace(csprojAbsolutePath))
-        {
-            return null;
-        }
-
-        var providers = new HashSet<MyEfVibeProvider>();
-        CollectEntityFrameworkProviders(
-            Path.GetFullPath(csprojAbsolutePath),
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-            providers);
-
-        return providers.Count == 1 ? providers.First() : null;
+        return TryReadEntityFrameworkProviderDescriptor(csprojAbsolutePath)?.KnownProvider;
     }
 
     internal static bool UsesWebSdk(string csprojAbsolutePath)
@@ -138,46 +121,7 @@ internal static class CsprojInspector
             .Replace('/', Path.DirectorySeparatorChar);
     }
 
-    private static void CollectEntityFrameworkProviders(
-        string csprojAbsolutePath,
-        HashSet<string> visitedProjects,
-        HashSet<MyEfVibeProvider> providers)
-    {
-        if (!visitedProjects.Add(csprojAbsolutePath) || !File.Exists(csprojAbsolutePath))
-        {
-            return;
-        }
-
-        foreach (var packageId in EnumeratePackageReferenceIds(csprojAbsolutePath))
-        {
-            var provider = MapEntityFrameworkProviderPackage(packageId);
-
-            if (provider.HasValue)
-            {
-                providers.Add(provider.Value);
-            }
-        }
-
-        foreach (var reference in GetProjectReferencePaths(csprojAbsolutePath))
-        {
-            CollectEntityFrameworkProviders(reference, visitedProjects, providers);
-        }
-    }
-
-    private static MyEfVibeProvider? MapEntityFrameworkProviderPackage(string packageId)
-    {
-        foreach (var (knownPackageId, provider) in KnownEntityFrameworkProviderPackages)
-        {
-            if (string.Equals(packageId, knownPackageId, StringComparison.OrdinalIgnoreCase))
-            {
-                return provider;
-            }
-        }
-
-        return null;
-    }
-
-    private static IEnumerable<string> EnumeratePackageReferenceIds(string csprojAbsolutePath)
+    internal static IEnumerable<string> EnumeratePackageReferenceIds(string csprojAbsolutePath)
     {
         var dom = Load(csprojAbsolutePath);
         var xmlns = dom.Root!.Name.Namespace;

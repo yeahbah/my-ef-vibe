@@ -50,6 +50,12 @@ internal static class DbInfoReporter
             rows.Add(("Provider name", providerName));
         }
 
+        if (host.ActiveProviderDescriptor is { } providerDescriptor)
+        {
+            rows.Add(("EF provider package", providerDescriptor.PackageId));
+            rows.Add(("Feature tier", providerDescriptor.ResolveFeatureTier(dbContext).Describe()));
+        }
+
         var commandTimeout = database.GetType().GetProperty("CommandTimeout")?.GetValue(database);
 
         if (commandTimeout is int timeoutSeconds)

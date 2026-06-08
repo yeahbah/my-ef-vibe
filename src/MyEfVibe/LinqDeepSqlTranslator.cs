@@ -119,6 +119,7 @@ internal static class LinqDeepSqlTranslator
             session.DbContext,
             sql,
             host.EnumerateLoadedAssemblies(),
+            host.ActiveProviderDescriptor,
             cancellationToken);
 
         return new LinqSqlTranslationResult(

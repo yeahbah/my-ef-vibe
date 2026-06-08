@@ -1,35 +1,11 @@
 using System.Collections.Immutable;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 
 namespace MyEfVibe;
 
 internal static class DbContextActivator
 {
-    private static readonly IReadOnlyDictionary<MyEfVibeProvider, ProviderExtensionSpec[]> ProviderExtensionSpecs =
-        new Dictionary<MyEfVibeProvider, ProviderExtensionSpec[]>
-        {
-            [MyEfVibeProvider.SqlServer] =
-                [new ProviderExtensionSpec("Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer")],
-            [MyEfVibeProvider.Npgsql] =
-                [new ProviderExtensionSpec("Npgsql.EntityFrameworkCore.PostgreSQL", "UseNpgsql")],
-            [MyEfVibeProvider.Sqlite] =
-                [new ProviderExtensionSpec("Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite")],
-            [MyEfVibeProvider.Oracle] =
-                [new ProviderExtensionSpec("Oracle.EntityFrameworkCore", "UseOracle")],
-            [MyEfVibeProvider.MySql] =
-            [
-                new ProviderExtensionSpec("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
-                new ProviderExtensionSpec("MySql.EntityFrameworkCore", "UseMySQL")
-            ],
-            [MyEfVibeProvider.MariaDb] =
-            [
-                new ProviderExtensionSpec("Pomelo.EntityFrameworkCore.MySql", "UseMySql"),
-                new ProviderExtensionSpec("MySql.EntityFrameworkCore", "UseMySQL")
-            ]
-        };
-
     internal static Type ResolveContextType(
         WorkspaceHost host,
         string? contextFullName,
@@ -55,12 +31,16 @@ internal static class DbContextActivator
         WorkspaceHost host,
         string? contextFullName,
         string? connectionString,
-        MyEfVibeProvider? provider,
+        ProviderDescriptor? explicitProvider,
         bool allowInteractiveSelection = true)
     {
+        var providerDescriptor = explicitProvider;
+        MyEfVibeProvider? provider = explicitProvider?.KnownProvider;
+
         // SQLitePCL must be initialized before EF discovery or any Microsoft.Data.Sqlite load.
         if (!string.IsNullOrWhiteSpace(connectionString)
-            && (provider == MyEfVibeProvider.Sqlite
+            && (providerDescriptor?.IsSqlite == true
+                || provider == MyEfVibeProvider.Sqlite
                 || SqliteConnectionStringNormalizer.LooksLikeSqliteConnection(connectionString)))
         {
             connectionString = SqliteConnectionStringNormalizer.Normalize(
@@ -68,11 +48,12 @@ internal static class DbContextActivator
                 host.StartupProjectPath,
                 host.OutputDirectory);
             provider ??= MyEfVibeProvider.Sqlite;
+            providerDescriptor ??= ProviderDescriptor.TryFromKnownProvider(MyEfVibeProvider.Sqlite);
         }
 
-        if (provider.HasValue)
+        if (providerDescriptor is not null)
         {
-            host.EnsureProviderDependenciesLoaded(provider.Value);
+            host.EnsureProviderDependenciesLoaded(providerDescriptor);
         }
 
         var selectedDbContextType = ResolveContextType(host, contextFullName, allowInteractiveSelection);
@@ -83,34 +64,34 @@ internal static class DbContextActivator
         // --connection-string/--provider), build DbContextOptions first so provider naming customizers
         // are registered before any design-time factory or appsettings-based construction path.
         if (!string.IsNullOrWhiteSpace(connectionString)
-            && provider.HasValue
+            && providerDescriptor is not null
             && TryCreateUsingOptionsConstructor(
                 selectedDbContextType,
                 connectionString,
-                provider.Value,
+                providerDescriptor,
                 host,
                 out var explicitOptionsInstance))
         {
-            DbContextHostHints.TryApplyPostgreSqlNamingHint(
-                explicitOptionsInstance,
-                host.StartupProjectPath,
-                provider.Value);
+            TryApplyProviderHints(explicitOptionsInstance, host, provider, providerDescriptor);
 
-            return explicitOptionsInstance;
+            return Finish(host, providerDescriptor, explicitOptionsInstance);
         }
 
         if (TryCreateUsingDesignTimeFactory(selectedDbContextType, host, out var designTimeInstance,
                 ref designTimeFactoryErrors))
         {
-            if (provider.HasValue)
+            providerDescriptor ??= EntityFrameworkProviderDiscovery.TryDiscoverFromProject(host.ProjectPath);
+
+            if (providerDescriptor is not null || provider.HasValue)
             {
-                DbContextHostHints.TryApplyPostgreSqlNamingHint(
+                TryApplyProviderHints(
                     designTimeInstance,
-                    host.StartupProjectPath,
-                    provider.Value);
+                    host,
+                    provider,
+                    providerDescriptor);
             }
 
-            return designTimeInstance;
+            return Finish(host, providerDescriptor, designTimeInstance);
         }
 
         var resolvedConnectionFromConfiguration = false;
@@ -121,14 +102,16 @@ internal static class DbContextActivator
                 host.ProjectPath,
                 host.OutputDirectory,
                 out var fromConfiguration,
-                out var inferredProvider))
+                out var inferredProviderDescriptor))
         {
             connectionString = fromConfiguration;
-            provider ??= inferredProvider;
+            providerDescriptor ??= inferredProviderDescriptor;
+            provider ??= inferredProviderDescriptor?.KnownProvider;
             resolvedConnectionFromConfiguration = true;
         }
         else if (!string.IsNullOrWhiteSpace(connectionString)
-                 && (provider == MyEfVibeProvider.Sqlite
+                 && (providerDescriptor?.IsSqlite == true
+                     || provider == MyEfVibeProvider.Sqlite
                      || SqliteConnectionStringNormalizer.LooksLikeSqliteConnection(connectionString)))
         {
             connectionString = SqliteConnectionStringNormalizer.Normalize(
@@ -136,33 +119,38 @@ internal static class DbContextActivator
                 host.StartupProjectPath,
                 host.OutputDirectory);
             provider ??= MyEfVibeProvider.Sqlite;
+            providerDescriptor ??= ProviderDescriptor.TryFromKnownProvider(MyEfVibeProvider.Sqlite);
         }
 
-        if (!string.IsNullOrWhiteSpace(connectionString) && provider.HasValue
-                                                         && TryCreateUsingOptionsConstructor(selectedDbContextType,
-                                                             connectionString, provider.Value, host,
-                                                             out var optionsInstance))
+        if (!string.IsNullOrWhiteSpace(connectionString)
+            && providerDescriptor is not null
+            && TryCreateUsingOptionsConstructor(
+                selectedDbContextType,
+                connectionString,
+                providerDescriptor,
+                host,
+                out var optionsInstance))
         {
-            DbContextHostHints.TryApplyPostgreSqlNamingHint(
-                optionsInstance,
-                host.StartupProjectPath,
-                provider.Value);
+            TryApplyProviderHints(optionsInstance, host, provider, providerDescriptor);
 
-            return optionsInstance;
+            return Finish(host, providerDescriptor, optionsInstance);
         }
 
         if (!resolvedConnectionFromConfiguration
             && TryCreateUsingParameterlessConstructor(selectedDbContextType, out var parameterlessInstance))
         {
-            if (provider.HasValue)
+            providerDescriptor ??= EntityFrameworkProviderDiscovery.TryDiscoverFromProject(host.ProjectPath);
+
+            if (providerDescriptor is not null || provider.HasValue)
             {
-                DbContextHostHints.TryApplyPostgreSqlNamingHint(
+                TryApplyProviderHints(
                     parameterlessInstance,
-                    host.StartupProjectPath,
-                    provider.Value);
+                    host,
+                    provider,
+                    providerDescriptor);
             }
 
-            return parameterlessInstance;
+            return Finish(host, providerDescriptor, parameterlessInstance);
         }
 
         var failureMessage =
@@ -174,7 +162,9 @@ internal static class DbContextActivator
             + $"{Environment.NewLine}"
             + " - Add a public parameterless constructor on the DbContext."
             + $"{Environment.NewLine}"
-            + " - Pass `--connection-string` together with `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb) to build `DbContextOptions<TContext>` (optional packages such as NetTopologySuite are applied when referenced)."
+            + " - Pass `--connection-string` together with `--provider` ("
+            + ProviderParser.ProviderHelpText
+            + ") to build `DbContextOptions<TContext>` (optional packages such as NetTopologySuite are applied when referenced)."
             + $"{Environment.NewLine}"
             + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.";
 
@@ -195,16 +185,28 @@ internal static class DbContextActivator
             {
                 failureMessage += ", but no connection string was found.";
             }
-            else if (!provider.HasValue)
+            else if (providerDescriptor is null)
             {
-                failureMessage +=
-                    ", but the database provider could not be determined from the `-p` project. Add an EF provider package reference (for example `Microsoft.EntityFrameworkCore.SqlServer`) or pass `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).";
+                if (EntityFrameworkProviderDiscovery.TryDescribeAmbiguousProviders(
+                        host.ProjectPath,
+                        out var ambiguousProvidersMessage))
+                {
+                    failureMessage +=
+                        $", but {ambiguousProvidersMessage.TrimEnd('.')}.";
+                }
+                else
+                {
+                    failureMessage +=
+                        ", but the database provider could not be determined from the `-p` project. Add an EF provider package reference (for example `Microsoft.EntityFrameworkCore.SqlServer`) or pass `--provider` ("
+                        + ProviderParser.ProviderHelpText
+                        + ").";
+                }
             }
             else
             {
                 failureMessage +=
-                    ", but constructing `DbContextOptions` failed."
-                    + " Ensure EF provider packages are referenced by the `-p` project and restore/build succeeded.";
+                    ", but constructing `DbContextOptions` failed. "
+                    + EntityFrameworkProviderExtensionInvoker.DescribeInvokeFailure(providerDescriptor);
             }
         }
 
@@ -839,12 +841,35 @@ internal static class DbContextActivator
         return true;
     }
 
-    private static bool TryCreateUsingOptionsConstructor(Type dbContextConcreteType, string connectionString,
-        MyEfVibeProvider providerKey, WorkspaceHost host, out object instance)
+    private static void TryApplyProviderHints(
+        object instance,
+        WorkspaceHost host,
+        MyEfVibeProvider? provider,
+        ProviderDescriptor? providerDescriptor)
+    {
+        var providerKey = provider ?? providerDescriptor?.KnownProvider;
+
+        if (!providerKey.HasValue)
+        {
+            return;
+        }
+
+        DbContextHostHints.TryApplyPostgreSqlNamingHint(
+            instance,
+            host.StartupProjectPath,
+            providerKey.Value);
+    }
+
+    private static bool TryCreateUsingOptionsConstructor(
+        Type dbContextConcreteType,
+        string connectionString,
+        ProviderDescriptor providerDescriptor,
+        WorkspaceHost host,
+        out object instance)
     {
         instance = null!;
 
-        host.EnsureProviderDependenciesLoaded(providerKey);
+        host.EnsureProviderDependenciesLoaded(providerDescriptor);
 
         var efAssembly = LoadWorkspaceAssembly(host, "Microsoft.EntityFrameworkCore");
 
@@ -878,12 +903,20 @@ internal static class DbContextActivator
             return false;
         }
 
-        if (!TryInvokeUseProviderExtension(host, builderInstance, connectionString, providerKey))
+        if (!EntityFrameworkProviderExtensionInvoker.TryInvoke(
+                host,
+                providerDescriptor,
+                builderInstance,
+                connectionString))
         {
             return false;
         }
 
-        ProviderOptionsConfigurator.TryApplyEfCoreNamingConventions(host, builderInstance, providerKey);
+        if (providerDescriptor.SupportsNamingConventionOverride
+            && providerDescriptor.KnownProvider is { } namingProvider)
+        {
+            ProviderOptionsConfigurator.TryApplyEfCoreNamingConventions(host, builderInstance, namingProvider);
+        }
 
         var closedOptionsType =
             efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContextOptions`1")!.MakeGenericType(
@@ -907,7 +940,7 @@ internal static class DbContextActivator
 
         var optionsInstanceType = compiledOptionsConcreteInstance.GetType();
 
-        if (providerKey == MyEfVibeProvider.Sqlite
+        if (providerDescriptor.IsSqlite
             && TryCreateUsingOptionsAndDatabaseProviderAccessor(
                 dbContextConcreteType,
                 compiledOptionsConcreteInstance,
@@ -939,10 +972,13 @@ internal static class DbContextActivator
 
         instance = createdContextInstance;
 
-        DbContextHostHints.TryApplyPostgreSqlNamingHint(
-            instance,
-            host.StartupProjectPath,
-            providerKey);
+        if (providerDescriptor.KnownProvider is { } hintProvider)
+        {
+            DbContextHostHints.TryApplyPostgreSqlNamingHint(
+                instance,
+                host.StartupProjectPath,
+                hintProvider);
+        }
 
         return true;
     }
@@ -1061,112 +1097,16 @@ internal static class DbContextActivator
         return host.LoadAssembly(assemblyName);
     }
 
-    private static bool TryInvokeUseProviderExtension(WorkspaceHost host, object closedBuilderInstance,
-        string connectionString, MyEfVibeProvider providerKey)
+    private static object Finish(
+        WorkspaceHost host,
+        ProviderDescriptor? providerDescriptor,
+        object instance)
     {
-        if (!ProviderExtensionSpecs.TryGetValue(providerKey, out var specs))
-        {
-            return false;
-        }
+        host.SetActiveProviderDescriptor(
+            providerDescriptor
+            ?? EntityFrameworkProviderDiscovery.TryDiscoverFromProject(host.ProjectPath));
 
-        foreach (var spec in specs)
-        {
-            var providerAssembly = ResolveProviderAssembly(host, spec.AssemblyName);
-
-            if (providerAssembly is null)
-            {
-                continue;
-            }
-
-            if (providerKey.UsesMySqlProtocol()
-                && string.Equals(spec.MethodName, "UseMySql", StringComparison.Ordinal)
-                && PomeloMySqlConfigurator.TryInvokeUseMySql(
-                    providerAssembly,
-                    closedBuilderInstance,
-                    connectionString,
-                    providerKey))
-            {
-                return true;
-            }
-
-            if (ProviderOptionsConfigurator.TryInvokeUseProviderWithOptions(
-                    host,
-                    providerAssembly,
-                    closedBuilderInstance,
-                    connectionString,
-                    spec.MethodName,
-                    providerKey))
-            {
-                return true;
-            }
-
-            if (!(providerKey.UsesMySqlProtocol()
-                  && string.Equals(spec.MethodName, "UseMySql", StringComparison.Ordinal))
-                && TryInvokeUseProviderExtensionMethod(
-                    providerAssembly,
-                    closedBuilderInstance,
-                    connectionString,
-                    spec.MethodName))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool TryInvokeUseProviderExtensionMethod(
-        Assembly providerAssembly,
-        object closedBuilderInstance,
-        string connectionString,
-        string methodName)
-    {
-        foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(providerAssembly))
-        foreach (var staticMethodCandidate in exported.GetMethods(BindingFlags.Static | BindingFlags.Public
-                     | BindingFlags.NonPublic))
-        {
-            if (!staticMethodCandidate.IsDefined(typeof(ExtensionAttribute), false))
-            {
-                continue;
-            }
-
-            if (!string.Equals(staticMethodCandidate.Name, methodName, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var parametersDetailed = staticMethodCandidate.GetParameters();
-
-            if (parametersDetailed.Length < 2)
-            {
-                continue;
-            }
-
-            if (!parametersDetailed[0].ParameterType.IsAssignableFrom(closedBuilderInstance.GetType()))
-            {
-                continue;
-            }
-
-            if (parametersDetailed[1].ParameterType != typeof(string))
-            {
-                continue;
-            }
-
-            var invokeArguments = new object?[parametersDetailed.Length];
-            invokeArguments[0] = closedBuilderInstance;
-            invokeArguments[1] = connectionString;
-
-            staticMethodCandidate.Invoke(null, invokeArguments);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private static Assembly? ResolveProviderAssembly(WorkspaceHost host, string providerAssemblyName)
-    {
-        return LoadWorkspaceAssembly(host, providerAssemblyName);
+        return instance;
     }
 
     private sealed class CurrentDirectoryScope : IDisposable
@@ -1189,6 +1129,4 @@ internal static class DbContextActivator
             return new CurrentDirectoryScope(workingDirectory);
         }
     }
-
-    private readonly record struct ProviderExtensionSpec(string AssemblyName, string MethodName);
 }

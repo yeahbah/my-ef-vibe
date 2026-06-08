@@ -27,10 +27,10 @@ public sealed class AppSettingsConnectionResolverTests
                 efProject,
                 Path.Combine(temp.Path),
                 out var connectionString,
-                out var provider));
+                out var providerDescriptor));
 
         Assert.Contains("Port=3306", connectionString, StringComparison.Ordinal);
-        Assert.Equal(MyEfVibeProvider.MySql, provider);
+        Assert.Equal(MyEfVibeProvider.MySql, providerDescriptor?.KnownProvider);
     }
 
     [Fact]
@@ -58,10 +58,10 @@ public sealed class AppSettingsConnectionResolverTests
                 efProject,
                 Path.Combine(temp.Path),
                 out var connectionString,
-                out var provider));
+                out var providerDescriptor));
 
         Assert.Contains("FREEPDB1", connectionString, StringComparison.Ordinal);
-        Assert.Equal(MyEfVibeProvider.Oracle, provider);
+        Assert.Equal(MyEfVibeProvider.Oracle, providerDescriptor?.KnownProvider);
     }
 
     [Fact]
@@ -103,14 +103,14 @@ public sealed class AppSettingsConnectionResolverTests
                 efProject,
                 Path.Combine(temp.Path),
                 out var connectionString,
-                out var provider));
+                out var providerDescriptor));
 
         Assert.Contains("FREEPDB1", connectionString, StringComparison.Ordinal);
-        Assert.Equal(MyEfVibeProvider.Oracle, provider);
+        Assert.Equal(MyEfVibeProvider.Oracle, providerDescriptor?.KnownProvider);
     }
 
     [Fact]
-    public void ResolveProvider_prefers_appsettings_override_over_ef_project_package()
+    public void ResolveProviderDescriptor_prefers_appsettings_override_over_ef_project_package()
     {
         using var temp = new TempDirectory();
         var efProject = Path.Combine(temp.Path, "AdventureWorks.Infrastructure.Persistence.csproj");
@@ -125,9 +125,9 @@ public sealed class AppSettingsConnectionResolverTests
             }
             """);
 
-        var provider = AppSettingsConnectionResolver.ResolveProvider(startupProject, efProject);
+        var providerDescriptor = AppSettingsConnectionResolver.ResolveProviderDescriptor(startupProject, efProject);
 
-        Assert.Equal(MyEfVibeProvider.Npgsql, provider);
+        Assert.Equal(MyEfVibeProvider.Npgsql, providerDescriptor?.KnownProvider);
     }
 
     private static void WriteProjectWithProvider(string csprojPath, string packageId)

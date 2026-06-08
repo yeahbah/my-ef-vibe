@@ -65,8 +65,8 @@ db.JsonBlobDocuments
 | `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--dblog` or `:dblog`. |
 | `-c`, `--context` | `DbContext` type name (e.g. `MyDbContext`) or fully qualified name |
 | `--connection-string`, `-cs` | Connection string for manual `DbContextOptions` construction |
-| *(automatic)* | When building `DbContextOptions` from config, efvibe uses `UseSqlServer(conn, o => …)` / `UseNpgsql(conn, o => …)` and applies optional extensions referenced by the EF project (e.g. `UseNetTopologySuite`, `UseHierarchyId`) |
-| `--provider` | Provider with `-cs`: `sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb` |
+| *(automatic)* | When building `DbContextOptions` from config, efvibe discovers the provider from `-p` `PackageReference` entries and invokes the matching `Use*` extension (optional satellite packages such as NetTopologySuite are applied when referenced) |
+| `--provider` | Override with a provider alias (`sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb`) or EF package id (for example `FirebirdSql.EntityFrameworkCore.Firebird`). Required with `-cs` when passed explicitly. |
 | `-e`, `--expression` | Run one expression and exit |
 | `expression` (positional) | Same as `-e` when passed as trailing arguments |
 | `--format` | One-shot output format: `text` (default) or `json` (for editors and scripts) |
@@ -215,7 +215,7 @@ Re-show with `:warnings`.
 | `:next`, `:prev` | Step through scan review (also **→** / **←** on empty prompt) |
 | `:dismiss`, `:note` | Skip finding in future scans · save a note (**Del** = dismiss on empty prompt) |
 | `:repeat`, `:end` | Restart scan review · exit scan review |
-| `:plan` | Execution plan for last translated SQL — `EXPLAIN` (PostgreSQL), `EXPLAIN QUERY PLAN` (SQLite), `SET SHOWPLAN_ALL` (SQL Server, separate batches) |
+| `:plan` | Execution plan for last translated SQL when supported — `EXPLAIN` (PostgreSQL), `EXPLAIN QUERY PLAN` (SQLite), `SET SHOWPLAN_ALL` (SQL Server, separate batches). Unavailable for newly discovered providers until capabilities are registered; shows a friendly note instead of failing. |
 | `:compare set` | Set baseline for comparison |
 | `:compare` | Diff baseline vs last run (timings, rows, SQL) |
 | `:compare clear` | Clear comparison baseline |
@@ -302,6 +302,7 @@ Output columns: **Member**, **Type**, **nullable**, **Notes**. Scalar properties
 - Session directory (`<ProjectName>/<DbContextName>/` under workspace root)
 - EF Core assembly version
 - Provider display name and EF provider name
+- EF provider package and feature tier (when resolved from `-p` or `--provider`)
 - Command timeout and DbSet count
 - Live connection: state, data source, database, server version, connection string
 
@@ -344,16 +345,31 @@ efvibe -w ./myefvibe-session -p ./src/MyApp.Api/MyApp.Api.csproj db.Products.Cou
 
 ## Database providers
 
-| Provider | `--provider` | Notes |
-|----------|--------------|--------|
+See [docs/database-providers.md](docs/database-providers.md) for the full reference (discovery rules, `--provider` syntax, feature tiers, and limits).
+
+efvibe auto-discovers the EF provider from **`PackageReference` entries on `-p`** (and project references). Connection strings from `-s` are not parsed to guess the provider.
+
+| Provider | `--provider` alias | Notes |
+|----------|-------------------|--------|
 | SQL Server | `sqlserver` | Use Docker on macOS/Linux; requires workspace `Microsoft.Data.SqlClient` + `Microsoft.EntityFrameworkCore.SqlServer` |
-| PostgreSQL | `npgsql` | `EXPLAIN` for `:plan` |
+| PostgreSQL | `npgsql` | `EXPLAIN` for `:plan`; naming convention customizers |
 | SQLite | `sqlite` | `EXPLAIN QUERY PLAN` for `:plan`; good for local files |
 | Oracle | `oracle` | Requires `Oracle.EntityFrameworkCore` in the workspace; `EXPLAIN PLAN FOR` for `:plan` |
 | MySQL | `mysql` | Pomelo (`Pomelo.EntityFrameworkCore.MySql`) or Oracle provider (`MySql.EntityFrameworkCore`); `EXPLAIN` for `:plan` |
-| MariaDB | `mariadb` | Same EF packages as MySQL (Pomelo recommended); `ConnectionStrings:MariaDb` supported; `EXPLAIN` for `:plan` |
+| MariaDB | `mariadb` | `MariaDB.EntityFrameworkCore` or Pomelo; `ConnectionStrings:MariaDb` supported; `EXPLAIN` for `:plan` |
+| Other relational EF packages | package id | For example `FirebirdSql.EntityFrameworkCore.Firebird` — LINQ REPL and SQL translation work; `:plan` is opt-in per provider |
 
-Pass `--connection-string` (or rely on the startup project). `--provider` is required when using `-cs` explicitly.
+Pass `--connection-string` (or rely on the startup project). `--provider` is required when using `-cs` explicitly, or when `-p` references more than one EF provider package.
+
+### Feature tiers
+
+| Tier | What works |
+|------|------------|
+| **Sql** | DbContext construction, LINQ REPL, SQL translation (default for newly discovered providers) |
+| **QueryPlan** | Above + `:plan` / EXPLAIN (SqlServer, Oracle, MySQL/MariaDB, …) |
+| **Conventions** | Above + PostgreSQL/SQLite naming customizers |
+
+`:dbinfo` shows the resolved EF provider package and feature tier for the active session.
 
 ### Connection string resolution (no `-cs`)
 
@@ -362,9 +378,7 @@ When you do not pass `--connection-string`, and the DbContext cannot be created 
 1. **User secrets** — `UserSecretsId` on the startup `.csproj`, then `~/.microsoft/usersecrets/<id>/secrets.json` (macOS/Linux).
 2. **`appsettings.json` / `appsettings.Development.json`** — next to the startup project (and its `bin` output if present).
 
-Preferred keys: `ConnectionStrings:DefaultConnection`, then `Postgres`, `Sqlite`, `MySql`, `MariaDb`, `Oracle`, `Database`, then any other `ConnectionStrings:*` entry. Provider is inferred from EF assemblies in the **built EF project** output (MariaDB when the connection string mentions `mariadb`).
-
-Use `-p` for the persistence/library project and `-s` for the API (or rely on auto-inference when the API references the library).
+Preferred keys: `ConnectionStrings:DefaultConnection`, then `Postgres`, `Sqlite`, `MySql`, `MariaDb`, `Oracle`, `Database`, then any other `ConnectionStrings:*` entry. The database provider comes from the EF provider package on `-p`, not from the connection string text.
 
 ## macOS notes
 

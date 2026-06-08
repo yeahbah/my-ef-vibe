@@ -92,7 +92,7 @@ efvibe -w ./myefvibe-session
 | Flag                      | Role                                                                                                                        |
 |---------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | `-w`, `--workspace`       | **Workspace root** — `<ProjectName>/<DbContextName>/` under this path (optional; default `~/.efvibe` or `%APPDATA%\efvibe`) |
-| `-p`, `--project`         | **EF project** to build — the `.csproj` that contains (or references) the `DbContext`                                       |
+| `-p`, `--project`         | **EF project** to build — the `.csproj` that contains (or references) the `DbContext`; also the source of truth for **which EF provider package** to wire up |
 | `-s`, `--startup-project` | **Config project** — user secrets and `appsettings` (like `dotnet ef --startup-project`)                                    |
 
 If `-p` is omitted, projects are discovered under the **current directory** (not `-w`). If `-s` / `--startup-project` is
@@ -160,7 +160,7 @@ Typical issues:
 | `:plan` — `SET SHOWPLAN` batch error                                                                  | SQL Server requires `SET SHOWPLAN_ALL` in its own batch; fixed in recent builds.                                                                                                                                                                                                                                  |
 | `System.Diagnostics.DiagnosticSource` version 9.0.0 / 10.0.0 not found                                | Transitive NuGet pulls multiple versions; use a current `efvibe` build (version-aware `.deps.json` loading). If it persists, run the tool on the same band as your app, e.g. `dotnet efvibe -f net8.0` from a repo with `dotnet-tools.json`.                                                                      |
 
-For greenfield Mac work without Docker, use `--provider sqlite` or `npgsql` on a project that targets those providers.
+For greenfield Mac work without Docker, use a project with `Microsoft.EntityFrameworkCore.Sqlite` or `Npgsql.EntityFrameworkCore.PostgreSQL` on `-p`, or pass `--provider sqlite` / `--provider npgsql` with `--connection-string`.
 
 ## Projects and configuration
 
@@ -175,7 +175,9 @@ DbContext construction (in order):
 1. `IDesignTimeDbContextFactory<T>`
 2. Parameterless constructor
 3. User secrets on the startup project, then `appsettings*.json` next to that project
-4. `--connection-string` + `--provider` (`sqlserver` \| `npgsql` \| `sqlite` \| `oracle` \| `mysql` \| `mariadb`)
+4. `--connection-string` + `--provider` (alias such as `npgsql`, or EF package id such as `Microsoft.EntityFrameworkCore.SqlServer`)
+
+When you do not pass `--connection-string` or `--provider`, efvibe discovers the EF provider from **`PackageReference` entries on `-p`** (including referenced projects). Reference exactly one relational provider package, or pass `--provider` when several are present.
 
 User secrets use flat keys such as `ConnectionStrings:DefaultConnection` in
 `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json`.
@@ -207,8 +209,8 @@ Highlights:
 - **`:describe <entity>`** (`:desc`) — property sheet for an entity (`Product`, `AddressEntity`, DbSet name `Products`,
   or full type name). Shows CLR types (including arrays such as `byte[]`); adds PK, FK, column name, and max length when
   EF model metadata is available.
-- **`:dbinfo`** — DbContext type, EF/Core version, provider, connection state, connection string, and server version.
-- **`:plan`** — execution plan for the last translated SQL (provider-specific).
+- **`:dbinfo`** — DbContext type, EF/Core version, provider, **EF provider package**, **feature tier**, connection state, connection string, and server version.
+- **`:plan`** — execution plan for the last translated SQL when the active provider supports it; unknown providers get a clear message instead of failing the session.
 - **`:scan lite`** / **`:scan deep`** — project-wide LINQ scan with a review queue, **Fix** hints, **Translated SQL**
   and **Query plan (EXPLAIN)** on deep scan (same engine as `:plan`), `:dismiss`, and `:note`. Deep results persist in
   `myefvibe-scan-deep.json`.
@@ -229,6 +231,7 @@ Highlights:
 | Doc (repository)                                                             | Description                                                                                                                      |
 |------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
 | [features.md](features.md)                                                   | Full REPL and CLI reference                                                                                                      |
+| [docs/database-providers.md](docs/database-providers.md)                     | EF provider discovery, `--provider`, feature tiers, and limits                                                                   |
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md)                   | Install the VS Code extension ([Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) or VSIX) |
 | [vscode-extension/README.md](vscode-extension/README.md)                     | VS Code extension (run selection, `efvibe serve`, scan review, editable panel)                                                   |
 | [rider-extension/README.md](rider-extension/README.md)                       | Rider extension MVP (Gradle plugin, settings, actions, tool window)                                                              |

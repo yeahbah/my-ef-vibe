@@ -17,6 +17,7 @@ internal static partial class QueryPlanRunner
         object dbContext,
         string? sql,
         IEnumerable<Assembly> inspectionAssemblies,
+        ProviderDescriptor? configuredProvider = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sql))
@@ -24,7 +25,13 @@ internal static partial class QueryPlanRunner
             return QueryPlanResult.Failed("No SQL available for EXPLAIN.");
         }
 
-        var provider = ResolveProvider(dbContext);
+        if (!ProviderCapabilityResolver.SupportsQueryPlan(configuredProvider, dbContext))
+        {
+            return QueryPlanResult.Failed(
+                ProviderCapabilityResolver.DescribeUnavailableQueryPlan(configuredProvider));
+        }
+
+        var provider = ProviderRuntimeProbe.TryResolveKnownProvider(dbContext);
 
         if (provider is null)
         {
@@ -71,6 +78,7 @@ internal static partial class QueryPlanRunner
         object dbContext,
         string? translatedSql,
         IEnumerable<Assembly> inspectionAssemblies,
+        ProviderDescriptor? configuredProvider = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(translatedSql))
@@ -81,7 +89,12 @@ internal static partial class QueryPlanRunner
             return;
         }
 
-        var result = await TryExplainAsync(dbContext, translatedSql, inspectionAssemblies, cancellationToken);
+        var result = await TryExplainAsync(
+            dbContext,
+            translatedSql,
+            inspectionAssemblies,
+            configuredProvider,
+            cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(result.PlanText))
         {
@@ -284,57 +297,6 @@ internal static partial class QueryPlanRunner
         {
             await ExecuteNonQueryAsync(scope.Connection, "SET SHOWPLAN_ALL OFF", cancellationToken);
         }
-    }
-
-    private static MyEfVibeProvider? ResolveProvider(object dbContext)
-    {
-        var database = dbContext.GetType().GetProperty("Database")?.GetValue(dbContext);
-
-        if (database is null)
-        {
-            return null;
-        }
-
-        var providerName = database.GetType().GetProperty("ProviderName")?.GetValue(database) as string;
-
-        if (string.IsNullOrWhiteSpace(providerName))
-        {
-            return null;
-        }
-
-        if (providerName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
-        {
-            return MyEfVibeProvider.Npgsql;
-        }
-
-        if (providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
-        {
-            return MyEfVibeProvider.Sqlite;
-        }
-
-        if (providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-        {
-            return MyEfVibeProvider.SqlServer;
-        }
-
-        if (providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase))
-        {
-            return MyEfVibeProvider.Oracle;
-        }
-
-        if (providerName.Contains("MariaDb", StringComparison.OrdinalIgnoreCase)
-            || providerName.Contains("MariaDB", StringComparison.Ordinal))
-        {
-            return MyEfVibeProvider.MariaDb;
-        }
-
-        if (providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
-            || providerName.Contains("MySQL", StringComparison.Ordinal))
-        {
-            return MyEfVibeProvider.MySql;
-        }
-
-        return null;
     }
 
     private static async Task<IReadOnlyList<string>> ExecuteQueryAsync(

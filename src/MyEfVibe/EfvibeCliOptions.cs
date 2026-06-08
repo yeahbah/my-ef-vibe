@@ -21,7 +21,7 @@ internal sealed class EfvibeCliOptions
     public string? ConnectionString { get; set; }
 
     [Option("provider",
-        HelpText = "Provider with --connection-string: sqlserver | npgsql | sqlite | oracle | mysql | mariadb.")]
+        HelpText = "Provider with --connection-string: alias (sqlserver, npgsql, sqlite, oracle, mysql, mariadb) or EF package id.")]
     public string? Provider { get; set; }
 
     [Option('e', "expression", HelpText = "Run a single expression and exit (non-interactive).")]

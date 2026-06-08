@@ -48,8 +48,9 @@ class EfvibeConfigurable(private val project: Project) : Configurable {
                     .bindText(settings::connectionString)
             }
             row("Provider:") {
-                comboBox(listOf("", "sqlserver", "npgsql", "sqlite", "oracle", "mysql", "mariadb"))
-                    .bindItem({ settings.provider }, { settings.provider = it.orEmpty() })
+                textField()
+                    .align(com.intellij.ui.dsl.builder.AlignX.FILL)
+                    .bindText(settings::provider)
             }
             row("efvibe executable:") {
                 textField()

@@ -43,6 +43,7 @@ internal sealed class ScanCliOptions
     [Option("connection-string|cs", HelpText = "Connection string for deep scan (requires --provider).")]
     public string? ConnectionString { get; set; }
 
-    [Option("provider", HelpText = "Database provider for deep scan with --connection-string.")]
+    [Option("provider",
+        HelpText = "Provider with --connection-string: alias or EF package id (for example Microsoft.EntityFrameworkCore.SqlServer).")]
     public string? Provider { get; set; }
 }

@@ -21,7 +21,7 @@ This script:
 4. Converts the SQL Server database to PostgreSQL (pgloader), SQLite (DuckDB), and Oracle (Python).
 5. Builds **myefvibe**.
 
-Override paths with `EFVIBE_INTEGRATION_ROOT` if needed.
+Integration scenarios pass `--provider` per database (alias or package id). Provider discovery for normal CLI use is documented in [docs/database-providers.md](../../docs/database-providers.md).
 
 Re-run conversion only:
 
