@@ -33,7 +33,7 @@ public sealed class PostgreSqlConnectivityTests
             host,
             scenario.Context,
             scenario.ConnectionString,
-            ProviderParser.ParseOrNull(scenario.Provider),
+            ProviderParser.ParseDescriptorOrNull(scenario.Provider),
             false);
 
         var scriptSession = new ScriptSession(

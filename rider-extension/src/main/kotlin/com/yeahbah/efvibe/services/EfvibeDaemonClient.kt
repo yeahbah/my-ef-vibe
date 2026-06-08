@@ -159,7 +159,6 @@ class EfvibeDaemonClient(private val project: Project) {
             PathResolver.resolve(settings.startupProject, project),
             settings.context.trim(),
             settings.connectionString.trim(),
-            settings.provider.trim(),
             settings.toolPath.trim(),
             settings.dotnetFramework.trim(),
             settings.dbLog.toString(),

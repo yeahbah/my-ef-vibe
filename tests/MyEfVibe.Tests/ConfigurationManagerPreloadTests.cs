@@ -41,7 +41,7 @@ public sealed class ConfigurationManagerPreloadTests
             host,
             "AdventureWorksDbContext",
             "Host=localhost;Port=5432;Database=adventureworks;Username=postgres;Password=x",
-            MyEfVibeProvider.Npgsql,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Npgsql),
             false);
 
         Assert.Equal("AdventureWorksDbContext", dbContext.GetType().Name);

@@ -2,24 +2,6 @@ namespace MyEfVibe;
 
 internal static class ProviderAssemblyNames
 {
-    private static readonly HashSet<string> KnownProviderAssemblies =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            "Microsoft.EntityFrameworkCore.SqlServer",
-            "Microsoft.Data.SqlClient",
-            "Npgsql.EntityFrameworkCore.PostgreSQL",
-            "Npgsql",
-            "Microsoft.EntityFrameworkCore.Sqlite",
-            "Microsoft.Data.Sqlite",
-            "SQLitePCLRaw.core",
-            "SQLitePCLRaw.provider.e_sqlite3",
-            "SQLitePCLRaw.batteries_v2",
-            "Oracle.EntityFrameworkCore",
-            "Oracle.ManagedDataAccess",
-            "Pomelo.EntityFrameworkCore.MySql",
-            "MySql.EntityFrameworkCore"
-        };
-
     /// <summary>
     ///     Assembly simple names that differ from the NuGet package id (lowercase folder under ~/.nuget/packages).
     /// </summary>
@@ -32,6 +14,27 @@ internal static class ProviderAssemblyNames
             ["Microsoft.EntityFrameworkCore.Sqlite"] = "microsoft.entityframeworkcore.sqlite.core",
             ["SQLitePCLRaw.batteries_v2"] = "sqlitepclraw.bundle_e_sqlite3"
         };
+
+    internal static IEnumerable<string> For(ProviderDescriptor descriptor)
+    {
+        yield return descriptor.ProviderAssemblyName;
+
+        if (descriptor.KnownProvider is not { } knownProvider)
+        {
+            yield break;
+        }
+
+        foreach (var assemblySimpleName in For(knownProvider))
+        {
+            if (!string.Equals(
+                    assemblySimpleName,
+                    descriptor.ProviderAssemblyName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                yield return assemblySimpleName;
+            }
+        }
+    }
 
     internal static IEnumerable<string> For(MyEfVibeProvider provider)
     {
@@ -51,6 +54,7 @@ internal static class ProviderAssemblyNames
             [
                 "SQLitePCLRaw.core",
                 "SQLitePCLRaw.provider.e_sqlite3",
+                "SQLitePCLRaw.batteries_v2",
                 "Microsoft.EntityFrameworkCore.Sqlite",
                 "Microsoft.Data.Sqlite"
             ],
@@ -66,12 +70,6 @@ internal static class ProviderAssemblyNames
             ],
             _ => []
         };
-    }
-
-    internal static bool IsKnownProviderAssembly(string? assemblySimpleName)
-    {
-        return !string.IsNullOrEmpty(assemblySimpleName)
-               && KnownProviderAssemblies.Contains(assemblySimpleName);
     }
 
     internal static string GetNuGetPackageFolderName(string assemblySimpleName)

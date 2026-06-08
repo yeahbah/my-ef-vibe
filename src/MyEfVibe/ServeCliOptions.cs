@@ -19,9 +19,6 @@ internal sealed class ServeCliOptions
     [Option("connection-string|cs", HelpText = "Connection string for manual DbContextOptions construction.")]
     public string? ConnectionString { get; set; }
 
-    [Option("provider", HelpText = "Provider with --connection-string.")]
-    public string? Provider { get; set; }
-
     [Option("dblog", Default = true, HelpText = "Enable EF database command logging.")]
     public bool DbLog { get; set; }
 

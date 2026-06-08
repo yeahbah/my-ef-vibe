@@ -91,14 +91,6 @@ internal static class Program
             dbLogSettings.Level = parsedLevel;
         }
 
-        var parsedProvider = ProviderParser.ParseOrNull(options.Provider);
-        if (!string.IsNullOrWhiteSpace(options.ConnectionString) && parsedProvider is null)
-        {
-            CliUi.WriteError(
-                "`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
-            return 3;
-        }
-
         var oneShotExpression = CliPathHelper.ResolveOneShotExpression(options.Expression, options.ExpressionParts);
         var workspace = CliPathHelper.ResolveWorkspace(options.Workspace);
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
@@ -227,7 +219,7 @@ internal static class Program
                 host,
                 options.Context,
                 options.ConnectionString,
-                parsedProvider,
+                null,
                 allowInteractiveSelection);
         }
         catch (InvalidOperationException resolutionFailure)

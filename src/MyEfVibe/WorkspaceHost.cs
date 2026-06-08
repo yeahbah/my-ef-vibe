@@ -50,6 +50,8 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal string SessionDirectory { get; private set; }
 
+    internal ProviderDescriptor? ActiveProviderDescriptor { get; private set; }
+
     public void Dispose()
     {
         AssemblyLoader.Dispose();
@@ -59,6 +61,11 @@ internal sealed class WorkspaceHost : IDisposable
     internal void SetSessionDirectory(string sessionDirectory)
     {
         SessionDirectory = SessionPaths.EnsureSessionDirectory(sessionDirectory);
+    }
+
+    internal void SetActiveProviderDescriptor(ProviderDescriptor? providerDescriptor)
+    {
+        ActiveProviderDescriptor = providerDescriptor;
     }
 
     internal static WorkspaceHost Load(WorkspaceBuildResult workspaceBuild)
@@ -259,7 +266,14 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal void EnsureProviderDependenciesLoaded(MyEfVibeProvider provider)
     {
-        if (provider == MyEfVibeProvider.Sqlite)
+        EnsureProviderDependenciesLoaded(ProviderDescriptor.FromKnownProvider(provider));
+    }
+
+    internal void EnsureProviderDependenciesLoaded(ProviderDescriptor descriptor)
+    {
+        _resolver.DepsManifest?.RegisterDiscoveredProvider(descriptor);
+
+        if (descriptor.IsSqlite)
         {
             WorkspaceSqliteNativeBootstrap.EnsureBatteriesInitialized(this);
         }
@@ -268,9 +282,55 @@ internal sealed class WorkspaceHost : IDisposable
             EnsureEntityFrameworkRelationalLoaded();
         }
 
-        foreach (var assemblySimpleName in ProviderAssemblyNames.For(provider))
+        foreach (var assemblySimpleName in ProviderAssemblyNames.For(descriptor))
         {
-            PreloadPackageByName(assemblySimpleName);
+            PreloadProviderAssembly(assemblySimpleName, descriptor);
+        }
+    }
+
+    private void PreloadProviderAssembly(string assemblySimpleName, ProviderDescriptor descriptor)
+    {
+        if (_resolver.DepsManifest?.TryResolve(assemblySimpleName, false, out var depsPath) == true)
+        {
+            PreloadPackageWithClosure(depsPath);
+            RegisterProviderAssemblyReferences(depsPath);
+
+            return;
+        }
+
+        if (_resolver.DepsManifest?.TryResolve(assemblySimpleName, true, out var fallbackPath) == true)
+        {
+            PreloadPackageWithClosure(fallbackPath);
+            RegisterProviderAssemblyReferences(fallbackPath);
+
+            return;
+        }
+
+        var loaded = LoadAssembly(assemblySimpleName);
+
+        if (loaded is not null)
+        {
+            _resolver.DepsManifest?.RegisterProviderAssemblyReferences(loaded);
+        }
+    }
+
+    private void RegisterProviderAssemblyReferences(string assemblyPath)
+    {
+        if (_resolver.DepsManifest is null || !File.Exists(assemblyPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var assembly = LoadOrGetAssembly(assemblyPath);
+            _resolver.DepsManifest.RegisterProviderAssemblyReferences(assembly);
+        }
+        catch (FileLoadException)
+        {
+        }
+        catch (BadImageFormatException)
+        {
         }
     }
 

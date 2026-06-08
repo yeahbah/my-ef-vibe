@@ -2,6 +2,8 @@
 
 This guide walks through installing and configuring the My EF Vibe Rider plugin for a single Rider project. The plugin uses your existing `efvibe` CLI configuration model: EF project, optional startup project, DbContext, and workspace root.
 
+efvibe supports **most EF Core relational providers**. Provider discovery follows the EF project's `PackageReference` entries — the same rules as the CLI. See [database-providers.md](database-providers.md).
+
 > Screenshot placeholder: Rider plugin installed in **Settings > Plugins**.
 
 ## 1. Install the plugin
@@ -45,7 +47,7 @@ Set the fields that match your EF Core solution:
 | **DbContext** | The context type name, for example `AppDbContext`. |
 | **Workspace root** | Optional session/output root. Leave blank to use the CLI default. |
 | **Connection string** | Optional override when the startup project does not provide one. |
-| **Provider** | Optional provider override such as `sqlserver`, `npgsql`, or `sqlite`. |
+| **Provider** | Optional override: alias (`sqlserver`, `npgsql`, `sqlite`, …) or EF package id (for example `FirebirdSql.EntityFrameworkCore.Firebird`). Leave empty to discover the provider from `-p` `PackageReference` entries. Required when **Connection string** is set. |
 | **efvibe executable** | Optional explicit path to `efvibe` or `myefvibe`. Leave blank to use a local tool or PATH. |
 | **.NET framework** | Optional target framework, for example `net8.0` or `net10.0`. |
 

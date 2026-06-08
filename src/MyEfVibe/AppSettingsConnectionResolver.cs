@@ -9,10 +9,10 @@ internal static class AppSettingsConnectionResolver
         string efProjectPath,
         string efOutputDirectory,
         out string connectionString,
-        out MyEfVibeProvider? provider)
+        out ProviderDescriptor? providerDescriptor)
     {
         connectionString = string.Empty;
-        provider = null;
+        providerDescriptor = null;
 
         if (!TryResolveLayeredAppSettings(startupProjectPath, out connectionString))
         {
@@ -39,23 +39,39 @@ internal static class AppSettingsConnectionResolver
             return false;
         }
 
-        provider = ResolveProvider(startupProjectPath, efProjectPath);
+        providerDescriptor = ResolveProviderDescriptor(startupProjectPath, efProjectPath);
 
-        if (provider == MyEfVibeProvider.Sqlite)
+        if (providerDescriptor?.IsSqlite == true)
         {
             connectionString = SqliteConnectionStringNormalizer.Normalize(
                 connectionString,
                 startupProjectPath,
                 efOutputDirectory);
         }
+        else if (providerDescriptor?.KnownProvider == MyEfVibeProvider.SqlServer
+                 || providerDescriptor?.PackageId.Contains("SqlServer", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            connectionString = SqlServerConnectionStringNormalizer.Normalize(connectionString);
+        }
 
         return true;
     }
 
+    internal static ProviderDescriptor? ResolveProviderDescriptor(string startupProjectPath, string efProjectPath)
+    {
+        var fromSettings = MapDatabaseProviderName(TryReadDatabaseProviderName(startupProjectPath));
+
+        if (fromSettings.HasValue)
+        {
+            return ProviderDescriptor.FromKnownProvider(fromSettings.Value);
+        }
+
+        return CsprojInspector.TryReadEntityFrameworkProviderDescriptor(efProjectPath);
+    }
+
     internal static MyEfVibeProvider? ResolveProvider(string startupProjectPath, string efProjectPath)
     {
-        return MapDatabaseProviderName(TryReadDatabaseProviderName(startupProjectPath))
-               ?? CsprojInspector.TryReadEntityFrameworkProvider(efProjectPath);
+        return ResolveProviderDescriptor(startupProjectPath, efProjectPath)?.KnownProvider;
     }
 
     internal static string? TryReadDatabaseProviderName(string startupProjectPath)

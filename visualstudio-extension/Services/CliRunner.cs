@@ -45,7 +45,6 @@ internal sealed class CliRunner
         AddOption(args, "-s", settings.StartupProject);
         AddOption(args, "-c", settings.Context);
         AddOption(args, "--connection-string", settings.ConnectionString);
-        AddOption(args, "--provider", settings.Provider);
 
         if (!settings.DbLog)
             args.Add("--no-dblog");

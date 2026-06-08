@@ -48,7 +48,7 @@ public sealed class SqliteBootstrapTests
             host,
             "AdventureWorksDbContext",
             "Data Source=/home/adiaz/Projects/AdventureWorks/Source/AdventureWorksLT.db",
-            MyEfVibeProvider.Sqlite,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Sqlite),
             false);
 
         _ = dbContext.GetType().GetProperty("Database")!.GetValue(dbContext);
@@ -93,7 +93,7 @@ public sealed class SqliteBootstrapTests
             host,
             "AdventureWorksDbContext",
             "Data Source=/home/adiaz/Projects/AdventureWorks/Source/AdventureWorksLT.db",
-            MyEfVibeProvider.Sqlite,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Sqlite),
             false);
 
         var database = dbContext.GetType().GetProperty("Database")!.GetValue(dbContext);

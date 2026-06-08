@@ -17,7 +17,7 @@ public sealed class EfvibeOptionsPage : DialogPage
 
     [Category("Project")]
     [DisplayName("Startup project")]
-    [Description("Startup project for appsettings, user secrets, and provider configuration. Relative paths resolve from the solution directory.")]
+    [Description("Startup project for appsettings and user secrets. Relative paths resolve from the solution directory.")]
     public string StartupProject { get; set; } = string.Empty;
 
     [Category("Project")]
@@ -29,11 +29,6 @@ public sealed class EfvibeOptionsPage : DialogPage
     [DisplayName("Connection string")]
     [Description("Optional connection string passed to efvibe --connection-string.")]
     public string ConnectionString { get; set; } = string.Empty;
-
-    [Category("Connection")]
-    [DisplayName("Provider")]
-    [Description("Provider with connection string: sqlserver, npgsql, sqlite, oracle, mysql, or mariadb.")]
-    public string Provider { get; set; } = string.Empty;
 
     [Category("CLI")]
     [DisplayName("Tool path")]

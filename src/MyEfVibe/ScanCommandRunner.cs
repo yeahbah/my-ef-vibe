@@ -21,7 +21,6 @@ internal static class ScanCommandRunner
             options.Json,
             options.NoBanner,
             options.ConnectionString,
-            options.Provider,
             cancellationToken);
     }
 
@@ -38,7 +37,6 @@ internal static class ScanCommandRunner
         bool jsonOutput,
         bool noBanner,
         string? connectionString,
-        string? providerRaw,
         CancellationToken cancellationToken = default)
     {
         CliUi.Configure();
@@ -61,15 +59,6 @@ internal static class ScanCommandRunner
         {
             CliUi.WriteError(minSeverityError!);
             return 2;
-        }
-
-        var parsedProvider = ProviderParser.ParseOrNull(providerRaw);
-
-        if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
-        {
-            CliUi.WriteError(
-                "`--connection-string` requires `--provider` (sqlserver | npgsql | sqlite | oracle | mysql | mariadb).");
-            return 3;
         }
 
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
@@ -182,7 +171,7 @@ internal static class ScanCommandRunner
                     host,
                     contextFullName,
                     connectionString,
-                    parsedProvider,
+                    null,
                     false);
             }
             catch (InvalidOperationException resolutionFailure)

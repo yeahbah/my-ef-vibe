@@ -180,10 +180,10 @@ public sealed class SqliteConnectionStringNormalizerTests
                 startupProject,
                 temp.Path,
                 out var connectionString,
-                out var provider));
+                out var providerDescriptor));
 
         Assert.Equal($"Data Source={developmentDatabase}", connectionString);
-        Assert.Equal(MyEfVibeProvider.Sqlite, provider);
+        Assert.Equal(MyEfVibeProvider.Sqlite, providerDescriptor?.KnownProvider);
     }
 
     private sealed class TempDirectory : IDisposable

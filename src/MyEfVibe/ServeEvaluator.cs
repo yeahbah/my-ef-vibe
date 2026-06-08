@@ -32,6 +32,7 @@ internal static class ServeEvaluator
                     runtime.DbContext,
                     AnalyticsPresenter.GetPlanSql(metrics),
                     runtime.Host.EnumerateLoadedAssemblies(),
+                    runtime.Host.ActiveProviderDescriptor,
                     cancellationToken);
             }
 

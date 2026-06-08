@@ -202,7 +202,6 @@ internal sealed class EfvibeDaemonClient : IDisposable
             context.Settings.StartupProject,
             context.Settings.Context,
             context.Settings.ConnectionString,
-            context.Settings.Provider,
             context.Settings.ToolPath,
             context.Settings.DotnetFramework,
             context.Settings.DbLog.ToString());

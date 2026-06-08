@@ -45,7 +45,7 @@ public sealed class SqliteRelationalNamingTests
             host,
             "AdventureWorksDbContext",
             $"Data Source={sqliteDb}",
-            MyEfVibeProvider.Sqlite,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Sqlite),
             false);
 
         var productsProperty = dbContext.GetType().GetProperty("Products");

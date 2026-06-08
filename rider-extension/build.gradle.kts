@@ -34,7 +34,8 @@ intellijPlatform {
         name = providers.gradleProperty("pluginName")
         version = providers.gradleProperty("pluginVersion")
         description = """
-            Evaluate EF Core LINQ in JetBrains Rider by launching the efvibe CLI.
+            Evaluate EF Core LINQ in JetBrains Rider against most relational providers
+            (SQL Server, PostgreSQL, SQLite, Oracle, MySQL, Firebird, and more) by launching the efvibe CLI.
             Run selected queries, inspect dbinfo/tables, start a REPL, and review scan JSON.
         """.trimIndent()
         vendor {

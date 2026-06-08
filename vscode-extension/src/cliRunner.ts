@@ -207,10 +207,6 @@ export function buildEfvibeArgs(settings: EfvibeSettings, baseDirectory?: string
     args.push('--connection-string', settings.connectionString);
   }
 
-  if (settings.provider) {
-    args.push('--provider', settings.provider);
-  }
-
   if (!settings.dbLog) {
     args.push('--no-dblog');
   }

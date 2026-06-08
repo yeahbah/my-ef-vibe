@@ -42,6 +42,7 @@ internal static class QueryResultWriter
                         dbContextInstance,
                         AnalyticsPresenter.GetPlanSql(metrics),
                         host.EnumerateLoadedAssemblies(),
+                        host.ActiveProviderDescriptor,
                         cancellationToken);
                 }
 

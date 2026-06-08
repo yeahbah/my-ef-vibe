@@ -33,7 +33,7 @@ public sealed class ConfigurationManagerPreloadTests
             host,
             scenario.Context,
             scenario.ConnectionString,
-            ProviderParser.ParseOrNull(scenario.Provider),
+            ProviderParser.ParseDescriptorOrNull(scenario.Provider),
             false);
 
         Assert.Equal(scenario.Context, dbContext.GetType().Name);

@@ -76,7 +76,7 @@ internal sealed class EfvibeIntegrationSession : IAsyncDisposable
 
         host.SetSessionDirectory(sessionDirectory);
 
-        var provider = ProviderParser.ParseOrNull(scenario.Provider);
+        var provider = ProviderParser.ParseDescriptorOrNull(scenario.Provider);
 
         var dbContext = DbContextActivator.ResolveInstance(
             host,

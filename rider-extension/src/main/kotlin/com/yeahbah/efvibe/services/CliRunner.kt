@@ -262,7 +262,6 @@ class CliRunner(private val project: Project) {
         addOption("-s", PathResolver.resolve(settings.startupProject, project))
         addOption("-c", settings.context.trim())
         addOption("--connection-string", settings.connectionString.trim())
-        addOption("--provider", settings.provider.trim())
         if (!settings.dbLog) add("--no-dblog")
         addOption("--framework", settings.dotnetFramework.trim())
     }

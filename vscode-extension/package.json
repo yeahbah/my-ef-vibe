@@ -1,8 +1,8 @@
 {
   "name": "vscode-efvibe",
   "displayName": "My EF Vibe",
-  "description": "Evaluate EF Core LINQ in VS Code: Run Selection with SQL, deep scan + Scan Review, REPL terminal, and efvibe Session sidebar.",
-  "version": "0.5.33",
+  "description": "Evaluate EF Core LINQ in VS Code against most relational providers (SQL Server, PostgreSQL, SQLite, Oracle, MySQL, Firebird, and more): Run Selection with SQL, deep scan + Scan Review, REPL terminal, and efvibe Session sidebar.",
+  "version": "0.6.0",
   "icon": "images/icon.png",
   "galleryBanner": {
     "color": "#1a1b26",
@@ -359,20 +359,6 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Optional connection string passed to `efvibe --connection-string`."
-        },
-        "efvibe.provider": {
-          "type": "string",
-          "default": "",
-          "enum": [
-            "",
-            "sqlserver",
-            "npgsql",
-            "sqlite",
-            "oracle",
-            "mysql",
-            "mariadb"
-          ],
-          "markdownDescription": "Database provider when using `efvibe.connectionString`."
         },
         "efvibe.toolPath": {
           "type": "string",

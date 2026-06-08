@@ -20,10 +20,6 @@ internal sealed class EfvibeCliOptions
     [Option("connection-string|cs", HelpText = "Connection string for manual DbContextOptions construction.")]
     public string? ConnectionString { get; set; }
 
-    [Option("provider",
-        HelpText = "Provider with --connection-string: sqlserver | npgsql | sqlite | oracle | mysql | mariadb.")]
-    public string? Provider { get; set; }
-
     [Option('e', "expression", HelpText = "Run a single expression and exit (non-interactive).")]
     public string? Expression { get; set; }
 

@@ -181,11 +181,6 @@ internal static class ProviderOptionsConfigurator
         string useProviderMethodName,
         MyEfVibeProvider providerKey)
     {
-        if (!HasOptionalExtensions(host, providerKey))
-        {
-            return false;
-        }
-
         foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(providerAssembly))
         foreach (var staticMethodCandidate in exported.GetMethods(BindingFlags.Static | BindingFlags.Public
                      | BindingFlags.NonPublic))

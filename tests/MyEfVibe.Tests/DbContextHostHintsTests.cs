@@ -45,9 +45,9 @@ public sealed class DbContextHostHintsTests
                 startupProject,
                 temp.Path,
                 out _,
-                out var provider));
+                out var providerDescriptor));
 
-        Assert.Equal(MyEfVibeProvider.Npgsql, provider);
+        Assert.Equal(MyEfVibeProvider.Npgsql, providerDescriptor?.KnownProvider);
     }
 
     [Fact]

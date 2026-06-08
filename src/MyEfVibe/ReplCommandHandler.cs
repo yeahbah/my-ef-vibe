@@ -130,6 +130,7 @@ internal sealed class ReplCommandHandler
                     _dbContext,
                     AnalyticsPresenter.GetPlanSql(_analytics.LastMetrics),
                     _host.EnumerateLoadedAssemblies(),
+                    _host.ActiveProviderDescriptor,
                     cancellationToken);
                 return true;
 

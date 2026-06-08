@@ -13,7 +13,18 @@ internal static class RelationalDatabaseFacadeInvoker
         IEnumerable<Assembly> inspectionAssemblies,
         out DbConnection? connection)
     {
-        if (TryGetDbConnectionCore(databaseFacade, inspectionAssemblies, out connection))
+        return TryGetDbConnection(databaseFacade, inspectionAssemblies, out connection, out _);
+    }
+
+    internal static bool TryGetDbConnection(
+        object databaseFacade,
+        IEnumerable<Assembly> inspectionAssemblies,
+        out DbConnection? connection,
+        out string? failureMessage)
+    {
+        failureMessage = null;
+
+        if (TryGetDbConnectionCore(databaseFacade, inspectionAssemblies, out connection, ref failureMessage))
         {
             return true;
         }
@@ -21,13 +32,15 @@ internal static class RelationalDatabaseFacadeInvoker
         return TryGetDbConnectionCore(
             databaseFacade,
             AppDomain.CurrentDomain.GetAssemblies(),
-            out connection);
+            out connection,
+            ref failureMessage);
     }
 
     private static bool TryGetDbConnectionCore(
         object databaseFacade,
         IEnumerable<Assembly> inspectionAssemblies,
-        out DbConnection? connection)
+        out DbConnection? connection,
+        ref string? failureMessage)
     {
         connection = null;
 
@@ -73,8 +86,9 @@ internal static class RelationalDatabaseFacadeInvoker
                         return true;
                     }
                 }
-                catch
+                catch (Exception failure)
                 {
+                    failureMessage ??= FormatFailure(failure);
                 }
             }
 
@@ -113,13 +127,24 @@ internal static class RelationalDatabaseFacadeInvoker
                             return true;
                         }
                     }
-                    catch
+                    catch (Exception failure)
                     {
+                        failureMessage ??= FormatFailure(failure);
                     }
                 }
             }
         }
 
         return false;
+    }
+
+    private static string FormatFailure(Exception failure)
+    {
+        if (failure is TargetInvocationException { InnerException: { } innerFailure })
+        {
+            return innerFailure.Message;
+        }
+
+        return failure.Message;
     }
 }

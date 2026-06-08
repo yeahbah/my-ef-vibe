@@ -229,16 +229,16 @@ internal static partial class EfReplQueryableRewriter
                 $"{Runtime}.Select<{FormatTypeNameForScript(entityType)}, {FormatTypeNameForScript(resultType)}>({source}, {selector})";
         }
 
+        if (entityType is not null)
+        {
+            // Cast to IQueryable<T> so Roslyn binds Queryable.Select for anonymous projections
+            // (CS8917 when calling ReplQueryableRuntime.Select with an inferred lambda).
+            return
+                $"((global::System.Linq.IQueryable<{FormatTypeNameForScript(entityType)}>)({source})).Select({selector})";
+        }
+
         if (source.StartsWith("db.", StringComparison.Ordinal))
         {
-            // Ensure Roslyn binds Queryable.Select (expression trees), not Enumerable.Select,
-            // even when projecting to anonymous types (whose TResult can't be named).
-            if (entityType is not null)
-            {
-                return
-                    $"((global::System.Linq.IQueryable<{FormatTypeNameForScript(entityType)}>)({source})).Select({selector})";
-            }
-
             return $"{source}.Select({selector})";
         }
 

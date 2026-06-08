@@ -50,6 +50,12 @@ internal static class DbInfoReporter
             rows.Add(("Provider name", providerName));
         }
 
+        if (host.ActiveProviderDescriptor is { } providerDescriptor)
+        {
+            rows.Add(("EF provider package", providerDescriptor.PackageId));
+            rows.Add(("Feature tier", providerDescriptor.ResolveFeatureTier(dbContext).Describe()));
+        }
+
         var commandTimeout = database.GetType().GetProperty("CommandTimeout")?.GetValue(database);
 
         if (commandTimeout is int timeoutSeconds)
@@ -67,10 +73,15 @@ internal static class DbInfoReporter
         if (!RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
                 host.EnumerateLoadedAssemblies(),
-                out var connection)
+                out var connection,
+                out var connectionFailure)
             || connection is not DbConnection dbConnection)
         {
-            rows.Add(("Connection", "(not relational or unavailable)"));
+            rows.Add((
+                string.IsNullOrWhiteSpace(connectionFailure) ? "Connection" : "Connection error",
+                string.IsNullOrWhiteSpace(connectionFailure)
+                    ? "(not relational or unavailable)"
+                    : connectionFailure));
             WritePanel(rows);
             return;
         }
@@ -93,7 +104,7 @@ internal static class DbInfoReporter
         }
         catch (Exception failure)
         {
-            rows.Add(("Connection error", failure.Message));
+            rows.Add(("Connection error", FormatConnectionFailure(failure)));
         }
         finally
         {
@@ -253,5 +264,17 @@ internal static class DbInfoReporter
     private static string NullIfEmpty(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "(empty)" : value;
+    }
+
+    private static string FormatConnectionFailure(Exception failure)
+    {
+        if (failure.InnerException is null)
+        {
+            return failure.Message;
+        }
+
+        return failure.Message
+               + Environment.NewLine
+               + failure.InnerException.Message;
     }
 }

@@ -69,6 +69,16 @@ internal static class DbInfoJsonReporter
             rows.Add(new DbInfoJsonEntry { Key = "Provider name", Value = providerName });
         }
 
+        if (host.ActiveProviderDescriptor is { } providerDescriptor)
+        {
+            rows.Add(new DbInfoJsonEntry { Key = "EF provider package", Value = providerDescriptor.PackageId });
+            rows.Add(new DbInfoJsonEntry
+            {
+                Key = "Feature tier",
+                Value = providerDescriptor.ResolveFeatureTier(dbContext).Describe()
+            });
+        }
+
         var commandTimeout = database.GetType().GetProperty("CommandTimeout")?.GetValue(database);
         var timeoutSeconds = commandTimeout is int timeout ? timeout : 0;
         rows.Add(new DbInfoJsonEntry
@@ -83,10 +93,14 @@ internal static class DbInfoJsonReporter
             Value = SchemaBrowser.GetDbSets(dbContext).Count.ToString()
         });
 
+        host.EnsureEntityFrameworkRelationalLoaded();
+        host.EnsureAspNetCoreSharedFrameworkLoaded();
+
         if (RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
                 host.EnumerateLoadedAssemblies(),
-                out var connection)
+                out var connection,
+                out var connectionFailure)
             && connection is DbConnection dbConnection)
         {
             try
@@ -110,7 +124,13 @@ internal static class DbInfoJsonReporter
         }
         else
         {
-            rows.Add(new DbInfoJsonEntry { Key = "Connection", Value = "(not relational or unavailable)" });
+            rows.Add(new DbInfoJsonEntry
+            {
+                Key = string.IsNullOrWhiteSpace(connectionFailure) ? "Connection" : "Connection error",
+                Value = string.IsNullOrWhiteSpace(connectionFailure)
+                    ? "(not relational or unavailable)"
+                    : connectionFailure
+            });
         }
 
         return new DbInfoJsonPayload

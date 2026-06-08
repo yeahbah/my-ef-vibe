@@ -12,7 +12,6 @@ data class EfvibeSettingsState(
     var startupProject: String = "",
     var context: String = "",
     var connectionString: String = "",
-    var provider: String = "",
     var toolPath: String = "",
     var dotnetFramework: String = "",
     var dbLog: Boolean = true,

@@ -8,7 +8,6 @@ internal static class WorkspaceRuntimeBootstrap
         FileInfo? startupProjectPath,
         string? contextFullName,
         string? connectionString,
-        string? providerRaw,
         bool dbLogEnabled,
         bool noDbLog,
         string? dbLogLevelRaw,
@@ -26,13 +25,6 @@ internal static class WorkspaceRuntimeBootstrap
             && DbLogLevelParser.TryParse(dbLogLevelRaw, out var parsedLevel))
         {
             dbLogSettings.Level = parsedLevel;
-        }
-
-        var parsedProvider = ProviderParser.ParseOrNull(providerRaw);
-
-        if (!string.IsNullOrWhiteSpace(connectionString) && parsedProvider is null)
-        {
-            return (null, 3, "`--connection-string` requires `--provider`.");
         }
 
         var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
@@ -110,7 +102,7 @@ internal static class WorkspaceRuntimeBootstrap
                 host,
                 contextFullName,
                 connectionString,
-                parsedProvider,
+                null,
                 false);
         }
         catch (InvalidOperationException resolutionFailure)

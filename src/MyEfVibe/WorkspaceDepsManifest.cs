@@ -20,6 +20,8 @@ internal sealed class WorkspaceDepsManifest
 
     private readonly List<PackageLibrary> _packageLibraries = [];
 
+    private readonly WorkspaceProviderAssemblyRegistry _providerAssemblyRegistry = new();
+
     private readonly HashSet<string> _projectAssemblyPaths =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -46,6 +48,16 @@ internal sealed class WorkspaceDepsManifest
 
             return paths.ToImmutableArray();
         }
+    }
+
+    internal void RegisterDiscoveredProvider(ProviderDescriptor descriptor)
+    {
+        _providerAssemblyRegistry.Register(descriptor);
+    }
+
+    internal void RegisterProviderAssemblyReferences(Assembly assembly)
+    {
+        _providerAssemblyRegistry.RegisterAssemblyReferences(assembly);
     }
 
     internal static WorkspaceDepsManifest? TryLoad(string entryAssemblyPath)
@@ -584,7 +596,8 @@ internal sealed class WorkspaceDepsManifest
 
         if (string.IsNullOrEmpty(requested.Name)
             || requested.Version is null
-            || AssemblyResolutionHelpers.IsZeroVersion(requested.Version))
+            || AssemblyResolutionHelpers.IsZeroVersion(requested.Version)
+            || !_providerAssemblyRegistry.AllowsNuGetFallback(requested.Name))
         {
             return false;
         }
@@ -593,7 +606,7 @@ internal sealed class WorkspaceDepsManifest
         {
             var packageFolder = Path.Combine(
                 _nuGetPackagesRoot,
-                ProviderAssemblyNames.GetNuGetPackageFolderName(requested.Name!),
+                _providerAssemblyRegistry.GetNuGetPackageFolderName(requested.Name!),
                 versionFolder);
 
             var dllPath = FindAssemblyDllInPackage(packageFolder, requested.Name);
@@ -613,14 +626,14 @@ internal sealed class WorkspaceDepsManifest
 
     /// <summary>
     ///     Resolves EF provider packages from the global NuGet cache when the workspace project does not
-    ///     reference them (e.g. <c>--provider npgsql</c> against a SqlServer-only EF library).
+    ///     reference them, but the provider was discovered from <c>-p</c> or passed via <c>--provider</c>.
     /// </summary>
     private bool TryResolveLatestProviderFromNuGetPackageFolder(AssemblyName requested, out string absolutePath)
     {
         absolutePath = string.Empty;
 
         if (string.IsNullOrEmpty(requested.Name)
-            || !ProviderAssemblyNames.IsKnownProviderAssembly(requested.Name))
+            || !_providerAssemblyRegistry.AllowsNuGetFallback(requested.Name))
         {
             return false;
         }
@@ -639,7 +652,7 @@ internal sealed class WorkspaceDepsManifest
 
         var packageRoot = Path.Combine(
             _nuGetPackagesRoot,
-            ProviderAssemblyNames.GetNuGetPackageFolderName(requested.Name));
+            _providerAssemblyRegistry.GetNuGetPackageFolderName(requested.Name));
 
         if (!Directory.Exists(packageRoot))
         {
