@@ -48,6 +48,11 @@ internal static class AppSettingsConnectionResolver
                 startupProjectPath,
                 efOutputDirectory);
         }
+        else if (providerDescriptor?.KnownProvider == MyEfVibeProvider.SqlServer
+                 || providerDescriptor?.PackageId.Contains("SqlServer", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            connectionString = SqlServerConnectionStringNormalizer.Normalize(connectionString);
+        }
 
         return true;
     }

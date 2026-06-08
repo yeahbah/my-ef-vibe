@@ -99,7 +99,7 @@ internal static class DbInfoReporter
         }
         catch (Exception failure)
         {
-            rows.Add(("Connection error", failure.Message));
+            rows.Add(("Connection error", FormatConnectionFailure(failure)));
         }
         finally
         {
@@ -259,5 +259,17 @@ internal static class DbInfoReporter
     private static string NullIfEmpty(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "(empty)" : value;
+    }
+
+    private static string FormatConnectionFailure(Exception failure)
+    {
+        if (failure.InnerException is null)
+        {
+            return failure.Message;
+        }
+
+        return failure.Message
+               + Environment.NewLine
+               + failure.InnerException.Message;
     }
 }

@@ -21,7 +21,7 @@ This script:
 4. Converts the SQL Server database to PostgreSQL (pgloader), SQLite (DuckDB), and Oracle (Python).
 5. Builds **myefvibe**.
 
-Integration scenarios pass `--provider` per database (alias or package id). Provider discovery for normal CLI use is documented in [docs/database-providers.md](../../docs/database-providers.md).
+Integration scenarios pass `--provider` per database (alias or package id) to exercise each engine explicitly. In normal CLI use, efvibe auto-discovers the provider from `-p` and works with most relational EF Core packages — see [docs/database-providers.md](../../docs/database-providers.md).
 
 Re-run conversion only:
 

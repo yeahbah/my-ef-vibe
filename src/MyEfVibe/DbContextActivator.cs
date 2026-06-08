@@ -67,7 +67,7 @@ internal static class DbContextActivator
             && providerDescriptor is not null
             && TryCreateUsingOptionsConstructor(
                 selectedDbContextType,
-                connectionString,
+                NormalizeSqlServerConnectionString(connectionString),
                 providerDescriptor,
                 host,
                 out var explicitOptionsInstance))
@@ -126,7 +126,7 @@ internal static class DbContextActivator
             && providerDescriptor is not null
             && TryCreateUsingOptionsConstructor(
                 selectedDbContextType,
-                connectionString,
+                NormalizeSqlServerConnectionString(connectionString),
                 providerDescriptor,
                 host,
                 out var optionsInstance))
@@ -1095,6 +1095,11 @@ internal static class DbContextActivator
     private static Assembly? LoadWorkspaceAssembly(WorkspaceHost host, string assemblyName)
     {
         return host.LoadAssembly(assemblyName);
+    }
+
+    private static string NormalizeSqlServerConnectionString(string connectionString)
+    {
+        return SqlServerConnectionStringNormalizer.Normalize(connectionString);
     }
 
     private static object Finish(

@@ -6,6 +6,10 @@
 
 Interactive CLI to run LINQ against an external .NET project's EF Core `DbContext`.
 
+**Works with most EF Core relational providers** — SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB, Firebird, and
+other packages discovered from your EF project's `PackageReference` entries. See
+[docs/database-providers.md](docs/database-providers.md).
+
 Point `efvibe` at your solution, get a REPL with **`db`** (your `DbContext`) in scope, see translated SQL,
 execution metrics, and helpers like `:tables`, `:describe`, `:dbinfo`, `:plan`, `:stats`, `:scan lite`, and
 `:scan deep`.
@@ -141,11 +145,28 @@ dotnet run --project src/MyEfVibe/MyEfVibe.csproj -f net10.0 -- \
   -c AdventureWorksDbContext
 ```
 
+## Database providers
+
+efvibe auto-discovers the EF provider from **`PackageReference` entries on `-p`** (including referenced projects).
+Reference one relational provider package, or pass `--provider` when several are present.
+
+| Tier | Providers | What you get |
+|------|-----------|--------------|
+| **Full** | SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB | DbContext construction, LINQ REPL, SQL translation, `:plan` (where supported); PostgreSQL/SQLite also get naming customizers |
+| **Generic** | Any other `*.EntityFrameworkCore.*` package (e.g. Firebird) | DbContext construction, LINQ REPL, SQL translation; pass the package id as `--provider` when needed |
+
+Pass `--connection-string` with `--provider` (alias or EF package id) to override config from `-s`. `:dbinfo` shows the
+resolved provider package and feature tier.
+
+Full reference: [docs/database-providers.md](docs/database-providers.md). Cosmos DB and InMemory are not supported through
+the relational auto-construct path.
+
 ## macOS and SQL Server
 
 SQL Server is not Windows-only for development. On macOS (and Linux), run **SQL Server in Docker** and connect with
-`--provider sqlserver`. The tool loads the Unix `Microsoft.Data.SqlClient` runtime from the workspace `.deps.json` (not
-the portable `lib/` assembly).
+`--provider sqlserver` (or discovery from `-p`). The tool loads the Unix `Microsoft.Data.SqlClient` runtime from the
+workspace `.deps.json` (not the portable `lib/` assembly) and normalizes common local connection strings (for example
+`Encrypt=False` and stripping `Trusted_Connection` when SQL credentials are present).
 
 Typical issues:
 
@@ -231,7 +252,7 @@ Highlights:
 | Doc (repository)                                                             | Description                                                                                                                      |
 |------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
 | [features.md](features.md)                                                   | Full REPL and CLI reference                                                                                                      |
-| [docs/database-providers.md](docs/database-providers.md)                     | EF provider discovery, `--provider`, feature tiers, and limits                                                                   |
+| [docs/database-providers.md](docs/database-providers.md)                     | Multi-provider support — discovery, `--provider`, feature tiers, and limits                                                      |
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md)                   | Install the VS Code extension ([Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) or VSIX) |
 | [vscode-extension/README.md](vscode-extension/README.md)                     | VS Code extension (run selection, `efvibe serve`, scan review, editable panel)                                                   |
 | [rider-extension/README.md](rider-extension/README.md)                       | Rider extension MVP (Gradle plugin, settings, actions, tool window)                                                              |

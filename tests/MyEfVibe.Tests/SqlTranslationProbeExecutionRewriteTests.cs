@@ -159,13 +159,30 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
         var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
 
         Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
-        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.OrderBy<", normalized, StringComparison.Ordinal);
         Assert.Contains(
-            "global::MyEfVibe.ReplQueryableRuntime.Select(global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10)",
+            "((global::System.Linq.IQueryable<global::MyEfVibe.Tests.FakeRewriterUser>)(global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10))).Select(x => new { x.Id, x.Name })",
             normalized, StringComparison.Ordinal);
+        Assert.Contains(".OrderBy(x => x.Name)", normalized, StringComparison.Ordinal);
         Assert.Contains("x => new { x.Id, x.Name }", normalized, StringComparison.Ordinal);
         Assert.Contains("x => x.Name", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("Take(db.Users, 10).Select(", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_TakeSelectAnonymousToList_UsesQueryableCastForAnonymousProjection()
+    {
+        const string probe = "db.Users.Take(10).Select(x => new { x.Id, x.Name }).ToList()";
+
+        var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
+
+        Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
+        Assert.Contains(
+            "((global::System.Linq.IQueryable<global::MyEfVibe.Tests.FakeRewriterUser>)(global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 10))).Select(x => new { x.Id, x.Name })",
+            normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "ReplQueryableRuntime.Select(global::MyEfVibe.ReplQueryableRuntime.Take",
+            normalized,
+            StringComparison.Ordinal);
     }
 
     [Fact]

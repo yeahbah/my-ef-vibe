@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
   <Metadata>
-    <Identity Id="MyEfVibe.VisualStudio" Version="0.5.32" Language="en-US" Publisher="Arnold Diaz" />
+    <Identity Id="MyEfVibe.VisualStudio" Version="0.6.0" Language="en-US" Publisher="Arnold Diaz" />
     <DisplayName>My EF Vibe</DisplayName>
-    <Description xml:space="preserve">Evaluate EF Core LINQ in Visual Studio by launching and querying the efvibe CLI.</Description>
+    <Description xml:space="preserve">Evaluate EF Core LINQ in Visual Studio against most relational providers (SQL Server, PostgreSQL, SQLite, Oracle, MySQL, Firebird, and more) by launching and querying the efvibe CLI.</Description>
     <MoreInfo>https://myefvibe.com/</MoreInfo>
     <License>LICENSE</License>
     <Tags>efcore;entity-framework;linq;sql;database;visual-studio</Tags>

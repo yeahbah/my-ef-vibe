@@ -2,6 +2,8 @@
 
 This guide walks through installing and configuring the My EF Vibe Rider plugin for a single Rider project. The plugin uses your existing `efvibe` CLI configuration model: EF project, optional startup project, DbContext, and workspace root.
 
+efvibe supports **most EF Core relational providers**. Provider discovery follows the EF project's `PackageReference` entries — the same rules as the CLI. See [database-providers.md](database-providers.md).
+
 > Screenshot placeholder: Rider plugin installed in **Settings > Plugins**.
 
 ## 1. Install the plugin

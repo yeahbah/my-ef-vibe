@@ -109,4 +109,6 @@ If you see **no matching commands**, the extension is not installed in that wind
 
 Use the exact `DbContext` type name (spelling matters). Point `efvibe.toolPath` at a local `myefvibe` build when using **serve**, **scan**, and repository-snippet evaluation from the latest CLI in this repo.
 
+**Database providers:** leave `efvibe.provider` empty when your EF project references one relational provider package. Set it to an alias or EF package id when using `efvibe.connectionString` or when several providers are referenced. See [docs/database-providers.md](../docs/database-providers.md).
+
 See [README.md](README.md) for editor workflows and [features.md](../features.md) for CLI flags (`--dblog`, `--format json`, repository snippet adaptation).

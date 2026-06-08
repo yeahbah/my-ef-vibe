@@ -72,7 +72,8 @@ internal static class EntityFrameworkProviderExtensionInvoker
         return "Could not invoke a `Use*` extension for `"
                + descriptor.PackageId
                + "`. Ensure the provider package is restored and exposes "
-               + "`Use*(DbContextOptionsBuilder, string)`. "
+               + "`Use*(DbContextOptionsBuilder, string)` or "
+               + "`Use*(DbContextOptionsBuilder, string, Action<ProviderOptionsBuilder>)`. "
                + "Providers that need extra configuration may require a registered configurator.";
     }
 
@@ -96,7 +97,7 @@ internal static class EntityFrameworkProviderExtensionInvoker
                 continue;
             }
 
-            if (TryInvokeTwoParameterExtension(staticMethodCandidate, closedBuilderInstance, connectionString))
+            if (TryInvokeConnectionStringExtension(staticMethodCandidate, closedBuilderInstance, connectionString))
             {
                 return true;
             }
@@ -140,7 +141,7 @@ internal static class EntityFrameworkProviderExtensionInvoker
             .ThenBy(method => method.Name, StringComparer.Ordinal)
             .ToArray();
 
-        return TryInvokeTwoParameterExtension(ordered[0], closedBuilderInstance, connectionString);
+        return TryInvokeConnectionStringExtension(ordered[0], closedBuilderInstance, connectionString);
     }
 
     private static bool IsCandidateUseExtension(MethodInfo method, object closedBuilderInstance)
@@ -159,7 +160,7 @@ internal static class EntityFrameworkProviderExtensionInvoker
 
         var parameters = method.GetParameters();
 
-        if (parameters.Length != 2)
+        if (parameters.Length is not (2 or 3))
         {
             return false;
         }
@@ -169,7 +170,18 @@ internal static class EntityFrameworkProviderExtensionInvoker
             return false;
         }
 
-        return parameters[1].ParameterType == typeof(string);
+        if (parameters[1].ParameterType != typeof(string))
+        {
+            return false;
+        }
+
+        if (parameters.Length == 3)
+        {
+            return parameters[2].ParameterType.IsGenericType
+                   && parameters[2].ParameterType.GetGenericTypeDefinition() == typeof(Action<>);
+        }
+
+        return true;
     }
 
     private static int ScoreDiscoveredExtension(MethodInfo method, ProviderDescriptor descriptor)
@@ -196,25 +208,64 @@ internal static class EntityFrameworkProviderExtensionInvoker
             }
         }
 
+        if (method.GetParameters().Length == 3)
+        {
+            score += 10;
+        }
+
         return score;
     }
 
-    private static bool TryInvokeTwoParameterExtension(
+    private static bool TryInvokeConnectionStringExtension(
         MethodInfo staticMethodCandidate,
         object closedBuilderInstance,
-        string connectionString)
+        string connectionString,
+        Delegate? configureDelegate = null)
     {
         var parametersDetailed = staticMethodCandidate.GetParameters();
 
-        if (parametersDetailed.Length != 2
+        if (parametersDetailed.Length is not (2 or 3)
             || !parametersDetailed[0].ParameterType.IsAssignableFrom(closedBuilderInstance.GetType())
             || parametersDetailed[1].ParameterType != typeof(string))
         {
             return false;
         }
 
-        staticMethodCandidate.Invoke(null, [closedBuilderInstance, connectionString]);
+        if (parametersDetailed.Length == 2)
+        {
+            staticMethodCandidate.Invoke(null, [closedBuilderInstance, connectionString]);
 
-        return true;
+            return true;
+        }
+
+        if (parametersDetailed.Length == 3
+            && parametersDetailed[2].ParameterType.IsGenericType
+            && parametersDetailed[2].ParameterType.GetGenericTypeDefinition() == typeof(Action<>))
+        {
+            var delegateInstance = configureDelegate
+                                   ?? CreateNoOpConfigureDelegate(parametersDetailed[2].ParameterType);
+
+            staticMethodCandidate.Invoke(null, [closedBuilderInstance, connectionString, delegateInstance]);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static Delegate CreateNoOpConfigureDelegate(Type actionType)
+    {
+        var configureMethod = typeof(ProviderExtensionNoOp).GetMethod(
+            nameof(ProviderExtensionNoOp.Configure),
+            BindingFlags.Static | BindingFlags.Public)!;
+
+        return Delegate.CreateDelegate(actionType, configureMethod);
+    }
+
+    private static class ProviderExtensionNoOp
+    {
+        public static void Configure(object _)
+        {
+        }
     }
 }

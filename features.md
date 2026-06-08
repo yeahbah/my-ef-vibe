@@ -4,6 +4,8 @@
 
 MyEfVibe is an interactive CLI for running LINQ against an **external** EF Core `DbContext`. It builds the EF project, loads assemblies into a Roslyn scripting session, and exposes the context as `db` in a REPL.
 
+efvibe works with **most EF Core relational providers** — SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB, Firebird, and other packages auto-discovered from `-p`. See [docs/database-providers.md](docs/database-providers.md).
+
 Licensed under [Apache 2.0](LICENSE).
 
 ## Core workflow
@@ -347,17 +349,18 @@ efvibe -w ./myefvibe-session -p ./src/MyApp.Api/MyApp.Api.csproj db.Products.Cou
 
 See [docs/database-providers.md](docs/database-providers.md) for the full reference (discovery rules, `--provider` syntax, feature tiers, and limits).
 
-efvibe auto-discovers the EF provider from **`PackageReference` entries on `-p`** (and project references). Connection strings from `-s` are not parsed to guess the provider.
+efvibe auto-discovers the EF provider from **`PackageReference` entries on `-p`** (and project references). Connection strings from `-s` are not parsed to guess the provider. Any relational package matching `*.EntityFrameworkCore.*` is supported for DbContext construction, the LINQ REPL, and SQL translation when the provider exposes a standard `Use*` extension.
 
 | Provider | `--provider` alias | Notes |
 |----------|-------------------|--------|
-| SQL Server | `sqlserver` | Use Docker on macOS/Linux; requires workspace `Microsoft.Data.SqlClient` + `Microsoft.EntityFrameworkCore.SqlServer` |
+| SQL Server | `sqlserver` | Use Docker on macOS/Linux; Unix SqlClient from workspace `.deps.json`; local connection string normalization |
 | PostgreSQL | `npgsql` | `EXPLAIN` for `:plan`; naming convention customizers |
 | SQLite | `sqlite` | `EXPLAIN QUERY PLAN` for `:plan`; good for local files |
 | Oracle | `oracle` | Requires `Oracle.EntityFrameworkCore` in the workspace; `EXPLAIN PLAN FOR` for `:plan` |
 | MySQL | `mysql` | Pomelo (`Pomelo.EntityFrameworkCore.MySql`) or Oracle provider (`MySql.EntityFrameworkCore`); `EXPLAIN` for `:plan` |
 | MariaDB | `mariadb` | `MariaDB.EntityFrameworkCore` or Pomelo; `ConnectionStrings:MariaDb` supported; `EXPLAIN` for `:plan` |
-| Other relational EF packages | package id | For example `FirebirdSql.EntityFrameworkCore.Firebird` — LINQ REPL and SQL translation work; `:plan` is opt-in per provider |
+| Firebird | `FirebirdSql.EntityFrameworkCore.Firebird` | Generic discovery; LINQ REPL and SQL translation; `:plan` not yet registered |
+| Other relational EF packages | package id | Auto-discovered from `-p`; same **Sql** tier as Firebird unless capabilities are added |
 
 Pass `--connection-string` (or rely on the startup project). `--provider` is required when using `-cs` explicitly, or when `-p` references more than one EF provider package.
 

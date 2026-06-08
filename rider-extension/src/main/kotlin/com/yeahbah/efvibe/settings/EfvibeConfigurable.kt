@@ -51,6 +51,7 @@ class EfvibeConfigurable(private val project: Project) : Configurable {
                 textField()
                     .align(com.intellij.ui.dsl.builder.AlignX.FILL)
                     .bindText(settings::provider)
+                    .comment("Optional alias or EF package id (for example FirebirdSql.EntityFrameworkCore.Firebird). Leave empty to auto-discover from the EF project.")
             }
             row("efvibe executable:") {
                 textField()

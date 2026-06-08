@@ -1,6 +1,6 @@
 # My EF Vibe (`efvibe`)
 
-Run **[efvibe](https://myefvibe.com/)** inside VS Code — evaluate EF Core LINQ against your real `DbContext`, see translated and executed SQL, scan the repo, and open an interactive REPL. Maps workspace settings to CLI `-p`, `-s`, and `-c`.
+Run **[efvibe](https://myefvibe.com/)** inside VS Code — evaluate EF Core LINQ against your real `DbContext`, see translated and executed SQL, scan the repo, and open an interactive REPL. Works with **most EF Core relational providers** (SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB, Firebird, and others discovered from your EF project). Maps workspace settings to CLI `-p`, `-s`, and `-c`.
 
 **Docs:** [myefvibe.com/docs/vscode.html](https://myefvibe.com/docs/vscode.html) · **CLI:** [NuGet `efvibe`](https://www.nuget.org/packages/efvibe) · **Source:** [github.com/yeahbah/my-ef-vibe](https://github.com/yeahbah/my-ef-vibe)
 
@@ -21,6 +21,16 @@ Run **[efvibe](https://myefvibe.com/)** inside VS Code — evaluate EF Core LINQ
 3. Workspace settings: `efvibe.project`, `efvibe.context` (and usually `efvibe.startupProject`)
 
 **Run Selection**, model tree (tables / describe / DbInfo), scan, and `db.*` completions use `efvibe serve` by default (`efvibe.useDaemon`: true) so build + DbContext stay warm.
+
+## Database providers
+
+The extension uses the same provider model as the CLI:
+
+- Leave **`efvibe.provider`** empty to auto-discover from `efvibe.project` `PackageReference` entries.
+- Set **`efvibe.provider`** to an alias (`sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb`) or an EF package id (for example `FirebirdSql.EntityFrameworkCore.Firebird`) when using **`efvibe.connectionString`** or when several providers are referenced.
+- **`efvibe.startupProject`** supplies connection strings from user secrets / `appsettings` — same split as `dotnet ef`.
+
+See [docs/database-providers.md](https://github.com/yeahbah/my-ef-vibe/blob/main/docs/database-providers.md) for feature tiers, `:plan` support, and platform notes.
 
 ## Quick start
 

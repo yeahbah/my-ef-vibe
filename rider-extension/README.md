@@ -2,6 +2,8 @@
 
 JetBrains Rider plugin that shells out to the `efvibe` CLI. The plugin owns settings, actions, terminal/tool-window UX, and output display; `efvibe` remains the evaluation and scan engine.
 
+efvibe supports **most EF Core relational providers** — SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB, Firebird, and other packages discovered from your EF project. See [docs/database-providers.md](../docs/database-providers.md).
+
 For a step-by-step setup and usage walkthrough, see [docs/rider-extension.md](../docs/rider-extension.md).
 
 ## Install

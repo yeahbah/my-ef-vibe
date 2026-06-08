@@ -32,7 +32,7 @@ public sealed class EfvibeOptionsPage : DialogPage
 
     [Category("Connection")]
     [DisplayName("Provider")]
-    [Description("Optional provider override: alias (sqlserver, npgsql, sqlite, oracle, mysql, mariadb) or EF package id. Leave empty to discover from the EF project. Required with connection string.")]
+    [Description("Optional provider override: alias (sqlserver, npgsql, sqlite, oracle, mysql, mariadb) or EF package id (for example FirebirdSql.EntityFrameworkCore.Firebird). Leave empty to auto-discover from the EF project. Required with connection string.")]
     public string Provider { get; set; } = string.Empty;
 
     [Category("CLI")]

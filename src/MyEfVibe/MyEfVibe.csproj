@@ -14,15 +14,15 @@
         <Title>MyEfVibe — EF Core LINQ REPL</Title>
         <PackageTags>efcore;entity-framework-core;ef-core;dotnet-tool;global-tool;linq;repl;cli;database;orm;interactive;shell</PackageTags>
         <!-- Published version is set by CI tags; this is the local/dev fallback. -->
-        <Version>0.5.32</Version>
-        <Description>Interactive global .NET tool (efvibe) to run LINQ against an external project's EF Core DbContext with SQL, query plans, and session analytics.</Description>
+        <Version>0.6.0</Version>
+        <Description>Interactive global .NET tool (efvibe) to run LINQ against an external project's EF Core DbContext with most relational providers (SQL Server, PostgreSQL, SQLite, Oracle, MySQL, Firebird, and more), plus SQL, query plans, and session analytics.</Description>
         <Authors>Arnold Diaz</Authors>
         <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageProjectUrl>https://myefvibe.com</PackageProjectUrl>
         <RepositoryUrl>https://github.com/yeahbah/my-ef-vibe.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <PackageReleaseNotes>Workspace deps/RID loading for macOS SqlClient; smart project selection; SQL Server :plan batch fix; ConfigurationManager preload; keyword tab completion.</PackageReleaseNotes>
+        <PackageReleaseNotes>Generic EF Core provider discovery for most relational databases; SQL Server connection string normalization on Unix; EF Core 10 Use* extension support; improved connection error messages.</PackageReleaseNotes>
         <RollForward>Major</RollForward>
     </PropertyGroup>
 
