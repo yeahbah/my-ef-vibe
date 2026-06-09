@@ -55,6 +55,11 @@ internal static class ProviderRuntimeProbe
             return MyEfVibeProvider.MySql;
         }
 
+        if (providerName.Contains("Couchbase", StringComparison.OrdinalIgnoreCase))
+        {
+            return MyEfVibeProvider.Couchbase;
+        }
+
         if (providerName.Contains("Firebird", StringComparison.OrdinalIgnoreCase))
         {
             return null;

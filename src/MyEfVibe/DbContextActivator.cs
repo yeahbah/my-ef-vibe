@@ -100,6 +100,16 @@ internal static class DbContextActivator
             return Finish(host, providerDescriptor, designTimeInstance);
         }
 
+        if (TryCreateUsingCouchbaseConfiguration(
+                host,
+                ref providerDescriptor,
+                ref provider,
+                selectedDbContextType,
+                out var couchbaseInstance))
+        {
+            return Finish(host, providerDescriptor, couchbaseInstance);
+        }
+
         var resolvedConnectionFromConfiguration = false;
 
         if (string.IsNullOrWhiteSpace(connectionString)
@@ -170,7 +180,7 @@ internal static class DbContextActivator
             + $"{Environment.NewLine}"
             + " - Pass `--connection-string` to build `DbContextOptions<TContext>` when the EF provider is discovered from `-p` (optional packages such as NetTopologySuite are applied when referenced)."
             + $"{Environment.NewLine}"
-            + " - Ensure the startup project (`-s` / `--startup-project`) has `UserSecretsId` or `appsettings*.json` with `ConnectionStrings`.";
+            + " - For Couchbase, ensure the startup project (`-s`) has a `Couchbase` section (or user secrets) with connection string, credentials, bucket, and scope.";
 
         if (designTimeFactoryErrors is { Count: > 0 })
         {
@@ -191,7 +201,12 @@ internal static class DbContextActivator
             }
             else if (providerDescriptor is null)
             {
-                if (EntityFrameworkProviderDiscovery.TryDescribeAmbiguousProviders(
+                if (CouchbaseSettingsResolver.TryResolve(host.StartupProjectPath, out _))
+                {
+                    failureMessage +=
+                        ", but the EF project (`-p`) does not reference `Couchbase.EntityFrameworkCore`.";
+                }
+                else if (EntityFrameworkProviderDiscovery.TryDescribeAmbiguousProviders(
                         host.ProjectPath,
                         out var ambiguousProvidersMessage))
                 {
@@ -917,7 +932,11 @@ internal static class DbContextActivator
         if (providerDescriptor.SupportsNamingConventionOverride
             && providerDescriptor.KnownProvider is { } namingProvider)
         {
-            ProviderOptionsConfigurator.TryApplyEfCoreNamingConventions(host, builderInstance, namingProvider);
+            ProviderOptionsConfigurator.TryApplyEfCoreNamingConventions(
+                host,
+                builderInstance,
+                namingProvider,
+                connectionString);
         }
 
         var closedOptionsType =
@@ -1097,6 +1116,187 @@ internal static class DbContextActivator
     private static Assembly? LoadWorkspaceAssembly(WorkspaceHost host, string assemblyName)
     {
         return host.LoadAssembly(assemblyName);
+    }
+
+    private static bool TryCreateUsingCouchbaseConfiguration(
+        WorkspaceHost host,
+        ref ProviderDescriptor? providerDescriptor,
+        ref MyEfVibeProvider? provider,
+        Type selectedDbContextType,
+        out object instance)
+    {
+        instance = null!;
+
+        providerDescriptor ??= EntityFrameworkProviderDiscovery.TryDiscoverFromProject(host.ProjectPath);
+
+        if (providerDescriptor is null || !providerDescriptor.IsCouchbase)
+        {
+            return false;
+        }
+
+        if (!CouchbaseSettingsResolver.TryResolve(host.StartupProjectPath, out var couchbaseSettings))
+        {
+            return false;
+        }
+
+        provider ??= providerDescriptor.KnownProvider;
+
+        if (!TryCreateUsingCouchbaseOptionsConstructor(
+                selectedDbContextType,
+                couchbaseSettings,
+                providerDescriptor,
+                host,
+                out instance))
+        {
+            return false;
+        }
+
+        host.SetActiveCouchbaseSettings(couchbaseSettings);
+        TryApplyProviderHints(instance, host, provider, providerDescriptor);
+
+        return true;
+    }
+
+    private static bool TryCreateUsingCouchbaseOptionsConstructor(
+        Type dbContextConcreteType,
+        CouchbaseSettings couchbaseSettings,
+        ProviderDescriptor providerDescriptor,
+        WorkspaceHost host,
+        out object instance)
+    {
+        instance = null!;
+
+        host.EnsureProviderDependenciesLoaded(providerDescriptor);
+
+        var efAssembly = LoadWorkspaceAssembly(host, "Microsoft.EntityFrameworkCore");
+
+        if (efAssembly is null)
+        {
+            return false;
+        }
+
+        var openBuilderType =
+            efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContextOptionsBuilder`1");
+
+        if (openBuilderType is null)
+        {
+            return false;
+        }
+
+        var closedBuilderType =
+            openBuilderType.MakeGenericType(dbContextConcreteType);
+
+        var builderCtor = closedBuilderType.GetConstructor(Type.EmptyTypes);
+
+        if (builderCtor is null)
+        {
+            return false;
+        }
+
+        var builderInstance = builderCtor.Invoke(Array.Empty<object?>());
+
+        if (builderInstance is null)
+        {
+            return false;
+        }
+
+        var providerAssembly = host.LoadAssembly(providerDescriptor.ProviderAssemblyName);
+
+        if (providerAssembly is null)
+        {
+            return false;
+        }
+
+        if (!ProviderConfiguratorRegistry.TryConfigureCouchbase(
+                providerDescriptor,
+                host,
+                providerAssembly,
+                builderInstance,
+                couchbaseSettings))
+        {
+            return false;
+        }
+
+        TryApplyCamelCaseNamingConvention(host, builderInstance);
+
+        var closedOptionsType =
+            efAssembly.GetType("Microsoft.EntityFrameworkCore.DbContextOptions`1")!.MakeGenericType(
+                dbContextConcreteType);
+
+        var optionsPropertyAccessor =
+            closedBuilderType.GetProperty(
+                "Options",
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                closedOptionsType,
+                Type.EmptyTypes,
+                null);
+
+        var compiledOptionsConcreteInstance = optionsPropertyAccessor?.GetValue(builderInstance);
+
+        if (compiledOptionsConcreteInstance is null)
+        {
+            return false;
+        }
+
+        var optionsInstanceType = compiledOptionsConcreteInstance.GetType();
+
+        var matchingCtor = dbContextConcreteType
+            .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .FirstOrDefault(ctorCandidate =>
+                ctorCandidate.GetParameters() is [{ ParameterType: var optionsParameter }]
+                && (optionsParameter.IsAssignableFrom(optionsInstanceType)
+                    || optionsInstanceType.IsAssignableTo(optionsParameter)));
+
+        if (matchingCtor is null)
+        {
+            return false;
+        }
+
+        var createdContextInstance = matchingCtor.Invoke(new[] { compiledOptionsConcreteInstance });
+
+        if (createdContextInstance is null)
+        {
+            return false;
+        }
+
+        instance = createdContextInstance;
+
+        return true;
+    }
+
+    private static void TryApplyCamelCaseNamingConvention(WorkspaceHost host, object builderInstance)
+    {
+        var namingAssembly = host.LoadAssembly("EFCore.NamingConventions");
+
+        if (namingAssembly is null)
+        {
+            return;
+        }
+
+        foreach (var exported in ReflectionToolkit.EnumerateLoadableExportedTypes(namingAssembly))
+        foreach (var staticMethodCandidate in exported.GetMethods(BindingFlags.Static | BindingFlags.Public))
+        {
+            if (!string.Equals(
+                    staticMethodCandidate.Name,
+                    "UseCamelCaseNamingConvention",
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var parameters = staticMethodCandidate.GetParameters();
+
+            if (parameters.Length != 1
+                || !parameters[0].ParameterType.IsAssignableFrom(builderInstance.GetType()))
+            {
+                continue;
+            }
+
+            staticMethodCandidate.Invoke(null, [builderInstance]);
+
+            return;
+        }
     }
 
     private static string NormalizeSqlServerConnectionString(string connectionString)

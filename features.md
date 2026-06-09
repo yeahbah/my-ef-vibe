@@ -66,9 +66,8 @@ db.JsonBlobDocuments
 | `-p`, `--project` | EF Core `.csproj` to build (DbContext assembly) |
 | `-s`, `--startup-project` | Startup `.csproj` for user secrets / appsettings (auto-inferred when omitted). `-s` is not used for SQL — use `--dblog` or `:dblog`. |
 | `-c`, `--context` | `DbContext` type name (e.g. `MyDbContext`) or fully qualified name |
-| `--connection-string`, `-cs` | Connection string for manual `DbContextOptions` construction |
+| `--connection-string`, `-cs` | Connection string for manual `DbContextOptions` construction (provider discovered from `-p`) |
 | *(automatic)* | When building `DbContextOptions` from config, efvibe discovers the provider from `-p` `PackageReference` entries and invokes the matching `Use*` extension (optional satellite packages such as NetTopologySuite are applied when referenced) |
-| `--provider` | Override with a provider alias (`sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb`) or EF package id (for example `FirebirdSql.EntityFrameworkCore.Firebird`). Required with `-cs` when passed explicitly. |
 | `-e`, `--expression` | Run one expression and exit |
 | `expression` (positional) | Same as `-e` when passed as trailing arguments |
 | `--format` | One-shot output format: `text` (default) or `json` (for editors and scripts) |
@@ -304,7 +303,7 @@ Output columns: **Member**, **Type**, **nullable**, **Notes**. Scalar properties
 - Session directory (`<ProjectName>/<DbContextName>/` under workspace root)
 - EF Core assembly version
 - Provider display name and EF provider name
-- EF provider package and feature tier (when resolved from `-p` or `--provider`)
+- EF provider package and feature tier (when resolved from `-p`)
 - Command timeout and DbSet count
 - Live connection: state, data source, database, server version, connection string
 
@@ -347,22 +346,22 @@ efvibe -w ./myefvibe-session -p ./src/MyApp.Api/MyApp.Api.csproj db.Products.Cou
 
 ## Database providers
 
-See [docs/database-providers.md](docs/database-providers.md) for the full reference (discovery rules, `--provider` syntax, feature tiers, and limits).
+See [docs/database-providers.md](docs/database-providers.md) for the full reference (discovery rules, feature tiers, and limits).
 
 efvibe auto-discovers the EF provider from **`PackageReference` entries on `-p`** (and project references). Connection strings from `-s` are not parsed to guess the provider. Any relational package matching `*.EntityFrameworkCore.*` is supported for DbContext construction, the LINQ REPL, and SQL translation when the provider exposes a standard `Use*` extension.
 
-| Provider | `--provider` alias | Notes |
-|----------|-------------------|--------|
-| SQL Server | `sqlserver` | Use Docker on macOS/Linux; Unix SqlClient from workspace `.deps.json`; local connection string normalization |
-| PostgreSQL | `npgsql` | `EXPLAIN` for `:plan`; naming convention customizers |
-| SQLite | `sqlite` | `EXPLAIN QUERY PLAN` for `:plan`; good for local files |
-| Oracle | `oracle` | Requires `Oracle.EntityFrameworkCore` in the workspace; `EXPLAIN PLAN FOR` for `:plan` |
-| MySQL | `mysql` | Pomelo (`Pomelo.EntityFrameworkCore.MySql`) or Oracle provider (`MySql.EntityFrameworkCore`); `EXPLAIN` for `:plan` |
-| MariaDB | `mariadb` | `MariaDB.EntityFrameworkCore` or Pomelo; `ConnectionStrings:MariaDb` supported; `EXPLAIN` for `:plan` |
+| Provider | EF package (typical) | Notes |
+|----------|---------------------|--------|
+| SQL Server | `Microsoft.EntityFrameworkCore.SqlServer` | Use Docker on macOS/Linux; Unix SqlClient from workspace `.deps.json`; local connection string normalization |
+| PostgreSQL | `Npgsql.EntityFrameworkCore.PostgreSQL` | `EXPLAIN` for `:plan`; naming convention customizers |
+| SQLite | `Microsoft.EntityFrameworkCore.Sqlite` | `EXPLAIN QUERY PLAN` for `:plan`; good for local files |
+| Oracle | `Oracle.EntityFrameworkCore` | Requires `Oracle.EntityFrameworkCore` in the workspace; `EXPLAIN PLAN FOR` for `:plan` |
+| MySQL | `Pomelo.EntityFrameworkCore.MySql` or `MySql.EntityFrameworkCore` | Pomelo or Oracle provider; `EXPLAIN` for `:plan` |
+| MariaDB | `MariaDB.EntityFrameworkCore` or Pomelo | `ConnectionStrings:MariaDb` supported; `EXPLAIN` for `:plan` |
 | Firebird | `FirebirdSql.EntityFrameworkCore.Firebird` | Generic discovery; LINQ REPL and SQL translation; `:plan` not yet registered |
-| Other relational EF packages | package id | Auto-discovered from `-p`; same **Sql** tier as Firebird unless capabilities are added |
+| Other relational EF packages | `*.EntityFrameworkCore.*` | Auto-discovered from `-p`; same **Sql** tier as Firebird unless capabilities are added |
 
-Pass `--connection-string` (or rely on the startup project). `--provider` is required when using `-cs` explicitly, or when `-p` references more than one EF provider package.
+Pass `--connection-string` (or rely on the startup project). Reference exactly one provider package on `-p`.
 
 ### Feature tiers
 

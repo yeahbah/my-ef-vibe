@@ -46,8 +46,7 @@ Set the fields that match your EF Core solution:
 | **Startup project** | The app project with `appsettings*.json` or user secrets, for example `src/MyApp.Api/MyApp.Api.csproj`. |
 | **DbContext** | The context type name, for example `AppDbContext`. |
 | **Workspace root** | Optional session/output root. Leave blank to use the CLI default. |
-| **Connection string** | Optional override when the startup project does not provide one. |
-| **Provider** | Optional override: alias (`sqlserver`, `npgsql`, `sqlite`, …) or EF package id (for example `FirebirdSql.EntityFrameworkCore.Firebird`). Leave empty to discover the provider from `-p` `PackageReference` entries. Required when **Connection string** is set. |
+| **Connection string** | Optional override when the startup project does not provide one. The provider is discovered from **EF project** `PackageReference` entries. |
 | **efvibe executable** | Optional explicit path to `efvibe` or `myefvibe`. Leave blank to use a local tool or PATH. |
 | **.NET framework** | Optional target framework, for example `net8.0` or `net10.0`. |
 

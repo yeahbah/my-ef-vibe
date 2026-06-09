@@ -13,7 +13,10 @@ internal static class QueryEvaluator
         IEnumerable<Assembly> inspectionAssemblies,
         CancellationToken cancellationToken = default)
     {
-        var normalizedSnippet = SnippetNormalizer.ForEvaluation(snippet, session.DbContextType);
+        var normalizedSnippet = SnippetNormalizer.ForEvaluation(
+            snippet,
+            session.DbContextType,
+            session.PreserveAsyncQueries);
         var warnings = new List<string>(SnippetWarningsAnalyzer.Analyze(normalizedSnippet));
 
         using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance, dbLogSettings);

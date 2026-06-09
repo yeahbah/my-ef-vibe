@@ -56,28 +56,47 @@ internal static class ProviderOptionsConfigurator
     internal static void TryApplyEfCoreNamingConventions(
         WorkspaceHost host,
         object dbContextOptionsBuilder,
-        MyEfVibeProvider providerKey)
+        MyEfVibeProvider providerKey,
+        string connectionString)
     {
         switch (providerKey)
         {
             case MyEfVibeProvider.Npgsql:
-                TryRegisterEfVibeModelCustomizer(
-                    host,
-                    dbContextOptionsBuilder,
-                    typeof(PostgreSqlRelationalNamingApplier).GetMethod(
-                        nameof(PostgreSqlRelationalNamingApplier.CustomizeAfterBase),
-                        BindingFlags.Static | BindingFlags.Public)!);
-
-                foreach (var methodName in new[] { "UseSnakeCaseNamingConvention", "UseLowerCaseNamingConvention" })
+                switch (PostgreSqlNamingProbe.Detect(host, connectionString))
                 {
-                    if (TryInvokeDbContextOptionsBuilderExtension(
+                    case PostgreSqlNamingStyle.LowercasePgloader:
+                        TryRegisterEfVibeModelCustomizer(
                             host,
-                            "EFCore.NamingConventions",
-                            methodName,
-                            dbContextOptionsBuilder))
-                    {
+                            dbContextOptionsBuilder,
+                            typeof(PostgreSqlRelationalNamingApplier).GetMethod(
+                                nameof(PostgreSqlRelationalNamingApplier.CustomizeAfterBase),
+                                BindingFlags.Static | BindingFlags.Public)!);
+
+                        foreach (var methodName in new[] { "UseSnakeCaseNamingConvention", "UseLowerCaseNamingConvention" })
+                        {
+                            if (TryInvokeDbContextOptionsBuilderExtension(
+                                    host,
+                                    "EFCore.NamingConventions",
+                                    methodName,
+                                    dbContextOptionsBuilder))
+                            {
+                                return;
+                            }
+                        }
+
                         return;
-                    }
+
+                    case PostgreSqlNamingStyle.AdventureWorksPascalCase:
+                        PostgreSqlAdventureWorksNamingApplier.SetColumnIndex(
+                            PostgreSqlNamingProbe.LoadColumnNameIndex(host, connectionString));
+
+                        TryRegisterEfVibeModelCustomizer(
+                            host,
+                            dbContextOptionsBuilder,
+                            typeof(PostgreSqlAdventureWorksNamingApplier).GetMethod(
+                                nameof(PostgreSqlAdventureWorksNamingApplier.CustomizeAfterBase),
+                                BindingFlags.Static | BindingFlags.Public)!);
+                        return;
                 }
 
                 return;

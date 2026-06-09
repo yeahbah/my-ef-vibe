@@ -56,6 +56,20 @@ internal static class DbInfoReporter
             rows.Add(("Feature tier", providerDescriptor.ResolveFeatureTier(dbContext).Describe()));
         }
 
+        if (host.ActiveCouchbaseSettings is { } couchbaseSettings)
+        {
+            rows.Add(("Couchbase connection", RedactCouchbaseConnection(couchbaseSettings.ConnectionString)));
+            rows.Add(("Bucket", couchbaseSettings.BucketName));
+            rows.Add(("Scope", couchbaseSettings.ScopeName));
+
+            if (!string.IsNullOrWhiteSpace(couchbaseSettings.CollectionName))
+            {
+                rows.Add(("Collection", couchbaseSettings.CollectionName));
+            }
+
+            rows.Add(("Username", couchbaseSettings.Username));
+        }
+
         var commandTimeout = database.GetType().GetProperty("CommandTimeout")?.GetValue(database);
 
         if (commandTimeout is int timeoutSeconds)
@@ -69,6 +83,14 @@ internal static class DbInfoReporter
 
         host.EnsureEntityFrameworkRelationalLoaded();
         host.EnsureAspNetCoreSharedFrameworkLoaded();
+
+        if (host.ActiveCouchbaseSettings is not null
+            || host.ActiveProviderDescriptor?.IsCouchbase == true)
+        {
+            rows.Add(("Connection", "Couchbase (non-relational; use async LINQ)"));
+            WritePanel(rows);
+            return;
+        }
 
         if (!RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
@@ -179,7 +201,27 @@ internal static class DbInfoReporter
             return "MySQL";
         }
 
+        if (providerName.Contains("Couchbase", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Couchbase";
+        }
+
         return providerName;
+    }
+
+    internal static string RedactCouchbaseConnection(string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return "(empty)";
+        }
+
+        if (!Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
+        {
+            return connectionString;
+        }
+
+        return uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
     }
 
     private static string? TryGetEfCoreVersion()

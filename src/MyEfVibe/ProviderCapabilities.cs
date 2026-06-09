@@ -7,5 +7,6 @@ internal enum ProviderCapabilities
     SupportsAutoConstruction = 1,
     SupportsQueryPlan = 2,
     RequiresServerVersion = 4,
-    SupportsNamingConventionOverride = 8
+    SupportsNamingConventionOverride = 8,
+    RequiresAsyncQueries = 16
 }

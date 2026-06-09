@@ -33,7 +33,9 @@ internal static class WorkspaceDependencyLoader
                      "Microsoft.EntityFrameworkCore.Sqlite",
                      "Oracle.EntityFrameworkCore",
                      "Pomelo.EntityFrameworkCore.MySql",
-                     "MySql.EntityFrameworkCore"
+                     "MySql.EntityFrameworkCore",
+                     "Couchbase.EntityFrameworkCore",
+                     "Couchbase.NetClient"
                  })
         {
             if (depsManifest.TryResolve(bootstrap, false, out var bootstrapPath))

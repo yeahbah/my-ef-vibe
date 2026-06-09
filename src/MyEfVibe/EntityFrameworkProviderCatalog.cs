@@ -70,7 +70,13 @@ internal static class EntityFrameworkProviderCatalog
             "MySql.EntityFrameworkCore",
             "UseMySQL",
             MyEfVibeProvider.MySql,
-            ProviderCapabilities.SupportsAutoConstruction | ProviderCapabilities.SupportsQueryPlan)
+            ProviderCapabilities.SupportsAutoConstruction | ProviderCapabilities.SupportsQueryPlan),
+        new(
+            "Couchbase.EntityFrameworkCore",
+            "Couchbase.EntityFrameworkCore",
+            "UseCouchbase",
+            MyEfVibeProvider.Couchbase,
+            ProviderCapabilities.SupportsAutoConstruction | ProviderCapabilities.RequiresAsyncQueries)
     ];
 
     internal static bool IsEntityFrameworkProviderPackage(string packageId)

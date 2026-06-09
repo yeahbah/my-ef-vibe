@@ -60,6 +60,11 @@ internal static class ProviderCapabilityResolver
             return FeatureTier.QueryPlan;
         }
 
+        if (capabilities.HasFlag(ProviderCapabilities.RequiresAsyncQueries))
+        {
+            return FeatureTier.Linq;
+        }
+
         if (capabilities.HasFlag(ProviderCapabilities.SupportsAutoConstruction))
         {
             return FeatureTier.Sql;
@@ -68,11 +73,21 @@ internal static class ProviderCapabilityResolver
         return FeatureTier.Construct;
     }
 
+    internal static bool RequiresAsyncQueries(ProviderDescriptor? configuredProvider)
+    {
+        return configuredProvider?.RequiresAsyncQueries == true;
+    }
+
     internal static string DescribeUnavailableQueryPlan(ProviderDescriptor? configuredProvider)
     {
         var label = string.IsNullOrWhiteSpace(configuredProvider?.PackageId)
             ? "this provider"
             : configuredProvider.PackageId;
+
+        if (configuredProvider?.RequiresAsyncQueries == true)
+        {
+            return $":plan is not available for {label}. Use async LINQ (`*Async()` terminals) and SQL++ translation via `ToQueryString()`.";
+        }
 
         return $":plan is not available for {label} yet. LINQ queries and SQL translation still work.";
     }

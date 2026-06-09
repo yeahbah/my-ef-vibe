@@ -6,7 +6,10 @@ internal static class SnippetNormalizer
     ///     Prepares REPL input for Roslyn scripting. Trailing <c>;</c> on a final expression is removed so the
     ///     script returns a value; statement forms (e.g. <c>var</c> declarations) keep their terminator.
     /// </summary>
-    internal static string ForEvaluation(string snippet, Type? dbContextType = null)
+    internal static string ForEvaluation(
+        string snippet,
+        Type? dbContextType = null,
+        bool preserveAsyncQueries = false)
     {
         var trimmed = snippet.Trim();
 
@@ -17,7 +20,7 @@ internal static class SnippetNormalizer
 
         if (dbContextType is not null && LooksLikeRepositorySnippet(trimmed))
         {
-            return RepositorySnippetAdapter.PrepareForEvaluation(trimmed, dbContextType);
+            return RepositorySnippetAdapter.PrepareForEvaluation(trimmed, dbContextType, preserveAsyncQueries);
         }
 
         var lines = InputLineUtilities.SplitLines(trimmed);

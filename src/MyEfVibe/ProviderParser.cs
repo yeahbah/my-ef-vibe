@@ -3,7 +3,7 @@ namespace MyEfVibe;
 internal static class ProviderParser
 {
     internal const string ProviderHelpText =
-        "Provider alias (sqlserver, npgsql, sqlite, oracle, mysql, mariadb) "
+        "Provider alias (sqlserver, npgsql, sqlite, oracle, mysql, mariadb, couchbase) "
         + "or EF package id (for example Microsoft.EntityFrameworkCore.SqlServer "
         + "or FirebirdSql.EntityFrameworkCore.Firebird).";
 
@@ -72,6 +72,8 @@ internal static class ProviderParser
             "mysql" or "pomelo" => MyEfVibeProvider.MySql,
 
             "mariadb" or "maria" => MyEfVibeProvider.MariaDb,
+
+            "couchbase" or "cb" => MyEfVibeProvider.Couchbase,
 
             _ => null
         };

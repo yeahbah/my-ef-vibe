@@ -79,6 +79,25 @@ internal static class DbInfoJsonReporter
             });
         }
 
+        if (host.ActiveCouchbaseSettings is { } couchbaseSettings)
+        {
+            rows.Add(new DbInfoJsonEntry
+            {
+                Key = "Couchbase connection",
+                Value = DbInfoReporter.RedactCouchbaseConnection(couchbaseSettings.ConnectionString)
+            });
+            rows.Add(new DbInfoJsonEntry { Key = "Bucket", Value = couchbaseSettings.BucketName });
+            rows.Add(new DbInfoJsonEntry { Key = "Scope", Value = couchbaseSettings.ScopeName });
+
+            if (!string.IsNullOrWhiteSpace(couchbaseSettings.CollectionName))
+            {
+                rows.Add(new DbInfoJsonEntry
+                    { Key = "Collection", Value = couchbaseSettings.CollectionName });
+            }
+
+            rows.Add(new DbInfoJsonEntry { Key = "Username", Value = couchbaseSettings.Username });
+        }
+
         var commandTimeout = database.GetType().GetProperty("CommandTimeout")?.GetValue(database);
         var timeoutSeconds = commandTimeout is int timeout ? timeout : 0;
         rows.Add(new DbInfoJsonEntry
@@ -95,6 +114,22 @@ internal static class DbInfoJsonReporter
 
         host.EnsureEntityFrameworkRelationalLoaded();
         host.EnsureAspNetCoreSharedFrameworkLoaded();
+
+        if (host.ActiveCouchbaseSettings is not null
+            || host.ActiveProviderDescriptor?.IsCouchbase == true)
+        {
+            rows.Add(new DbInfoJsonEntry
+            {
+                Key = "Connection",
+                Value = "Couchbase (non-relational; use async LINQ)"
+            });
+
+            return new DbInfoJsonPayload
+            {
+                DbContext = contextType.Name,
+                Entries = rows.ToArray()
+            };
+        }
 
         if (RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,

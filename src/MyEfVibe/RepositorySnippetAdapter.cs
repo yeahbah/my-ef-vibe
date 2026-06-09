@@ -5,7 +5,10 @@ namespace MyEfVibe;
 /// </summary>
 internal static class RepositorySnippetAdapter
 {
-    internal static string PrepareForEvaluation(string snippet, Type dbContextType)
+    internal static string PrepareForEvaluation(
+        string snippet,
+        Type dbContextType,
+        bool preserveAsyncQueries = false)
     {
         if (string.IsNullOrWhiteSpace(snippet))
         {
@@ -15,7 +18,12 @@ internal static class RepositorySnippetAdapter
         var normalized = ProbeScriptFormatter.ToScriptExpression(snippet);
         normalized = DbContextAliasSyntaxRewriter.Rewrite(normalized);
         normalized = ProbeParameterStubber.Stub(normalized, new ProbeStubContext(dbContextType, null));
-        normalized = AsyncQueryableSyncRewriter.Rewrite(normalized);
+
+        if (!preserveAsyncQueries)
+        {
+            normalized = AsyncQueryableSyncRewriter.Rewrite(normalized);
+        }
+
         normalized = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(normalized, dbContextType)
                      ?? normalized;
         normalized = EfReplQueryableRewriter.TryCastDbSetRoots(normalized, dbContextType)

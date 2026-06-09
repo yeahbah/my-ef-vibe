@@ -42,8 +42,18 @@ public sealed class EntityFrameworkProviderCatalogTests
         Assert.True(descriptor.Capabilities.HasFlag(ProviderCapabilities.SupportsQueryPlan));
     }
 
+    [Fact]
+    public void CreateDescriptor_couchbase_requires_async_queries()
+    {
+        var descriptor = EntityFrameworkProviderCatalog.CreateDescriptor("Couchbase.EntityFrameworkCore");
+
+        Assert.Equal(MyEfVibeProvider.Couchbase, descriptor.KnownProvider);
+        Assert.True(descriptor.Capabilities.HasFlag(ProviderCapabilities.RequiresAsyncQueries));
+        Assert.False(descriptor.Capabilities.HasFlag(ProviderCapabilities.SupportsQueryPlan));
+    }
+
     [Theory]
-    [InlineData("sqlserver", "Microsoft.EntityFrameworkCore.SqlServer")]
+    [InlineData("Couchbase.EntityFrameworkCore", "Couchbase.EntityFrameworkCore")]
     [InlineData("Microsoft.EntityFrameworkCore.SqlServer", "Microsoft.EntityFrameworkCore.SqlServer")]
     [InlineData("SqlServer", "Microsoft.EntityFrameworkCore.SqlServer")]
     [InlineData("FirebirdSql.EntityFrameworkCore.Firebird", "FirebirdSql.EntityFrameworkCore.Firebird")]

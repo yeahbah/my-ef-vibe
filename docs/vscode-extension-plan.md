@@ -49,7 +49,7 @@ flowchart LR
 |------|--------|
 | Extension scaffold | `efvibe` publisher id; `package.json` contributes commands and configuration |
 | Prerequisite check | .NET SDK on PATH; `efvibe` global or local tool (`dotnet tool restore`) |
-| Settings | `efvibe.workspaceRoot`, `efvibe.project`, `efvibe.startupProject`, `efvibe.context`, `efvibe.connectionString`, `efvibe.provider` (alias or EF package id; auto-discovered from `-p` when empty), `efvibe.toolPath` |
+| Settings | `efvibe.workspaceRoot`, `efvibe.project`, `efvibe.startupProject`, `efvibe.context`, `efvibe.connectionString`, `efvibe.toolPath` |
 | Resolve session path | Mirror CLI: `{workspaceRoot}/{ProjectName}/{DbContextName}/` |
 | Command: Start REPL | Opens integrated terminal with resolved `efvibe` flags from settings and workspace folder |
 | Command: Run expression | `efvibe -e "..."` in terminal or output channel |

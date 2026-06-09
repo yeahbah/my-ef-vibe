@@ -11,6 +11,7 @@ Connection strings from `-s` are opaque — the tool does **not** infer the prov
 | Category | Examples | DbContext + LINQ REPL | `:plan` / EXPLAIN |
 |----------|----------|----------------------|-------------------|
 | First-class | SQL Server, PostgreSQL, SQLite, Oracle, MySQL, MariaDB | Yes | Yes (PostgreSQL/SQLite also get naming customizers) |
+| Document (async LINQ) | Couchbase | Yes (`*Async()` required) | No — SQL++ via `ToQueryString()` |
 | Generic discovery | Firebird, and any `*.EntityFrameworkCore.*` package | Yes | Not yet — friendly note instead of failing |
 | Not supported (auto-construct) | Cosmos DB, InMemory | — | — |
 
@@ -25,26 +26,11 @@ wires it up automatically.
 -s Api.csproj           → connection string from user secrets / appsettings
 ```
 
-Reference exactly **one** relational EF provider package on `-p`. If several packages are present (for example SQL Server and PostgreSQL in the same `.csproj`), construction fails with a message listing the packages and suggesting `--provider`.
+Reference exactly **one** relational EF provider package on `-p`. If several packages are present (for example SQL Server and PostgreSQL in the same `.csproj`), construction fails with a message listing the packages — reference only one provider in the EF project.
 
 Excluded from auto-discovery: `Microsoft.EntityFrameworkCore`, `.Design`, `.Tools`, `.InMemory`, analyzers, and similar non-provider packages.
 
-## Override with `--provider`
-
-Use `--provider` when:
-
-- You pass `--connection-string` explicitly (required together with `-cs`)
-- `-p` references more than one EF provider package
-- You want to force a provider that differs from the `-p` package (integration tests, cross-provider experiments)
-
-Accepted values:
-
-| Form | Example |
-|------|---------|
-| Alias | `sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb` |
-| EF package id | `Microsoft.EntityFrameworkCore.SqlServer`, `FirebirdSql.EntityFrameworkCore.Firebird` |
-
-Aliases `postgres`, `pg`, `mssql`, `mariadb`, and similar shorthands are also accepted (see CLI `--help`).
+When you pass `--connection-string` explicitly, efvibe still discovers the provider from `-p` and invokes the matching `Use*` extension.
 
 ## Known providers
 
@@ -56,8 +42,51 @@ Aliases `postgres`, `pg`, `mssql`, `mariadb`, and similar shorthands are also ac
 | Oracle | `oracle` | `Oracle.EntityFrameworkCore` | Yes | No |
 | MySQL | `mysql` | `Pomelo.EntityFrameworkCore.MySql` or `MySql.EntityFrameworkCore` | Yes | No |
 | MariaDB | `mariadb` | `MariaDB.EntityFrameworkCore` | Yes | No |
+| Couchbase | `couchbase`, `cb` | `Couchbase.EntityFrameworkCore` | Yes (async only) | No |
 
 Pomelo MySQL/MariaDB uses a dedicated configurator for `ServerVersion` when the `(builder, string)` overload is not enough.
+
+## Couchbase
+
+Couchbase uses a structured **`Couchbase`** config section on `-s` (not `ConnectionStrings`):
+
+```json
+"Couchbase": {
+  "ConnectionString": "couchbase://localhost",
+  "Username": "Administrator",
+  "Password": "password",
+  "BucketName": "adventureworks",
+  "ScopeName": "aw",
+  "CollectionName": "entities"
+}
+```
+
+efvibe also accepts a legacy top-level **`DefaultConnection`** object with the same fields (for older AdventureWorks CouchBase `appsettings.json` layouts).
+
+**Async-only REPL:** Couchbase EF does not support sync query terminals. End queries with `*Async()`:
+
+```csharp
+await db.Products.Where(p => p.ListPrice > 0).Take(10).ToListAsync();
+```
+
+Sync rewrites (`ToList()` instead of `ToListAsync()`) are skipped for Couchbase sessions. `:plan` / EXPLAIN is not available; use `ToQueryString()` for SQL++ preview.
+
+When `EFCore.NamingConventions` is referenced on `-p`, efvibe applies `UseCamelCaseNamingConvention()` to match Couchbase JSON camelCase defaults.
+
+### AdventureWorks CouchBase
+
+Reference `Couchbase.EntityFrameworkCore` on `-p` and add an `IDesignTimeDbContextFactory<AdventureWorksDbContext>` on `-s` that calls `UseCouchbase` and maps entities to the shared `entities` collection with `type` discriminators from `DocumentTypeRegistry`.
+
+Example:
+
+```bash
+efvibe \
+  -p ./AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj \
+  -s ./AdventureWorks.API/AdventureWorks.API.csproj \
+  -c AdventureWorksDbContext
+```
+
+Production AdventureWorks CouchBase continues to use `ICouchbaseContext` + N1QL; efvibe uses the design-time factory path.
 
 ## Other relational EF packages
 
@@ -78,8 +107,7 @@ efvibe \
 ```
 
 When `-p` references `FirebirdSql.EntityFrameworkCore.Firebird` and the startup project has the Firebird connection
-string, no `--provider` flag is needed. With an explicit connection string, pass
-`--provider FirebirdSql.EntityFrameworkCore.Firebird` or the package id.
+string (or you pass `--connection-string`), efvibe discovers the provider from `-p` automatically.
 
 `:dbinfo` shows the resolved **EF provider package** and **feature tier** for the active session.
 
@@ -87,6 +115,7 @@ string, no `--provider` flag is needed. With an explicit connection string, pass
 
 | Tier | What works |
 |------|------------|
+| **Linq** | DbContext, async LINQ REPL, SQL++ translation (Couchbase; no `:plan`) |
 | **Sql** | DbContext, LINQ REPL, SQL translation (default for newly discovered providers) |
 | **QueryPlan** | Above + `:plan` / EXPLAIN |
 | **Conventions** | Above + PostgreSQL/SQLite naming customizers |
@@ -98,13 +127,15 @@ When `:plan` is unavailable, efvibe returns a friendly note — it does not fail
 1. `IDesignTimeDbContextFactory<T>`
 2. Parameterless constructor
 3. Startup project user secrets, then `appsettings*.json`
-4. `--connection-string` + `--provider`
+   - **Relational:** `ConnectionStrings:DefaultConnection` (and aliases)
+   - **Couchbase:** `Couchbase` section (or legacy `DefaultConnection` object)
+4. `--connection-string` (relational providers only; provider discovered from `-p`)
 
 Preferred connection string keys: `ConnectionStrings:DefaultConnection`, then `Postgres`, `Sqlite`, `MySql`, `MariaDb`, `Oracle`, `Database`, then any other `ConnectionStrings:*` entry.
 
 ## Editor extensions
 
-VS Code, Rider, and Visual Studio pass `--provider` from project settings when set. Leave **Provider** empty to rely on `-p` discovery. When using a connection string override in the IDE, set provider to an alias or EF package id.
+VS Code, Rider, and Visual Studio pass `--connection-string` when configured. The provider is always discovered from the EF project (`efvibe.project` / `-p`).
 
 ## Platform notes
 
@@ -123,6 +154,7 @@ SQLite and SQL Server clients load RID-specific native libraries from the worksp
 ## Limits
 
 - **Cosmos DB** and **InMemory** are not supported through the relational auto-construct path.
-- Non-standard `Use*` signatures may require a registered `IProviderConfigurator` (Pomelo is built in today).
+- **Couchbase** requires async LINQ terminals, structured `Couchbase` settings (not connection strings), and explicit EF collection/discriminator mapping for non-default document layouts.
+- Non-standard `Use*` signatures may require a registered `IProviderConfigurator` (Pomelo and Couchbase are built in today).
 - Central Package Management (`Directory.Packages.props`) is supported when `PackageReference` entries appear in the `-p` project graph.
 - Schema/column naming must match your database — Firebird and other case-sensitive engines may need explicit EF column mappings in your project (not an efvibe limitation).

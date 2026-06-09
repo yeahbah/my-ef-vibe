@@ -115,7 +115,8 @@ internal static class WorkspaceRuntimeBootstrap
             dbContextInstance.GetType(),
             dbContextInstance,
             workspaceBuild.ReferenceAssemblyPaths,
-            host.AssemblyLoader);
+            host.AssemblyLoader,
+            ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor));
 
         return (
             new WorkspaceRuntime(

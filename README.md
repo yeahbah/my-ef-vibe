@@ -6,8 +6,8 @@
 
 Interactive CLI to run LINQ against an external .NET project's EF Core `DbContext`.
 
-**Works with most EF Core relational providers** — SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB, Firebird, and
-other packages discovered from your EF project's `PackageReference` entries. See
+**Works with most EF Core relational providers** — SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB, Firebird, **Couchbase** (async LINQ),
+and other packages discovered from your EF project's `PackageReference` entries. See
 [docs/database-providers.md](docs/database-providers.md).
 
 Point `efvibe` at your solution, get a REPL with **`db`** (your `DbContext`) in scope, see translated SQL,
@@ -102,7 +102,7 @@ efvibe -w ./myefvibe-session
 If `-p` is omitted, projects are discovered under the **current directory** (not `-w`). If `-s` / `--startup-project` is
 omitted, `efvibe` infers a project that references the EF project and has user secrets or appsettings.
 
-In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). End input with `;` to run. Use `:help` for
+In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). **Couchbase** sessions require async terminals (`await db.Products.Take(5).ToListAsync();`). End input with `;` to run. Use `:help` for
 all commands, `:about` for version and session info.
 
 **Explore the model**
@@ -148,14 +148,14 @@ dotnet run --project src/MyEfVibe/MyEfVibe.csproj -f net10.0 -- \
 ## Database providers
 
 efvibe auto-discovers the EF provider from **`PackageReference` entries on `-p`** (including referenced projects).
-Reference one relational provider package, or pass `--provider` when several are present.
+Reference exactly one relational provider package on `-p`.
 
 | Tier | Providers | What you get |
 |------|-----------|--------------|
 | **Full** | SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB | DbContext construction, LINQ REPL, SQL translation, `:plan` (where supported); PostgreSQL/SQLite also get naming customizers |
-| **Generic** | Any other `*.EntityFrameworkCore.*` package (e.g. Firebird) | DbContext construction, LINQ REPL, SQL translation; pass the package id as `--provider` when needed |
+| **Generic** | Any other `*.EntityFrameworkCore.*` package (e.g. Firebird) | DbContext construction, LINQ REPL, SQL translation |
 
-Pass `--connection-string` with `--provider` (alias or EF package id) to override config from `-s`. `:dbinfo` shows the
+Pass `--connection-string` to override config from `-s` (provider is still discovered from `-p`). `:dbinfo` shows the
 resolved provider package and feature tier.
 
 Full reference: [docs/database-providers.md](docs/database-providers.md). Cosmos DB and InMemory are not supported through
@@ -164,7 +164,7 @@ the relational auto-construct path.
 ## macOS and SQL Server
 
 SQL Server is not Windows-only for development. On macOS (and Linux), run **SQL Server in Docker** and connect with
-`--provider sqlserver` (or discovery from `-p`). The tool loads the Unix `Microsoft.Data.SqlClient` runtime from the
+a SQL Server provider package on `-p`. The tool loads the Unix `Microsoft.Data.SqlClient` runtime from the
 workspace `.deps.json` (not the portable `lib/` assembly) and normalizes common local connection strings (for example
 `Encrypt=False` and stripping `Trusted_Connection` when SQL credentials are present).
 
@@ -181,7 +181,7 @@ Typical issues:
 | `:plan` — `SET SHOWPLAN` batch error                                                                  | SQL Server requires `SET SHOWPLAN_ALL` in its own batch; fixed in recent builds.                                                                                                                                                                                                                                  |
 | `System.Diagnostics.DiagnosticSource` version 9.0.0 / 10.0.0 not found                                | Transitive NuGet pulls multiple versions; use a current `efvibe` build (version-aware `.deps.json` loading). If it persists, run the tool on the same band as your app, e.g. `dotnet efvibe -f net8.0` from a repo with `dotnet-tools.json`.                                                                      |
 
-For greenfield Mac work without Docker, use a project with `Microsoft.EntityFrameworkCore.Sqlite` or `Npgsql.EntityFrameworkCore.PostgreSQL` on `-p`, or pass `--provider sqlite` / `--provider npgsql` with `--connection-string`.
+For greenfield Mac work without Docker, use a project with `Microsoft.EntityFrameworkCore.Sqlite` or `Npgsql.EntityFrameworkCore.PostgreSQL` on `-p`, or pass `--connection-string` with a SQLite/PostgreSQL connection string.
 
 ## Projects and configuration
 
@@ -196,9 +196,9 @@ DbContext construction (in order):
 1. `IDesignTimeDbContextFactory<T>`
 2. Parameterless constructor
 3. User secrets on the startup project, then `appsettings*.json` next to that project
-4. `--connection-string` + `--provider` (alias such as `npgsql`, or EF package id such as `Microsoft.EntityFrameworkCore.SqlServer`)
+4. `--connection-string` (provider discovered from `-p`)
 
-When you do not pass `--connection-string` or `--provider`, efvibe discovers the EF provider from **`PackageReference` entries on `-p`** (including referenced projects). Reference exactly one relational provider package, or pass `--provider` when several are present.
+When you do not pass `--connection-string`, efvibe discovers the EF provider from **`PackageReference` entries on `-p`** (including referenced projects). Reference exactly one relational provider package on `-p`.
 
 User secrets use flat keys such as `ConnectionStrings:DefaultConnection` in
 `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json`.
@@ -252,7 +252,7 @@ Highlights:
 | Doc (repository)                                                             | Description                                                                                                                      |
 |------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
 | [features.md](features.md)                                                   | Full REPL and CLI reference                                                                                                      |
-| [docs/database-providers.md](docs/database-providers.md)                     | Multi-provider support — discovery, `--provider`, feature tiers, and limits                                                      |
+| [docs/database-providers.md](docs/database-providers.md)                     | Multi-provider support — discovery, feature tiers, and limits                                                      |
 | [vscode-extension/INSTALL.md](vscode-extension/INSTALL.md)                   | Install the VS Code extension ([Marketplace](https://marketplace.visualstudio.com/items?itemName=yeahbah.vscode-efvibe) or VSIX) |
 | [vscode-extension/README.md](vscode-extension/README.md)                     | VS Code extension (run selection, `efvibe serve`, scan review, editable panel)                                                   |
 | [rider-extension/README.md](rider-extension/README.md)                       | Rider extension MVP (Gradle plugin, settings, actions, tool window)                                                              |

@@ -46,7 +46,6 @@ Open **Settings -> Languages & Frameworks -> My EF Vibe** for the current Rider 
 | Startup project | `-s` |
 | DbContext | `-c` |
 | Connection string | `--connection-string` |
-| Provider | `--provider` — alias (`npgsql`, `sqlserver`, …) or EF package id; leave empty to discover from `-p` |
 | efvibe executable | direct executable path |
 | .NET framework | `--framework` / local tool framework |
 

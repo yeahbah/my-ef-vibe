@@ -15,6 +15,13 @@ internal static class LinqDeepSqlTranslator
         IEnumerable<string>? contextInstanceIdentifiers = null,
         CancellationToken cancellationToken = default)
     {
+        if (host.ActiveProviderDescriptor?.IsCouchbase == true)
+        {
+            return new LinqSqlTranslationResult(
+                null,
+                "Deep scan SQL++ translation is not available for Couchbase.EntityFrameworkCore in this release.");
+        }
+
         if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statementOrCode))
         {
             return new LinqSqlTranslationResult(

@@ -778,7 +778,7 @@ internal sealed class WorkspaceDepsManifest
 
     /// <summary>
     ///     Resolves EF provider packages from the global NuGet cache when the workspace project does not
-    ///     reference them, but the provider was discovered from <c>-p</c> or passed via <c>--provider</c>.
+    ///     reference them, but the provider was discovered from <c>-p</c>.
     /// </summary>
     private bool TryResolveLatestProviderFromNuGetPackageFolder(AssemblyName requested, out string absolutePath)
     {

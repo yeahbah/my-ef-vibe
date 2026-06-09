@@ -17,6 +17,15 @@ internal sealed record ProviderDescriptor(
     internal bool SupportsNamingConventionOverride =>
         Capabilities.HasFlag(ProviderCapabilities.SupportsNamingConventionOverride);
 
+    internal bool RequiresAsyncQueries =>
+        Capabilities.HasFlag(ProviderCapabilities.RequiresAsyncQueries)
+        || KnownProvider == MyEfVibeProvider.Couchbase
+        || PackageId.Contains("Couchbase.EntityFrameworkCore", StringComparison.OrdinalIgnoreCase);
+
+    internal bool IsCouchbase =>
+        KnownProvider == MyEfVibeProvider.Couchbase
+        || PackageId.Contains("Couchbase.EntityFrameworkCore", StringComparison.OrdinalIgnoreCase);
+
     internal FeatureTier ResolveFeatureTier(object? dbContext = null)
     {
         return ProviderCapabilityResolver.ResolveFeatureTier(this, dbContext);

@@ -13,7 +13,12 @@ public sealed class DbContextProviderOverrideTests
         }
 
         var outputDirectory = Path.GetDirectoryName(persistenceDll)!;
-        using var host = LoadHost(persistenceDll, outputDirectory);
+        using var host = TryLoadHost(persistenceDll, outputDirectory);
+
+        if (host is null)
+        {
+            return;
+        }
 
         var dbContext = DbContextActivator.ResolveInstance(
             host,
@@ -32,14 +37,13 @@ public sealed class DbContextProviderOverrideTests
         Assert.Contains("Npgsql", providerName ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static WorkspaceHost LoadHost(string persistenceDll, string outputDirectory)
+    private static WorkspaceHost? TryLoadHost(string persistenceDll, string outputDirectory)
     {
-        var efProject =
-            "/home/adiaz/Projects/AdventureWorks/apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj";
+        var efProject = ResolveAdventureWorksEfProject();
 
-        if (!File.Exists(efProject))
+        if (efProject is null)
         {
-            throw new InvalidOperationException($"AdventureWorks EF project not found: {efProject}");
+            return null;
         }
 
         var workspaceBuild = new WorkspaceBuildResult(
@@ -52,6 +56,44 @@ public sealed class DbContextProviderOverrideTests
             new ProjectBuildOutput(outputDirectory));
 
         return WorkspaceHost.Load(workspaceBuild);
+    }
+
+    private static string? ResolveAdventureWorksEfProject()
+    {
+        var fromEnvironment = Environment.GetEnvironmentVariable("EFVIBE_ADVENTUREWORKS_EF_PROJECT");
+
+        if (!string.IsNullOrWhiteSpace(fromEnvironment) && File.Exists(fromEnvironment))
+        {
+            return fromEnvironment;
+        }
+
+        foreach (var candidate in EnumerateAdventureWorksEfProjectCandidates())
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateAdventureWorksEfProjectCandidates()
+    {
+        const string relativeProject =
+            "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj";
+
+        var start = new DirectoryInfo(AppContext.BaseDirectory);
+
+        for (var directory = start; directory is not null; directory = directory.Parent)
+        {
+            if (string.Equals(directory.Name, "my-ef-vibe", StringComparison.OrdinalIgnoreCase))
+            {
+                yield return Path.Combine(directory.Parent!.FullName, "AdventureWorks", relativeProject);
+            }
+
+            yield return Path.Combine(directory.FullName, "AdventureWorks", relativeProject);
+        }
     }
 
     private static string? FindPrebuiltPersistenceDll()

@@ -3,6 +3,8 @@ namespace MyEfVibe.Tests;
 public sealed class ProviderParserTests
 {
     [Theory]
+    [InlineData("couchbase", "Couchbase.EntityFrameworkCore")]
+    [InlineData("cb", "Couchbase.EntityFrameworkCore")]
     [InlineData("npgsql", "Npgsql.EntityFrameworkCore.PostgreSQL")]
     [InlineData("postgres", "Npgsql.EntityFrameworkCore.PostgreSQL")]
     [InlineData("sqlserver", "Microsoft.EntityFrameworkCore.SqlServer")]

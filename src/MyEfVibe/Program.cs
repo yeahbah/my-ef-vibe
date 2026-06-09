@@ -232,7 +232,8 @@ internal static class Program
             dbContextInstance.GetType(),
             dbContextInstance,
             workspaceBuild.ReferenceAssemblyPaths,
-            host.AssemblyLoader);
+            host.AssemblyLoader,
+            ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor));
 
         if (options.TablesJson)
         {

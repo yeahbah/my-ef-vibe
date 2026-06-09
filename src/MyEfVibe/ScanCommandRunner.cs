@@ -184,7 +184,8 @@ internal static class ScanCommandRunner
                 dbContextInstance.GetType(),
                 dbContextInstance,
                 workspaceBuild.ReferenceAssemblyPaths,
-                host.AssemblyLoader);
+                host.AssemblyLoader,
+                ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor));
 
             if (!quietOutput)
             {

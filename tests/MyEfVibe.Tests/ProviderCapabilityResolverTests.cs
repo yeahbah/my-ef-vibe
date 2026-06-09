@@ -15,6 +15,27 @@ public sealed class ProviderCapabilityResolverTests
     }
 
     [Fact]
+    public void ResolveFeatureTier_couchbase_is_linq_tier_without_query_plan()
+    {
+        var descriptor = ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Couchbase);
+
+        Assert.Equal(FeatureTier.Linq, ProviderCapabilityResolver.ResolveFeatureTier(descriptor));
+        Assert.False(ProviderCapabilityResolver.SupportsQueryPlan(descriptor, new object()));
+        Assert.True(ProviderCapabilityResolver.RequiresAsyncQueries(descriptor));
+    }
+
+    [Fact]
+    public void DescribeUnavailableQueryPlan_couchbase_mentions_async()
+    {
+        var descriptor = ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Couchbase);
+
+        var message = ProviderCapabilityResolver.DescribeUnavailableQueryPlan(descriptor);
+
+        Assert.Contains("Couchbase.EntityFrameworkCore", message, StringComparison.Ordinal);
+        Assert.Contains("Async", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ResolveFeatureTier_sqlserver_has_query_plan_tier()
     {
         var descriptor = ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.SqlServer);

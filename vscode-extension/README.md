@@ -26,9 +26,9 @@ Run **[efvibe](https://myefvibe.com/)** inside VS Code — evaluate EF Core LINQ
 
 The extension uses the same provider model as the CLI:
 
-- Leave **`efvibe.provider`** empty to auto-discover from `efvibe.project` `PackageReference` entries.
-- Set **`efvibe.provider`** to an alias (`sqlserver`, `npgsql`, `sqlite`, `oracle`, `mysql`, `mariadb`) or an EF package id (for example `FirebirdSql.EntityFrameworkCore.Firebird`) when using **`efvibe.connectionString`** or when several providers are referenced.
+- The provider is **auto-discovered** from `efvibe.project` `PackageReference` entries.
 - **`efvibe.startupProject`** supplies connection strings from user secrets / `appsettings` — same split as `dotnet ef`.
+- Optional **`efvibe.connectionString`** overrides the connection string; the provider is still discovered from `-p`.
 
 See [docs/database-providers.md](https://github.com/yeahbah/my-ef-vibe/blob/main/docs/database-providers.md) for feature tiers, `:plan` support, and platform notes.
 
@@ -77,7 +77,7 @@ Supported command cells:
 | Setting | Description |
 |---------|-------------|
 | `efvibe.project` / `efvibe.startupProject` / `efvibe.context` | EF project, config host, DbContext type name |
-| `efvibe.connectionString` / `efvibe.provider` | Optional override; provider is alias or EF package id (required with connection string). Leave provider empty to discover from `-p`. |
+| `efvibe.connectionString` | Optional connection string override (provider discovered from `-p`) |
 | `efvibe.resultDestination` | `panel` (default), `output`, or `terminal` |
 | `efvibe.useDaemon` | `true` (default): workspace commands use `efvibe serve` (eval, tables, describe, DbInfo, scan, completions) |
 | `efvibe.dbLog` | Show executed SQL (default `true`) |

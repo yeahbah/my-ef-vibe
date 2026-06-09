@@ -5,6 +5,26 @@ namespace MyEfVibe.Tests;
 public sealed class RepositorySnippetAdapterTests
 {
     [Fact]
+    public void PrepareForEvaluation_PreservesAsyncWhenRequested()
+    {
+        const string snippet = """
+                               await db.Products
+                                   .Where(p => p.ListPrice > 0)
+                                   .Take(10)
+                                   .ToListAsync();
+                               """;
+
+        var normalized = SnippetNormalizer.ForEvaluation(
+            snippet,
+            typeof(FakeAdventureWorksDbContext),
+            preserveAsyncQueries: true);
+
+        Assert.Contains("ToListAsync", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToList(", normalized, StringComparison.Ordinal);
+        Assert.Contains("db.Products", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PrepareForEvaluation_RepositoryQuery_StripsAwaitDbContextAndParameters()
     {
         const string snippet = """

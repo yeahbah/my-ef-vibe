@@ -124,6 +124,12 @@ internal static class RelationalMetadataReflection
         }
     }
 
+    internal static string? GetPropertyName(object property)
+    {
+        return property.GetType().GetProperty("Name", BindingFlags.Public | BindingFlags.Instance)
+            ?.GetValue(property) as string;
+    }
+
     internal static void LowercaseColumnNames(RelationalMetadataMethods relationalMetadata, object entityType)
     {
         foreach (var property in EnumerateProperties(entityType))

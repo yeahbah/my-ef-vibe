@@ -7,7 +7,8 @@ internal enum MyEfVibeProvider
     Sqlite,
     Oracle,
     MySql,
-    MariaDb
+    MariaDb,
+    Couchbase
 }
 
 internal static class MyEfVibeProviderExtensions

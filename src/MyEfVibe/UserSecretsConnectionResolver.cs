@@ -23,21 +23,7 @@ internal static class UserSecretsConnectionResolver
         return !string.IsNullOrWhiteSpace(connectionString);
     }
 
-    private static string? ResolveSecretsFilePath(string userSecretsId)
-    {
-        var secretsRoot = GetUserSecretsRootDirectory();
-
-        if (string.IsNullOrEmpty(secretsRoot))
-        {
-            return null;
-        }
-
-        var candidate = Path.Combine(secretsRoot, userSecretsId, "secrets.json");
-
-        return File.Exists(candidate) ? candidate : null;
-    }
-
-    private static string GetUserSecretsRootDirectory()
+    internal static string GetUserSecretsRootDirectory()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -53,6 +39,20 @@ internal static class UserSecretsConnectionResolver
         return string.IsNullOrWhiteSpace(home)
             ? string.Empty
             : Path.Combine(home, ".microsoft", "usersecrets");
+    }
+
+    private static string? ResolveSecretsFilePath(string userSecretsId)
+    {
+        var secretsRoot = GetUserSecretsRootDirectory();
+
+        if (string.IsNullOrEmpty(secretsRoot))
+        {
+            return null;
+        }
+
+        var candidate = Path.Combine(secretsRoot, userSecretsId, "secrets.json");
+
+        return File.Exists(candidate) ? candidate : null;
     }
 
     private static bool TryReadConnectionString(string secretsPath, out string connectionString)

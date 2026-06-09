@@ -52,6 +52,8 @@ internal sealed class WorkspaceHost : IDisposable
 
     internal ProviderDescriptor? ActiveProviderDescriptor { get; private set; }
 
+    internal CouchbaseSettings? ActiveCouchbaseSettings { get; private set; }
+
     public void Dispose()
     {
         AssemblyLoader.Dispose();
@@ -66,6 +68,11 @@ internal sealed class WorkspaceHost : IDisposable
     internal void SetActiveProviderDescriptor(ProviderDescriptor? providerDescriptor)
     {
         ActiveProviderDescriptor = providerDescriptor;
+    }
+
+    internal void SetActiveCouchbaseSettings(CouchbaseSettings? settings)
+    {
+        ActiveCouchbaseSettings = settings;
     }
 
     internal static WorkspaceHost Load(WorkspaceBuildResult workspaceBuild)

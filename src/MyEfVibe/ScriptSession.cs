@@ -24,10 +24,12 @@ internal sealed class ScriptSession
         Type dbContextType,
         object dbContextInstance,
         ImmutableHashSet<string> workspaceAssemblyPaths,
-        InteractiveAssemblyLoader assemblyLoader)
+        InteractiveAssemblyLoader assemblyLoader,
+        bool preserveAsyncQueries = false)
     {
         _assemblyLoader = assemblyLoader;
         DbContextType = dbContextType;
+        PreserveAsyncQueries = preserveAsyncQueries;
         _globalsType = typeof(ScriptGlobals<>).MakeGenericType(dbContextType);
         _globals = Activator.CreateInstance(_globalsType)!;
         _globalsType.GetProperty("db")!.SetValue(_globals, dbContextInstance);
@@ -74,6 +76,8 @@ internal sealed class ScriptSession
     internal ImmutableArray<MetadataReference> MetadataReferences { get; }
 
     internal Type DbContextType { get; }
+
+    internal bool PreserveAsyncQueries { get; }
 
     internal object DbContext => _globalsType.GetProperty("db")!.GetValue(_globals)!;
 
@@ -137,7 +141,7 @@ internal sealed class ScriptSession
 
     internal async Task<object?> EvaluateAsync(string code, CancellationToken cancellationToken = default)
     {
-        var trimmed = SnippetNormalizer.ForEvaluation(code, DbContextType);
+        var trimmed = SnippetNormalizer.ForEvaluation(code, DbContextType, PreserveAsyncQueries);
         if (string.IsNullOrEmpty(trimmed))
         {
             return null;
@@ -192,7 +196,8 @@ internal sealed class ScriptSession
     {
         var trimmed = SnippetNormalizer.ForEvaluation(
             ProbeScriptFormatter.ToScriptExpression(code),
-            DbContextType);
+            DbContextType,
+            PreserveAsyncQueries);
 
         if (string.IsNullOrEmpty(trimmed))
         {

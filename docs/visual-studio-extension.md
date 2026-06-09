@@ -2,7 +2,7 @@
 
 The Visual Studio extension is a VSIX that hosts efvibe inside Visual Studio 2022 with the same workflow as the Rider plugin: a unified **My EF Vibe** tool window, `efvibe serve` daemon support with CLI fallback, and Tools/editor commands for REPL, scans, and model exploration.
 
-efvibe works with **most EF Core relational providers** — SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB, Firebird, and other packages auto-discovered from the EF project. Leave **Provider** empty when the EF project references one provider; set it to an alias or EF package id when using a connection string override. See [database-providers.md](database-providers.md).
+efvibe works with **most EF Core relational providers** — SQL Server, PostgreSQL, SQLite, Oracle, MySQL/MariaDB, Firebird, and other packages auto-discovered from the EF project. See [database-providers.md](database-providers.md).
 
 ## Build
 
@@ -28,7 +28,6 @@ Open **Tools > Options > My EF Vibe > General** and set:
 | Tool path | Explicit `efvibe` or `myefvibe` executable |
 | Target framework | `efvibe --framework` |
 | Connection string | `efvibe --connection-string` |
-| Provider | `efvibe --provider` — alias or EF package id; optional when the EF project references one provider |
 
 Relative paths resolve from the active solution directory. The extension also supports `$(SolutionDir)` and `${workspaceFolder}` placeholders.
 
