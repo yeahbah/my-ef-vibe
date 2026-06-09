@@ -11,6 +11,10 @@ internal sealed record ProviderDescriptor(
         KnownProvider == MyEfVibeProvider.Sqlite
         || PackageId.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
 
+    internal bool IsSqlServer =>
+        KnownProvider == MyEfVibeProvider.SqlServer
+        || PackageId.Contains("SqlServer", StringComparison.OrdinalIgnoreCase);
+
     internal bool SupportsQueryPlan =>
         Capabilities.HasFlag(ProviderCapabilities.SupportsQueryPlan);
 
