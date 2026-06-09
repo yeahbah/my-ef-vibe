@@ -90,7 +90,7 @@ internal static class LinqLiteScanner
                 continue;
             }
 
-            var statement = GetStatementText(invocation);
+            var statement = LinqScanStatementResolver.Resolve(invocation);
 
             if (!LinqEfQueryHeuristics.LooksLikeEfQuery(statement, scope, instanceIndex))
             {
@@ -228,34 +228,6 @@ internal static class LinqLiteScanner
     private static string? GetContainingMethodName(SyntaxNode node)
     {
         return node.FirstAncestorOrSelf<MethodDeclarationSyntax>()?.Identifier.Text;
-    }
-
-    private static string GetStatementText(SyntaxNode node)
-    {
-        var statement = node.FirstAncestorOrSelf<StatementSyntax>();
-        var text = statement?.ToString() ?? node.ToString();
-
-        if (LinqEfQueryHeuristics.LooksLikeEfQuery(text))
-        {
-            return text;
-        }
-
-        var block = node.FirstAncestorOrSelf<BlockSyntax>();
-
-        if (block is not null)
-        {
-            foreach (var sibling in block.Statements)
-            {
-                var siblingText = sibling.ToString();
-
-                if (LinqEfQueryHeuristics.LooksLikeEfQuery(siblingText))
-                {
-                    return siblingText;
-                }
-            }
-        }
-
-        return text;
     }
 
     private static string ToPreviewLine(string text)

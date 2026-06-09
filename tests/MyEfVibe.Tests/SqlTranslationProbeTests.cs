@@ -97,4 +97,47 @@ public sealed class SqlTranslationProbeTests
         Assert.NotNull(probe);
         Assert.Equal("db.Employees.Where(e => e.Active)", probe);
     }
+
+    [Fact]
+    public void TryCreateProbeExpression_CountAsyncWithCancellationToken_KeepsAggregateTerminal()
+    {
+        const string expression = "db.Actors.CountAsync(cancellationToken)";
+
+        var probe = SqlTranslationProbe.TryCreateProbeExpression(expression);
+
+        Assert.NotNull(probe);
+        Assert.Equal("db.Actors.Count()", ProbeTestHelper.CollapseWhitespace(probe));
+        Assert.True(SqlTranslationProbe.LooksLikeAggregateTerminalProbe(probe));
+    }
+
+    [Fact]
+    public void TryCreateProbeExpression_CountWithPredicate_KeepsAggregateTerminal()
+    {
+        const string expression = "db.Actors.Count(a => a.LastName.StartsWith(\"A\"))";
+
+        var probe = SqlTranslationProbe.TryCreateProbeExpression(expression);
+
+        Assert.NotNull(probe);
+        Assert.Equal(
+            "db.Actors.Count(a => a.LastName.StartsWith(\"A\"))",
+            ProbeTestHelper.CollapseWhitespace(probe));
+    }
+
+    [Fact]
+    public void TryCreateProbeExpression_CompositeAnonymousStats_ReturnsNull()
+    {
+        const string expression = """
+                                  new
+                                  {
+                                      Films = db.Films.Count(),
+                                      Rentals = db.Rentals.Count(),
+                                      Customers = db.Customers.Count(),
+                                      Actors = db.Actors.Count()
+                                  }
+                                  """;
+
+        var probe = SqlTranslationProbe.TryCreateProbeExpression(expression);
+
+        Assert.Null(probe);
+    }
 }

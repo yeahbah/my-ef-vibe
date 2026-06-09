@@ -132,6 +132,91 @@ public sealed class LinqQuerySiteCollectorTests
     }
 
     [Fact]
+    public void Collect_anonymous_stats_object_uses_per_member_query_statements()
+    {
+        using var temp = new TempDirectory();
+        var dbDir = Path.Combine(temp.Path, "Database");
+        var apiDir = Path.Combine(temp.Path, "Api");
+        Directory.CreateDirectory(dbDir);
+        Directory.CreateDirectory(apiDir);
+
+        var dbProject = Path.Combine(dbDir, "App.Database.csproj");
+        File.WriteAllText(
+            dbProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+            </Project>
+            """);
+
+        File.WriteAllText(
+            Path.Combine(dbDir, "PagilaDbContext.cs"),
+            """
+            using Microsoft.EntityFrameworkCore;
+            public class PagilaDbContext : DbContext
+            {
+                public PagilaDbContext(DbContextOptions<PagilaDbContext> options) : base(options) { }
+                public DbSet<Film> Films => Set<Film>();
+                public DbSet<Rental> Rentals => Set<Rental>();
+                public DbSet<Customer> Customers => Set<Customer>();
+                public DbSet<Actor> Actors => Set<Actor>();
+            }
+            public class Film;
+            public class Rental;
+            public class Customer;
+            public class Actor;
+            """);
+
+        var apiProject = Path.Combine(apiDir, "App.Api.csproj");
+        File.WriteAllText(
+            apiProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="../Database/App.Database.csproj" />
+              </ItemGroup>
+              <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+            </Project>
+            """);
+
+        File.WriteAllText(
+            Path.Combine(apiDir, "FilmsController.cs"),
+            """
+            using Microsoft.EntityFrameworkCore;
+            public sealed class FilmsController
+            {
+                private readonly PagilaDbContext db;
+                public FilmsController(PagilaDbContext db) => this.db = db;
+                public async Task<object> GetStats(CancellationToken cancellationToken = default)
+                {
+                    var stats = new
+                    {
+                        Films = await db.Films.CountAsync(cancellationToken),
+                        Rentals = await db.Rentals.CountAsync(cancellationToken),
+                        Customers = await db.Customers.CountAsync(cancellationToken),
+                        Actors = await db.Actors.CountAsync(cancellationToken)
+                    };
+                    return stats;
+                }
+            }
+            """);
+
+        var sites = LinqQuerySiteCollector.Collect(dbProject, apiProject, "PagilaDbContext");
+
+        Assert.Equal(4, sites.Count(static site => site.Statement.Contains("CountAsync", StringComparison.Ordinal)));
+        Assert.Contains(
+            sites,
+            site => site.Statement.Contains("db.Films.CountAsync", StringComparison.Ordinal)
+                    && !site.Statement.Contains("Rentals", StringComparison.Ordinal));
+        Assert.Contains(
+            sites,
+            site => site.Statement.Contains("db.Rentals.CountAsync", StringComparison.Ordinal)
+                    && !site.Statement.Contains("Films", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Collect_finds_sites_in_wide_world_importers_entities_controller_when_present()
     {
         var repoRoot = FindRepoRoot();

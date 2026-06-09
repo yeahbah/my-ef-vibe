@@ -84,6 +84,28 @@ public sealed class RepositorySnippetAdapterTests
     }
 
     [Fact]
+    public void PrepareForEvaluation_AnonymousTypeWithMultipleAwaits_StripsAwaitAfterSyncRewrite()
+    {
+        const string snippet = """
+                               var stats = new
+                               {
+                                   Films = await db.Films.CountAsync(cancellationToken),
+                                   Rentals = await db.Rentals.CountAsync(cancellationToken),
+                                   Customers = await db.Customers.CountAsync(cancellationToken),
+                                   Actors = await db.Actors.CountAsync(cancellationToken)
+                               };
+                               """;
+
+        var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakePagilaDbContext));
+
+        Assert.DoesNotContain("await ", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("CountAsync", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Count(db.Films)", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Count(db.Rentals)", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
     public void ReplQueryableRuntime_IsPublicForRoslynScriptSubmissions()
     {
         var type = typeof(ReplQueryableRuntime);
@@ -99,6 +121,25 @@ public sealed class FakeAdventureWorksDbContext : DbContext
 
     public DbSet<FakeEmployee> Employees => Set<FakeEmployee>();
 }
+
+public sealed class FakePagilaDbContext : DbContext
+{
+    public DbSet<FakeFilm> Films => Set<FakeFilm>();
+
+    public DbSet<FakeRental> Rentals => Set<FakeRental>();
+
+    public DbSet<FakeCustomer> Customers => Set<FakeCustomer>();
+
+    public DbSet<FakeActor> Actors => Set<FakeActor>();
+}
+
+public sealed class FakeFilm;
+
+public sealed class FakeRental;
+
+public sealed class FakeCustomer;
+
+public sealed class FakeActor;
 
 public sealed class FakeEmployee
 {

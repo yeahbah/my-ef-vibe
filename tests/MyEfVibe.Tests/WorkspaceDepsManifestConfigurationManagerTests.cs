@@ -3,7 +3,7 @@ namespace MyEfVibe.Tests;
 public sealed class WorkspaceDepsManifestConfigurationManagerTests
 {
     [Fact]
-    public void TryResolveConfigurationManagerForHost_prefers_netstandard_for_net10_workspace()
+    public void TryResolveConfigurationManagerForHost_prefers_compatible_net_lib_for_net10_workspace()
     {
         var packageRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -27,11 +27,15 @@ public sealed class WorkspaceDepsManifestConfigurationManagerTests
         var manifest = WorkspaceDepsManifest.TryLoad(entryDll);
 
         Assert.NotNull(manifest);
-        Assert.True(manifest!.TryResolveConfigurationManagerForHost(out var path));
+        var candidates = manifest!.EnumerateConfigurationManagerHostCandidates().ToArray();
+
+        Assert.NotEmpty(candidates);
         Assert.Contains(
-            $"{Path.DirectorySeparatorChar}lib{Path.DirectorySeparatorChar}netstandard2.0{Path.DirectorySeparatorChar}",
-            path,
+            $"{Path.DirectorySeparatorChar}lib{Path.DirectorySeparatorChar}net9.0{Path.DirectorySeparatorChar}",
+            candidates[0],
             StringComparison.OrdinalIgnoreCase);
+        Assert.True(manifest.TryResolveConfigurationManagerForHost(out var path));
+        Assert.Equal(candidates[0], path);
     }
 
     private static string BuildConfigurationManagerDepsJson()

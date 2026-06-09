@@ -80,6 +80,15 @@ internal static class LinqDeepSqlTranslator
         {
             var scriptProbe = ProbeScriptFormatter.ToScriptExpression(probe);
 
+            if (SqlTranslationProbe.LooksLikeAggregateTerminalProbe(scriptProbe))
+            {
+                return await TranslateAggregateProbeAsync(
+                    session,
+                    host,
+                    scriptProbe,
+                    cancellationToken);
+            }
+
             var queryable = await session.EvaluateProbeAsync(scriptProbe, cancellationToken);
 
             if (!RelationalQueryableSqlFormatter.TryGetSql(queryable, inspectionAssemblies, out var sql))
@@ -112,6 +121,44 @@ internal static class LinqDeepSqlTranslator
 
             return new LinqSqlTranslationResult(null, TruncateNote(failure.Message));
         }
+    }
+
+    private static async Task<LinqSqlTranslationResult> TranslateAggregateProbeAsync(
+        ScriptSession session,
+        WorkspaceHost host,
+        string scriptProbe,
+        CancellationToken cancellationToken)
+    {
+        using var sqlCapture = EfSqlCapture.TryAttach(session.DbContext, new DbLogSettings { Enabled = true });
+
+        if (sqlCapture is null)
+        {
+            return new LinqSqlTranslationResult(
+                null,
+                "Could not attach SQL capture for aggregate probe translation.");
+        }
+
+        try
+        {
+            await session.EvaluateProbeAsync(scriptProbe, cancellationToken);
+        }
+        catch (Exception failure)
+        {
+            return new LinqSqlTranslationResult(null, TruncateNote(failure.Message));
+        }
+
+        var sql = sqlCapture.Commands
+            .Select(EfSqlCapture.FormatEntry)
+            .LastOrDefault(static entry => !string.IsNullOrWhiteSpace(entry));
+
+        if (string.IsNullOrWhiteSpace(sql))
+        {
+            return new LinqSqlTranslationResult(
+                null,
+                "Aggregate probe did not emit SQL.");
+        }
+
+        return await AttachQueryPlanAsync(session, host, sql, cancellationToken);
     }
 
     private static async Task<LinqSqlTranslationResult> AttachQueryPlanAsync(

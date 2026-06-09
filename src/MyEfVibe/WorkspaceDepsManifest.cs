@@ -525,58 +525,67 @@ internal sealed class WorkspaceDepsManifest
 
     internal bool TryResolveConfigurationManagerForHost(out string absolutePath)
     {
-        absolutePath = string.Empty;
+        absolutePath = EnumerateConfigurationManagerHostCandidates().FirstOrDefault() ?? string.Empty;
+
+        return absolutePath.Length > 0;
+    }
+
+    internal IEnumerable<string> EnumerateConfigurationManagerHostCandidates()
+    {
         const string assemblySimpleName = "System.Configuration.ConfigurationManager";
+
+        string? basePath = null;
 
         if (_assetsBySimpleName.TryGetValue(assemblySimpleName, out var assets) && assets.Count > 0)
         {
-            var chosen = ChooseBestAsset(null, assets);
-
-            if (chosen is not null
-                && TryRemapToHostCompatiblePackageLib(chosen.Path, assemblySimpleName, out absolutePath))
-            {
-                return true;
-            }
+            basePath = ChooseBestAsset(null, assets)?.Path;
         }
-
-        if (!TryResolve(new AssemblyName(assemblySimpleName), false, out var resolvedPath))
+        else if (TryResolve(new AssemblyName(assemblySimpleName), false, out var resolvedPath))
         {
-            return false;
+            basePath = resolvedPath;
         }
 
-        return TryRemapToHostCompatiblePackageLib(resolvedPath, assemblySimpleName, out absolutePath);
+        if (basePath is null)
+        {
+            yield break;
+        }
+
+        foreach (var candidate in EnumerateHostCompatiblePackageLibCandidates(basePath, assemblySimpleName))
+        {
+            yield return candidate;
+        }
     }
 
-    private bool TryRemapToHostCompatiblePackageLib(
+    private static IEnumerable<string> EnumerateHostCompatiblePackageLibCandidates(
         string currentPath,
-        string assemblySimpleName,
-        out string absolutePath)
+        string assemblySimpleName)
     {
-        absolutePath = currentPath;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var hostMajor = Environment.Version.Major;
+        var candidates = new List<string>();
 
-        if (_workspaceNetCoreMajor is null
-            || !TryGetNetCoreLibMajorFromPath(currentPath, out var libMajor)
-            || libMajor >= _workspaceNetCoreMajor.Value)
+        void Offer(string? path)
         {
-            return File.Exists(absolutePath);
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path) || !seen.Add(path))
+            {
+                return;
+            }
+
+            candidates.Add(path);
         }
+
+        Offer(currentPath);
 
         var libRoot = FindPackageLibRoot(currentPath);
 
         if (libRoot is null)
         {
-            return File.Exists(absolutePath);
+            return candidates;
         }
 
         foreach (var tfmDirectory in EnumeratePreferredLibDirectories(libRoot))
         {
             var tfm = Path.GetFileName(tfmDirectory);
-
-            if (!tfm.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             var candidate = Path.Combine(tfmDirectory, $"{assemblySimpleName}.dll");
 
             if (!File.Exists(candidate))
@@ -584,12 +593,24 @@ internal sealed class WorkspaceDepsManifest
                 continue;
             }
 
-            absolutePath = candidate;
+            if (TryGetNetCoreLibMajor(tfm, out var libMajor))
+            {
+                // net9 assets run on a net10 host; prefer the highest compatible net* over netstandard.
+                if (libMajor <= hostMajor)
+                {
+                    Offer(candidate);
+                }
 
-            return true;
+                continue;
+            }
+
+            if (tfm.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase))
+            {
+                Offer(candidate);
+            }
         }
 
-        return File.Exists(absolutePath);
+        return candidates;
     }
 
     private static string? FindPackageLibRoot(string assemblyPath)

@@ -27,7 +27,7 @@ internal static class AsyncQueryableSyncRewriter
 
     internal static string Rewrite(string expression)
     {
-        if (string.IsNullOrWhiteSpace(expression) || !expression.Contains("Async", StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(expression))
         {
             return expression;
         }
@@ -36,9 +36,19 @@ internal static class AsyncQueryableSyncRewriter
         {
             var tree = CSharpSyntaxTree.ParseText(expression,
                 CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
-            var rewritten = new AsyncInvocationRewriter().Visit(tree.GetRoot());
+            var root = tree.GetRoot();
 
-            return rewritten.ToFullString();
+            if (expression.Contains("Async", StringComparison.Ordinal))
+            {
+                root = new AsyncInvocationRewriter().Visit(root)!;
+            }
+
+            if (expression.Contains("await ", StringComparison.Ordinal))
+            {
+                root = new AwaitRemovalRewriter().Visit(root)!;
+            }
+
+            return root.ToFullString();
         }
         catch (Exception)
         {
@@ -66,6 +76,14 @@ internal static class AsyncQueryableSyncRewriter
 
             var syncMember = memberAccess.WithName(SyntaxFactory.IdentifierName(syncName));
             return rewritten.WithExpression(syncMember);
+        }
+    }
+
+    private sealed class AwaitRemovalRewriter : CSharpSyntaxRewriter
+    {
+        public override SyntaxNode? VisitAwaitExpression(AwaitExpressionSyntax node)
+        {
+            return Visit(node.Expression);
         }
     }
 }

@@ -190,6 +190,22 @@ public sealed class LinqDeepExpressionAdapterTests
     }
 
     [Fact]
+    public void TryCreateProbeExpression_AnonymousStatsMember_CountAsync_ProducesQueryableProbe()
+    {
+        const string statement = "await db.Films.CountAsync(cancellationToken)";
+
+        var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
+            statement,
+            nameof(FakeFilm),
+            typeof(FakePagilaDbContext),
+            nameof(FakeFilm));
+
+        Assert.NotNull(probe);
+        Assert.Equal("db.Films.Count()", ProbeTestHelper.CollapseWhitespace(probe));
+        ProbeTestHelper.AssertParsesAsScript(probe);
+    }
+
+    [Fact]
     public void TryCreateProbeExpression_NonQueryableStatement_ReturnsNull()
     {
         const string statement = "return null;";

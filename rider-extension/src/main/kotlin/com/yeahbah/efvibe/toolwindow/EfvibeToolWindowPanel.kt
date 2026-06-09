@@ -83,6 +83,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         80,
     )
     private val notebookOutput = HighlightedOutput(project, "cs")
+    private val notebookTabs = JTabbedPane()
 
     private var lastPayload: EvaluationPayload? = null
     private var lastScan: ScanPayload? = null
@@ -100,6 +101,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
         expression.foreground = Foreground
         expression.caretColor = Foreground
         expression.font = Font(Font.MONOSPACED, Font.PLAIN, expression.font.size)
+        styleNotebookEditor(notebookCells)
         resultTable.autoResizeMode = JTable.AUTO_RESIZE_OFF
         modelTable.autoResizeMode = JTable.AUTO_RESIZE_OFF
         modelTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
@@ -758,8 +760,14 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                 ),
                 BorderLayout.NORTH,
             )
-            add(JBScrollPane(notebookCells), BorderLayout.CENTER)
-            add(notebookOutput, BorderLayout.SOUTH)
+            notebookTabs.addTab(
+                "Code",
+                JBScrollPane(notebookCells).apply {
+                    border = BorderFactory.createMatteBorder(1, 0, 0, 0, BorderColor)
+                },
+            )
+            notebookTabs.addTab("Result", notebookOutput)
+            add(notebookTabs, BorderLayout.CENTER)
         }
 
     private fun openNotebook() {
@@ -775,6 +783,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                 .mapNotNull { cell -> cell.asJsonObject.get("value")?.asString }
                 .joinToString("\n\n---\n")
         }.getOrElse { text }
+        notebookTabs.selectedIndex = notebookTabs.indexOfTab("Code")
         tabs.selectedIndex = tabs.indexOfTab("Notebook")
     }
 
@@ -837,6 +846,7 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             }
             SwingUtilities.invokeLater {
                 notebookOutput.text = output
+                notebookTabs.selectedIndex = notebookTabs.indexOfTab("Result")
                 tabs.selectedIndex = tabs.indexOfTab("Notebook")
                 setReady()
             }
@@ -917,7 +927,11 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             "Model" -> modelText.text
             "Scan Review" -> scanDetails.text
             "History" -> historyText.text
-            "Notebook" -> notebookOutput.text
+            "Notebook" -> if (notebookTabs.selectedIndex == notebookTabs.indexOfTab("Code")) {
+                notebookCells.text
+            } else {
+                notebookOutput.text
+            }
             else -> tableText(resultTable)
         }
         CopyPasteManager.getInstance().setContents(StringSelection(text))
@@ -1024,6 +1038,19 @@ private fun fileTypeFor(extension: String): FileType =
     } else {
         FileTypeManager.getInstance().getFileTypeByExtension(extension)
     }
+
+private fun styleNotebookEditor(editor: JTextArea) {
+    editor.lineWrap = true
+    editor.wrapStyleWord = true
+    editor.border = BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(BorderColor),
+        BorderFactory.createEmptyBorder(8, 10, 8, 10),
+    )
+    editor.background = EditorBackground
+    editor.foreground = Foreground
+    editor.caretColor = Foreground
+    editor.font = Font(Font.MONOSPACED, Font.PLAIN, editor.font.size)
+}
 
 private fun styleStatus(label: JLabel) {
     label.isOpaque = true

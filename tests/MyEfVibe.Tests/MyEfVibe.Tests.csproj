@@ -8,6 +8,10 @@
         <RootNamespace>MyEfVibe.Tests</RootNamespace>
     </PropertyGroup>
 
+    <Target Name="RemoveHostConfigurationManager" AfterTargets="Build">
+        <Delete Files="$(TargetDir)System.Configuration.ConfigurationManager.dll" ContinueOnError="true"/>
+    </Target>
+
     <ItemGroup>
         <ProjectReference Include="..\..\src\MyEfVibe\MyEfVibe.csproj"/>
     </ItemGroup>

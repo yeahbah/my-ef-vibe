@@ -44,6 +44,7 @@ internal static class QueryEvaluator
                     snippet,
                     result,
                     inspectionAssemblies,
+                    dbLogSettings,
                     cancellationToken);
 
                 if (!string.IsNullOrWhiteSpace(translatedSql))
@@ -89,19 +90,43 @@ internal static class QueryEvaluator
         string snippet,
         object? result,
         IEnumerable<Assembly> inspectionAssemblies,
+        DbLogSettings dbLogSettings,
         CancellationToken cancellationToken)
     {
         if (SqlTranslationProbe.TryCreateProbeExpression(snippet) is { } probeExpression)
         {
             try
             {
-                var probeSql = await session.EvaluateProbeAsync(
-                    $"{probeExpression}.ToQueryString()",
-                    cancellationToken);
-
-                if (probeSql is string literal && !string.IsNullOrWhiteSpace(literal))
+                if (SqlTranslationProbe.LooksLikeAggregateTerminalProbe(probeExpression))
                 {
-                    return literal;
+                    using var sqlCapture = EfSqlCapture.TryAttach(session.DbContext, dbLogSettings);
+
+                    if (sqlCapture is not null)
+                    {
+                        await session.EvaluateProbeAsync(
+                            ProbeScriptFormatter.ToScriptExpression(probeExpression),
+                            cancellationToken);
+
+                        var capturedSql = sqlCapture.Commands
+                            .Select(EfSqlCapture.FormatEntry)
+                            .LastOrDefault(static entry => !string.IsNullOrWhiteSpace(entry));
+
+                        if (!string.IsNullOrWhiteSpace(capturedSql))
+                        {
+                            return capturedSql;
+                        }
+                    }
+                }
+                else
+                {
+                    var probeSql = await session.EvaluateProbeAsync(
+                        $"{probeExpression}.ToQueryString()",
+                        cancellationToken);
+
+                    if (probeSql is string literal && !string.IsNullOrWhiteSpace(literal))
+                    {
+                        return literal;
+                    }
                 }
             }
             catch

@@ -169,11 +169,7 @@ internal sealed class WorkspaceHost : IDisposable
         string outputDirectory,
         string? startupOutputDirectory)
     {
-        if (AppDomain.CurrentDomain.GetAssemblies().Any(static assembly =>
-                string.Equals(
-                    assembly.GetName().Name,
-                    "System.Configuration.ConfigurationManager",
-                    StringComparison.OrdinalIgnoreCase)))
+        if (IsConfigurationManagerLoaded())
         {
             return;
         }
@@ -198,19 +194,45 @@ internal sealed class WorkspaceHost : IDisposable
             }
         }
 
-        if (resolver.DepsManifest?.TryResolveConfigurationManagerForHost(out var path) != true)
+        if (resolver.DepsManifest is null)
         {
             return;
         }
 
-        if (TryLoadConfigurationManager(path))
+        string? lastAttemptedPath = null;
+
+        foreach (var path in resolver.DepsManifest.EnumerateConfigurationManagerHostCandidates())
+        {
+            lastAttemptedPath = path;
+
+            if (TryLoadConfigurationManager(path) || IsConfigurationManagerLoaded())
+            {
+                return;
+            }
+        }
+
+        if (IsConfigurationManagerLoaded())
+        {
+            return;
+        }
+
+        if (lastAttemptedPath is null)
         {
             return;
         }
 
         throw new InvalidOperationException(
             "Failed to load `System.Configuration.ConfigurationManager` required by Microsoft.Data.SqlClient."
-            + $"{Environment.NewLine}Path: {path}");
+            + $"{Environment.NewLine}Path: {lastAttemptedPath}");
+    }
+
+    private static bool IsConfigurationManagerLoaded()
+    {
+        return AppDomain.CurrentDomain.GetAssemblies().Any(static assembly =>
+            string.Equals(
+                assembly.GetName().Name,
+                "System.Configuration.ConfigurationManager",
+                StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool TryLoadConfigurationManager(string absolutePath)
@@ -223,7 +245,7 @@ internal sealed class WorkspaceHost : IDisposable
         }
         catch
         {
-            return false;
+            return IsConfigurationManagerLoaded();
         }
     }
 

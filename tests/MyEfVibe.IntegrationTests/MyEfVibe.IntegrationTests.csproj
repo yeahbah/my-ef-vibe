@@ -10,6 +10,10 @@
         <Description>Live-database integration tests for efvibe against AdventureWorks sample repos.</Description>
     </PropertyGroup>
 
+    <Target Name="RemoveHostConfigurationManager" AfterTargets="Build">
+        <Delete Files="$(TargetDir)System.Configuration.ConfigurationManager.dll" ContinueOnError="true"/>
+    </Target>
+
     <ItemGroup>
         <ProjectReference Include="..\..\src\MyEfVibe\MyEfVibe.csproj"/>
     </ItemGroup>

@@ -193,12 +193,21 @@ internal static class WorkspaceDependencyLoader
             return;
         }
 
-        if (!depsManifest.TryResolveConfigurationManagerForHost(out var path))
+        foreach (var path in depsManifest.EnumerateConfigurationManagerHostCandidates())
         {
-            return;
-        }
+            try
+            {
+                AssemblyResolutionHelpers.LoadFromPath(loadContext, path);
 
-        AssemblyResolutionHelpers.LoadFromPath(loadContext, path);
+                return;
+            }
+            catch (BadImageFormatException)
+            {
+            }
+            catch (FileLoadException)
+            {
+            }
+        }
     }
 
     private static void PreloadEfReferenceAssemblies(

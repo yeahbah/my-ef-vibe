@@ -1,5 +1,8 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace MyEfVibe;
 
@@ -50,6 +53,13 @@ internal static partial class EfReplQueryableRewriter
             || trimmed.Contains(Runtime, StringComparison.Ordinal))
         {
             return null;
+        }
+
+        var embedded = TryRewriteEmbeddedTerminalCalls(trimmed, dbContextType);
+
+        if (embedded is not null)
+        {
+            return embedded;
         }
 
         var simple = SimpleTerminalRegex().Match(trimmed);
@@ -883,5 +893,126 @@ internal static partial class EfReplQueryableRewriter
 
         return property.PropertyType.GetGenericTypeDefinition().FullName?
             .StartsWith("Microsoft.EntityFrameworkCore.DbSet`1", StringComparison.Ordinal) == true;
+    }
+
+    internal static string? TryRewriteEmbeddedTerminalCalls(string snippet, Type dbContextType)
+    {
+        if (!LooksLikeAnonymousTypeCreation(snippet)
+            || !snippet.Contains("db.", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        try
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                snippet,
+                CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
+            var rewriter = new EmbeddedTerminalInvocationRewriter(dbContextType);
+            var rewritten = rewriter.Visit(tree.GetRoot());
+
+            return rewriter.Changed ? rewritten.ToFullString() : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static bool TryParseDbSetSource(string source, out string propertyName, out string middle)
+    {
+        propertyName = string.Empty;
+        middle = string.Empty;
+
+        if (!source.StartsWith("db.", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var afterDb = source["db.".Length..];
+        var dotIndex = afterDb.IndexOf('.');
+
+        if (dotIndex < 0)
+        {
+            propertyName = afterDb;
+            return !string.IsNullOrWhiteSpace(propertyName);
+        }
+
+        propertyName = afterDb[..dotIndex];
+        middle = afterDb[dotIndex..];
+        return !string.IsNullOrWhiteSpace(propertyName);
+    }
+
+    private static bool LooksLikeAnonymousTypeCreation(string snippet)
+    {
+        return snippet.Contains("new", StringComparison.Ordinal)
+               && snippet.Contains('{', StringComparison.Ordinal);
+    }
+
+    private static bool IsEmbeddedTerminalMethod(string methodName)
+    {
+        return methodName is "Count"
+            or "CountAsync"
+            or "First"
+            or "FirstAsync"
+            or "FirstOrDefault"
+            or "FirstOrDefaultAsync"
+            or "Single"
+            or "SingleAsync"
+            or "SingleOrDefault"
+            or "SingleOrDefaultAsync"
+            or "Any"
+            or "AnyAsync";
+    }
+
+    private sealed class EmbeddedTerminalInvocationRewriter(Type dbContextType) : CSharpSyntaxRewriter
+    {
+        internal bool Changed { get; private set; }
+
+        public override SyntaxNode? VisitInvocationExpression(InvocationExpressionSyntax node)
+        {
+            var visited = (InvocationExpressionSyntax)base.VisitInvocationExpression(node)!;
+
+            if (visited.Expression is not MemberAccessExpressionSyntax memberAccess)
+            {
+                return visited;
+            }
+
+            var methodName = memberAccess.Name.Identifier.Text;
+
+            if (!IsEmbeddedTerminalMethod(methodName))
+            {
+                return visited;
+            }
+
+            var source = memberAccess.Expression.ToString();
+
+            if (!TryParseDbSetSource(source, out var propertyName, out var middle))
+            {
+                return visited;
+            }
+
+            string? predicate = null;
+
+            if (visited.ArgumentList.Arguments.Count == 1)
+            {
+                predicate = visited.ArgumentList.Arguments[0].Expression.ToString();
+            }
+            else if (visited.ArgumentList.Arguments.Count > 1)
+            {
+                return visited;
+            }
+
+            var rewrite = TryBuildTerminalCall(dbContextType, propertyName, middle, methodName, predicate);
+
+            if (rewrite is null)
+            {
+                return visited;
+            }
+
+            Changed = true;
+
+            return SyntaxFactory.ParseExpression(rewrite).WithTriviaFrom(visited);
+        }
     }
 }

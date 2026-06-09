@@ -2,9 +2,26 @@ namespace MyEfVibe;
 
 internal static class SqlTranslationProbe
 {
+    private static readonly string[] AggregateTerminalMethods =
+    [
+        "Count",
+        "CountAsync",
+        "Any",
+        "AnyAsync",
+        "Max",
+        "MaxAsync",
+        "Min",
+        "MinAsync",
+        "Sum",
+        "SumAsync",
+        "Average",
+        "AverageAsync"
+    ];
+
     /// <summary>
-    ///     Terminal operators removed before <c>ToQueryString()</c>. For operators that EF translates with
-    ///     <c>LIMIT</c>/<c>TOP</c>, the probe keeps an equivalent <c>Take(n)</c> (and <c>Where</c> when needed).
+    ///     Terminal operators removed before <c>ToQueryString()</c> for materializers. Aggregate terminals
+    ///     (<c>Count</c>, <c>Any</c>, etc.) stay on the probe so deep scan can capture translated SQL.
+    ///     For <c>First</c>/<c>Single</c>, the probe keeps an equivalent <c>Take(n)</c> (and <c>Where</c> when needed).
     /// </summary>
     private static readonly (string Suffix, int? TakeLimit)[] TerminalMaterializationSuffixes =
     [
@@ -180,6 +197,38 @@ internal static class SqlTranslationProbe
                || expression.Contains(".ThenInclude(", StringComparison.Ordinal);
     }
 
+    internal static bool LooksLikeAggregateTerminalProbe(string probe)
+    {
+        var trimmed = probe.Trim().TrimEnd(';').Trim();
+
+        foreach (var methodName in AggregateTerminalMethods)
+        {
+            var needle = $".{methodName}(";
+            var index = trimmed.LastIndexOf(needle, StringComparison.Ordinal);
+
+            if (index < 0)
+            {
+                continue;
+            }
+
+            var openParenIndex = index + needle.Length - 1;
+
+            if (!TryFindClosingParenthesis(trimmed, openParenIndex, out var closeParenIndex))
+            {
+                continue;
+            }
+
+            if (!IsEndOfExpression(trimmed, closeParenIndex + 1))
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     internal static string? TryCreateProbeExpression(string snippet)
     {
         var trimmed = snippet.Trim().TrimEnd(';').Trim();
@@ -191,9 +240,14 @@ internal static class SqlTranslationProbe
                 continue;
             }
 
-            var probe = trimmed[..^suffix.Length].TrimEnd();
+            var queryable = trimmed[..^suffix.Length].TrimEnd();
 
-            return TryFinalizeProbe(probe, takeLimit);
+            if (TryGetAggregateMethodFromSuffix(suffix, out var aggregateMethod))
+            {
+                return TryFinalizeAggregateProbe(queryable, aggregateMethod);
+            }
+
+            return TryFinalizeProbe(queryable, takeLimit);
         }
 
         var terminalProbe = TryStripTrailingTerminalCall(trimmed);
@@ -222,7 +276,36 @@ internal static class SqlTranslationProbe
             }
         }
 
+        if (LooksLikeCompositeAnonymousExpression(probe))
+        {
+            return null;
+        }
+
         return LinqEfQueryHeuristics.LooksLikeEfQuery(probe) ? probe : null;
+    }
+
+    private static bool LooksLikeCompositeAnonymousExpression(string expression)
+    {
+        var trimmed = expression.TrimStart();
+
+        if (trimmed.StartsWith("new[]", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!trimmed.StartsWith("new", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var index = 3;
+
+        while (index < trimmed.Length && char.IsWhiteSpace(trimmed[index]))
+        {
+            index++;
+        }
+
+        return index < trimmed.Length && trimmed[index] == '{';
     }
 
     internal static bool TryExtractParenthesizedContent(string text, int openParenIndex, out string content)
@@ -275,12 +358,65 @@ internal static class SqlTranslationProbe
                 return null;
             }
 
+            if (IsAggregateTerminalMethod(methodName))
+            {
+                return TryFinalizeAggregateProbe(queryable, methodName, arguments);
+            }
+
             var takeLimit = TryGetTakeLimitForMethod(methodName);
 
             return TryFinalizeProbe(queryable, takeLimit, arguments);
         }
 
         return null;
+    }
+
+    private static bool IsAggregateTerminalMethod(string methodName)
+    {
+        return AggregateTerminalMethods.Contains(methodName, StringComparer.Ordinal);
+    }
+
+    private static bool TryGetAggregateMethodFromSuffix(string suffix, out string methodName)
+    {
+        methodName = string.Empty;
+
+        if (!suffix.StartsWith(".", StringComparison.Ordinal)
+            || !suffix.EndsWith("()", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        methodName = suffix[1..^2];
+
+        return IsAggregateTerminalMethod(methodName);
+    }
+
+    private static string? TryFinalizeAggregateProbe(
+        string queryable,
+        string methodName,
+        string? terminalArguments = null)
+    {
+        if (string.IsNullOrWhiteSpace(queryable))
+        {
+            return null;
+        }
+
+        var syncMethod = RemapAsyncAggregateMethod(methodName);
+        var predicate = TryExtractPredicateArgument(terminalArguments);
+
+        if (!string.IsNullOrWhiteSpace(predicate))
+        {
+            return $"{queryable}.{syncMethod}({predicate})";
+        }
+
+        return $"{queryable}.{syncMethod}()";
+    }
+
+    private static string RemapAsyncAggregateMethod(string methodName)
+    {
+        return methodName.EndsWith("Async", StringComparison.Ordinal)
+            ? methodName[..^5]
+            : methodName;
     }
 
     private static string? TryFinalizeProbe(string queryable, int? takeLimit, string? terminalArguments = null)

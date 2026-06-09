@@ -16,6 +16,27 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     }
 
     [Fact]
+    public void TryRewriteToEfStaticCalls_AnonymousTypeWithMultipleCounts_RewritesEachTerminal()
+    {
+        const string snippet = """
+                               new
+                               {
+                                   Films = db.Films.Count(),
+                                   Rentals = db.Rentals.Count()
+                               }
+                               """;
+
+        var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(
+            snippet,
+            typeof(FakePagilaStatsDbContext));
+
+        Assert.NotNull(rewritten);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Count(db.Films)", rewritten, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Count(db.Rentals)", rewritten, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(rewritten);
+    }
+
+    [Fact]
     public void TryRewriteToEfStaticCalls_CursorPagination_AppDbContext()
     {
         var assemblyPath = Path.GetFullPath(Path.Combine(
@@ -355,3 +376,14 @@ public sealed class FakeRewriterUser
 
     public string Name { get; set; } = string.Empty;
 }
+
+public sealed class FakePagilaStatsDbContext : DbContext
+{
+    public DbSet<FakePagilaStatsFilm> Films => Set<FakePagilaStatsFilm>();
+
+    public DbSet<FakePagilaStatsRental> Rentals => Set<FakePagilaStatsRental>();
+}
+
+public sealed class FakePagilaStatsFilm;
+
+public sealed class FakePagilaStatsRental;
