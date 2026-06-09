@@ -191,7 +191,7 @@ internal static class WorkspaceDependencyLoader
             return;
         }
 
-        if (!depsManifest.TryResolve(assemblySimpleName, false, out var path))
+        if (!depsManifest.TryResolveConfigurationManagerForHost(out var path))
         {
             return;
         }

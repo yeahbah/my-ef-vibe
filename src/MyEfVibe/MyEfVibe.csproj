@@ -31,6 +31,12 @@
         <Delete Files="$(TargetDir)System.Text.Json.dll" ContinueOnError="true"/>
     </Target>
 
+    <!-- dotnet tool pack uses Publish output; a bundled 8.x copy conflicts with workspace 9.x preload. -->
+    <Target Name="RemoveHostConfigurationManagerFromPublish" AfterTargets="Publish">
+        <Delete Files="$(PublishDir)System.Configuration.ConfigurationManager.dll" ContinueOnError="true"/>
+        <Delete Files="$(PublishDir)System.Text.Json.dll" ContinueOnError="true"/>
+    </Target>
+
     <ItemGroup>
         <InternalsVisibleTo Include="MyEfVibe.Tests"/>
         <InternalsVisibleTo Include="MyEfVibe.IntegrationTests"/>

@@ -25,9 +25,12 @@ internal sealed class WorkspaceDepsManifest
     private readonly HashSet<string> _projectAssemblyPaths =
         new(StringComparer.OrdinalIgnoreCase);
 
-    private WorkspaceDepsManifest(string nuGetPackagesRoot)
+    private readonly int? _workspaceNetCoreMajor;
+
+    private WorkspaceDepsManifest(string nuGetPackagesRoot, int? workspaceNetCoreMajor)
     {
         _nuGetPackagesRoot = nuGetPackagesRoot;
+        _workspaceNetCoreMajor = workspaceNetCoreMajor;
     }
 
     internal ImmutableArray<string> RuntimeAssemblyPaths
@@ -103,7 +106,8 @@ internal sealed class WorkspaceDepsManifest
             }
 
             var nuGetPackagesRoot = ResolveNuGetPackagesRoot();
-            var manifest = new WorkspaceDepsManifest(nuGetPackagesRoot);
+            var workspaceNetCoreMajor = TryParseNetCoreMajorFromRuntimeTarget(runtimeTargetName);
+            var manifest = new WorkspaceDepsManifest(nuGetPackagesRoot, workspaceNetCoreMajor);
             manifest.IndexPackageLibraries(librariesProperty, nuGetPackagesRoot);
             var runtimeFallbacks = HostRuntimeIdentifier.GetRuntimeFallbacks();
 
@@ -517,6 +521,154 @@ internal sealed class WorkspaceDepsManifest
         }
 
         return TryResolveFromNuGetPackageFolder(requested, out absolutePath);
+    }
+
+    internal bool TryResolveConfigurationManagerForHost(out string absolutePath)
+    {
+        absolutePath = string.Empty;
+        const string assemblySimpleName = "System.Configuration.ConfigurationManager";
+
+        if (_assetsBySimpleName.TryGetValue(assemblySimpleName, out var assets) && assets.Count > 0)
+        {
+            var chosen = ChooseBestAsset(null, assets);
+
+            if (chosen is not null
+                && TryRemapToHostCompatiblePackageLib(chosen.Path, assemblySimpleName, out absolutePath))
+            {
+                return true;
+            }
+        }
+
+        if (!TryResolve(new AssemblyName(assemblySimpleName), false, out var resolvedPath))
+        {
+            return false;
+        }
+
+        return TryRemapToHostCompatiblePackageLib(resolvedPath, assemblySimpleName, out absolutePath);
+    }
+
+    private bool TryRemapToHostCompatiblePackageLib(
+        string currentPath,
+        string assemblySimpleName,
+        out string absolutePath)
+    {
+        absolutePath = currentPath;
+
+        if (_workspaceNetCoreMajor is null
+            || !TryGetNetCoreLibMajorFromPath(currentPath, out var libMajor)
+            || libMajor >= _workspaceNetCoreMajor.Value)
+        {
+            return File.Exists(absolutePath);
+        }
+
+        var libRoot = FindPackageLibRoot(currentPath);
+
+        if (libRoot is null)
+        {
+            return File.Exists(absolutePath);
+        }
+
+        foreach (var tfmDirectory in EnumeratePreferredLibDirectories(libRoot))
+        {
+            var tfm = Path.GetFileName(tfmDirectory);
+
+            if (!tfm.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var candidate = Path.Combine(tfmDirectory, $"{assemblySimpleName}.dll");
+
+            if (!File.Exists(candidate))
+            {
+                continue;
+            }
+
+            absolutePath = candidate;
+
+            return true;
+        }
+
+        return File.Exists(absolutePath);
+    }
+
+    private static string? FindPackageLibRoot(string assemblyPath)
+    {
+        var directory = Path.GetDirectoryName(assemblyPath);
+
+        while (!string.IsNullOrEmpty(directory))
+        {
+            if (string.Equals(Path.GetFileName(directory), "lib", StringComparison.OrdinalIgnoreCase))
+            {
+                return directory;
+            }
+
+            directory = Path.GetDirectoryName(directory);
+        }
+
+        return null;
+    }
+
+    private static bool TryGetNetCoreLibMajorFromPath(string assemblyPath, out int major)
+    {
+        major = 0;
+        var libRoot = FindPackageLibRoot(assemblyPath);
+
+        if (libRoot is null)
+        {
+            return false;
+        }
+
+        var tfm = Path.GetFileName(Path.GetDirectoryName(assemblyPath));
+
+        if (string.IsNullOrEmpty(tfm))
+        {
+            return false;
+        }
+
+        return TryGetNetCoreLibMajor(tfm, out major);
+    }
+
+    private static bool TryGetNetCoreLibMajor(string tfm, out int major)
+    {
+        major = 0;
+
+        if (!tfm.StartsWith("net", StringComparison.OrdinalIgnoreCase)
+            || tfm.Contains('-', StringComparison.Ordinal)
+            || !Version.TryParse(tfm["net".Length..], out var version))
+        {
+            return false;
+        }
+
+        major = version.Major;
+
+        return true;
+    }
+
+    private static int? TryParseNetCoreMajorFromRuntimeTarget(string? runtimeTargetName)
+    {
+        if (string.IsNullOrWhiteSpace(runtimeTargetName))
+        {
+            return null;
+        }
+
+        const string prefix = "Version=v";
+        var prefixIndex = runtimeTargetName.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+
+        if (prefixIndex < 0)
+        {
+            return null;
+        }
+
+        var versionText = runtimeTargetName[(prefixIndex + prefix.Length)..];
+        var dotIndex = versionText.IndexOf('.', StringComparison.Ordinal);
+
+        if (dotIndex <= 0)
+        {
+            return null;
+        }
+
+        return int.TryParse(versionText[..dotIndex], out var major) ? major : null;
     }
 
     private void IndexPackageLibraries(JsonElement librariesProperty, string nuGetPackagesRoot)

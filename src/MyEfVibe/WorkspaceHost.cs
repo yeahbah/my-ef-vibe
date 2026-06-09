@@ -91,7 +91,10 @@ internal sealed class WorkspaceHost : IDisposable
 
         WorkspaceSystemTextJsonBootstrap.EnsureLoaded(assemblyResolver, sharedFrameworkCatalog);
 
-        EnsureWorkspaceConfigurationManagerLoaded(assemblyResolver);
+        EnsureWorkspaceConfigurationManagerLoaded(
+            assemblyResolver,
+            workspaceBuild.OutputDirectory,
+            workspaceBuild.StartupOutputDirectory);
 
         // Preload EF packages first, then the entry assembly, then startup-only references.
         // Preloading the startup copy of the EF project DLL before LoadEntryAssembly causes
@@ -107,7 +110,10 @@ internal sealed class WorkspaceHost : IDisposable
                 workspaceBuild.PrimaryAssemblyDll);
         }
 
-        EnsureWorkspaceConfigurationManagerLoaded(assemblyResolver);
+        EnsureWorkspaceConfigurationManagerLoaded(
+            assemblyResolver,
+            workspaceBuild.OutputDirectory,
+            workspaceBuild.StartupOutputDirectory);
 
         var assemblyLoader = new InteractiveAssemblyLoader();
 
@@ -151,7 +157,10 @@ internal sealed class WorkspaceHost : IDisposable
             workspaceBuild.SessionDirectory);
     }
 
-    private static void EnsureWorkspaceConfigurationManagerLoaded(WorkspaceAssemblyResolver resolver)
+    private static void EnsureWorkspaceConfigurationManagerLoaded(
+        WorkspaceAssemblyResolver resolver,
+        string outputDirectory,
+        string? startupOutputDirectory)
     {
         if (AppDomain.CurrentDomain.GetAssemblies().Any(static assembly =>
                 string.Equals(
@@ -162,22 +171,52 @@ internal sealed class WorkspaceHost : IDisposable
             return;
         }
 
-        if (resolver.DepsManifest?.TryResolve("System.Configuration.ConfigurationManager", out var path) != true)
+        foreach (var directory in new[] { outputDirectory, startupOutputDirectory })
+        {
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                continue;
+            }
+
+            var candidate = Path.Combine(directory, "System.Configuration.ConfigurationManager.dll");
+
+            if (!File.Exists(candidate))
+            {
+                continue;
+            }
+
+            if (TryLoadConfigurationManager(candidate))
+            {
+                return;
+            }
+        }
+
+        if (resolver.DepsManifest?.TryResolveConfigurationManagerForHost(out var path) != true)
         {
             return;
         }
 
+        if (TryLoadConfigurationManager(path))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Failed to load `System.Configuration.ConfigurationManager` required by Microsoft.Data.SqlClient."
+            + $"{Environment.NewLine}Path: {path}");
+    }
+
+    private static bool TryLoadConfigurationManager(string absolutePath)
+    {
         try
         {
-            AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, path);
+            AssemblyResolutionHelpers.LoadFromPath(AssemblyLoadContext.Default, absolutePath);
+
+            return true;
         }
-        catch (Exception failure)
+        catch
         {
-            throw new InvalidOperationException(
-                "Failed to load `System.Configuration.ConfigurationManager` required by Microsoft.Data.SqlClient."
-                + $"{Environment.NewLine}Path: {path}"
-                + $"{Environment.NewLine}{failure.Message}",
-                failure);
+            return false;
         }
     }
 
