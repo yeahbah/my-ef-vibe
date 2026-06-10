@@ -35,7 +35,8 @@ internal static class SnippetNormalizer
         {
             return RewriteBoundedEfQuery(
                 NormalizeFinalLine(ReplaceContextAliases(lines[0].TrimEnd())),
-                dbContextType);
+                dbContextType,
+                preserveAsyncQueries);
         }
 
         var normalized = new string[lines.Length];
@@ -58,7 +59,8 @@ internal static class SnippetNormalizer
 
         return RewriteBoundedEfQuery(
             ReplaceContextAliases(InputLineUtilities.JoinLines(normalized)),
-            dbContextType);
+            dbContextType,
+            preserveAsyncQueries);
     }
 
     private static string ReplaceContextAliases(string snippet)
@@ -73,20 +75,27 @@ internal static class SnippetNormalizer
         }
     }
 
-    private static string RewriteBoundedEfQuery(string snippet, Type? dbContextType)
+    private static string RewriteBoundedEfQuery(
+        string snippet,
+        Type? dbContextType,
+        bool preserveAsyncQueries = false)
     {
         if (dbContextType is null)
         {
             return snippet;
         }
 
-        var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(snippet, dbContextType)
+        var options = preserveAsyncQueries
+            ? EfReplQueryRewriteOptions.Async
+            : EfReplQueryRewriteOptions.Sync;
+
+        var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(snippet, dbContextType, options)
                         ?? snippet;
 
-        rewritten = EfReplQueryableRewriter.TryCastDbSetRoots(rewritten, dbContextType)
+        rewritten = EfReplQueryableRewriter.TryCastDbSetRoots(rewritten, dbContextType, options)
                     ?? rewritten;
 
-        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten, dbContextType)
+        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten, dbContextType, options)
                ?? EfReplQueryableRewriter.TryRewriteBareWhere(rewritten, dbContextType)
                ?? rewritten;
     }

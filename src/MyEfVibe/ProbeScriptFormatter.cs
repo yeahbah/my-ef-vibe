@@ -10,14 +10,16 @@ internal static class ProbeScriptFormatter
     /// <summary>
     ///     Collapses multiline query chains to one line so scripting does not treat each line as a separate statement.
     /// </summary>
-    internal static string ToScriptExpression(string probeExpression)
+    internal static string ToScriptExpression(string probeExpression, bool preserveLeadingAwait = false)
     {
         if (string.IsNullOrWhiteSpace(probeExpression))
         {
             return probeExpression;
         }
 
-        probeExpression = StripLeadingReturnAwait(StripVariableDeclarationPrefix(probeExpression));
+        probeExpression = StripLeadingReturnAwait(
+            StripVariableDeclarationPrefix(probeExpression),
+            preserveLeadingAwait);
 
         probeExpression = CollapseWhitespace(probeExpression);
 
@@ -144,7 +146,7 @@ internal static class ProbeScriptFormatter
         return -1;
     }
 
-    private static string StripLeadingReturnAwait(string expression)
+    private static string StripLeadingReturnAwait(string expression, bool preserveLeadingAwait = false)
     {
         var trimmed = expression.Trim();
 
@@ -153,7 +155,7 @@ internal static class ProbeScriptFormatter
             trimmed = trimmed["return ".Length..].Trim();
         }
 
-        if (trimmed.StartsWith("await ", StringComparison.Ordinal))
+        if (!preserveLeadingAwait && trimmed.StartsWith("await ", StringComparison.Ordinal))
         {
             trimmed = trimmed["await ".Length..].Trim();
         }

@@ -15,21 +15,28 @@ internal static class RepositorySnippetAdapter
             return snippet;
         }
 
-        var normalized = ProbeScriptFormatter.ToScriptExpression(snippet);
+        var normalized = ProbeScriptFormatter.ToScriptExpression(snippet, preserveAsyncQueries);
         normalized = DbContextAliasSyntaxRewriter.Rewrite(normalized);
-        normalized = ProbeParameterStubber.Stub(normalized, new ProbeStubContext(dbContextType, null));
+        normalized = ProbeParameterStubber.Stub(
+            normalized,
+            new ProbeStubContext(dbContextType, null),
+            preserveAsyncQueries);
 
         if (!preserveAsyncQueries)
         {
             normalized = AsyncQueryableSyncRewriter.Rewrite(normalized);
         }
 
-        normalized = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(normalized, dbContextType)
+        var options = preserveAsyncQueries
+            ? EfReplQueryRewriteOptions.Async
+            : EfReplQueryRewriteOptions.Sync;
+
+        normalized = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(normalized, dbContextType, options)
                      ?? normalized;
-        normalized = EfReplQueryableRewriter.TryCastDbSetRoots(normalized, dbContextType)
+        normalized = EfReplQueryableRewriter.TryCastDbSetRoots(normalized, dbContextType, options)
                      ?? normalized;
 
-        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(normalized, dbContextType)
+        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(normalized, dbContextType, options)
                ?? EfReplQueryableRewriter.TryRewriteBareWhere(normalized, dbContextType)
                ?? normalized;
     }

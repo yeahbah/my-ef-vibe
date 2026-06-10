@@ -8,8 +8,10 @@ MY_EF_VIBE_ROOT="$(cd "${ROOT}/../.." && pwd)"
 INTEGRATION_ROOT="${EFVIBE_INTEGRATION_ROOT:-/home/adiaz/Projects}"
 DOCKER_DIR="${ROOT}/docker"
 AW_REPO="${INTEGRATION_ROOT}/AdventureWorks"
+CB_REPO="${INTEGRATION_ROOT}/AdventureWorksCouchBase"
 SQLSERVER_DIR="${INTEGRATION_ROOT}/adventureworks"
 AW_URL="${ADVENTUREWORKS_REPO_URL:-https://github.com/theMickster/AdventureWorks.git}"
+CB_URL="${ADVENTUREWORKS_COUCHBASE_REPO_URL:-}"
 
 info() { printf '==> %s\n' "$*"; }
 warn() { printf 'warning: %s\n' "$*" >&2; }
@@ -62,6 +64,46 @@ setup_sqlserver() {
   configure_sqlserver_secrets
 }
 
+ensure_adventureworks_couchbase_repo() {
+  if [[ -d "${CB_REPO}/.git" ]]; then
+    info "Updating AdventureWorksCouchBase at ${CB_REPO}"
+    git -C "${CB_REPO}" fetch origin main --quiet 2>/dev/null || true
+    git -C "${CB_REPO}" pull --ff-only origin main --quiet 2>/dev/null || true
+    return 0
+  fi
+
+  if [[ -z "${CB_URL}" ]]; then
+    warn "AdventureWorksCouchBase not found at ${CB_REPO}; clone it or set ADVENTUREWORKS_COUCHBASE_REPO_URL."
+    return 0
+  fi
+
+  info "Cloning AdventureWorksCouchBase -> ${CB_REPO}"
+  git clone --branch main --depth 1 "${CB_URL}" "${CB_REPO}"
+}
+
+setup_couchbase() {
+  if [[ ! -f "${CB_REPO}/docker-compose.yml" ]]; then
+    warn "Couchbase docker-compose not found at ${CB_REPO}; skipping Couchbase."
+    return 0
+  fi
+
+  # shellcheck disable=SC1091
+  [[ -f "${DOCKER_DIR}/.env" ]] && source "${DOCKER_DIR}/.env"
+  local sql_password="${MSSQL_SA_PASSWORD:-Your_strong_Password123!}"
+
+  info "Starting Couchbase (aw-couchbase) and migration"
+  MIGRATION_SQL_CONNECTION_STRING="Server=host.docker.internal,1433;Database=AdventureWorks2022;User Id=sa;Password=${sql_password};TrustServerCertificate=true" \
+    docker compose -f "${CB_REPO}/docker-compose.yml" up -d couchbase couchbase-migrate
+
+  info "Waiting for Couchbase (first start can take several minutes)..."
+  for _ in $(seq 1 90); do
+    if docker inspect -f '{{.State.Health.Status}}' aw-couchbase 2>/dev/null | grep -qx healthy; then
+      break
+    fi
+    sleep 5
+  done
+}
+
 setup_docker_targets() {
   require_cmd docker
 
@@ -97,8 +139,10 @@ main() {
 
   info "Integration root: ${INTEGRATION_ROOT}"
   ensure_adventureworks_repo
+  ensure_adventureworks_couchbase_repo
   setup_sqlserver
   setup_docker_targets
+  setup_couchbase
   "${ROOT}/scripts/convert-databases.sh"
 
   info "Building MyEfVibe"

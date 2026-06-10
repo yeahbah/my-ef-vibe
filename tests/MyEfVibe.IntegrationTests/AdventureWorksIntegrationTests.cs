@@ -30,7 +30,11 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
 
         Assert.True(metrics.Succeeded);
         Assert.True(metrics.RowCount >= 1);
-        Assert.True(metrics.SqlCommandCount > 0 || !string.IsNullOrWhiteSpace(metrics.TranslatedSql));
+
+        if (session.Host.ActiveProviderDescriptor?.IsCouchbase != true)
+        {
+            Assert.True(metrics.SqlCommandCount > 0 || !string.IsNullOrWhiteSpace(metrics.TranslatedSql));
+        }
     }
 
     [SkippableTheory]
@@ -49,6 +53,12 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
     public async Task Query_plan_returns_rows(string scenarioId)
     {
         var session = await _sessions.GetAsync(scenarioId);
+
+        Skip.IfNot(
+            ProviderCapabilityResolver.SupportsQueryPlan(
+                session.Host.ActiveProviderDescriptor,
+                session.DbContext),
+            "Provider does not support relational EXPLAIN plans.");
 
         var (_, metrics) = await EvaluateOrAssertAsync(
             session,
@@ -95,6 +105,10 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
     {
         var session = await _sessions.GetAsync(scenarioId);
 
+        Skip.If(
+            session.Host.ActiveProviderDescriptor?.IsCouchbase == true,
+            "Couchbase deep scan SQL++ translation is not available in this release.");
+
         var (scanResult, stats) = await LinqDeepScanner.ScanAsync(
             session.Scenario.EfProjectPath,
             session.Scenario.StartupProjectPath,
@@ -111,18 +125,23 @@ public sealed class AdventureWorksIntegrationTests(IntegrationSessionCache sessi
 
         Assert.NotEmpty(withSql);
 
-        var planFailureNotes = withSql
-            .Where(finding => string.IsNullOrWhiteSpace(finding.QueryPlan)
-                              && !string.IsNullOrWhiteSpace(finding.QueryPlanNote))
-            .Select(finding => finding.QueryPlanNote)
-            .Distinct(StringComparer.Ordinal)
-            .Take(3)
-            .ToArray();
+        if (ProviderCapabilityResolver.SupportsQueryPlan(
+                session.Host.ActiveProviderDescriptor,
+                session.DbContext))
+        {
+            var planFailureNotes = withSql
+                .Where(finding => string.IsNullOrWhiteSpace(finding.QueryPlan)
+                                  && !string.IsNullOrWhiteSpace(finding.QueryPlanNote))
+                .Select(finding => finding.QueryPlanNote)
+                .Distinct(StringComparer.Ordinal)
+                .Take(3)
+                .ToArray();
 
-        Assert.True(
-            stats.QueryPlanCount > 0,
-            $"Expected at least one EXPLAIN plan (translated={stats.SqlTranslatedCount}, planFailed={stats.QueryPlanFailedCount})."
-            + $" Sample plan failure(s): {string.Join(" | ", planFailureNotes)}");
+            Assert.True(
+                stats.QueryPlanCount > 0,
+                $"Expected at least one EXPLAIN plan (translated={stats.SqlTranslatedCount}, planFailed={stats.QueryPlanFailedCount})."
+                + $" Sample plan failure(s): {string.Join(" | ", planFailureNotes)}");
+        }
     }
 
     private static async Task<(object? Result, EvaluationMetrics Metrics)> EvaluateOrAssertAsync(

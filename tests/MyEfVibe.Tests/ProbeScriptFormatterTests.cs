@@ -46,6 +46,17 @@ public sealed class ProbeScriptFormatterTests
     }
 
     [Fact]
+    public void ToScriptExpression_PreservesLeadingAwaitWhenRequested()
+    {
+        const string expression = "await db.Users.CountAsync();";
+
+        var script = ProbeScriptFormatter.ToScriptExpression(expression, preserveLeadingAwait: true);
+
+        Assert.StartsWith("await ", script, StringComparison.Ordinal);
+        Assert.Contains("CountAsync", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ToScriptExpression_VarAssignment_StripsPrefixWithoutBreakingLambdas()
     {
         const string expression =

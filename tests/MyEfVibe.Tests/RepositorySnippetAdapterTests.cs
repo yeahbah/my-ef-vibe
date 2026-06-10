@@ -5,6 +5,22 @@ namespace MyEfVibe.Tests;
 public sealed class RepositorySnippetAdapterTests
 {
     [Fact]
+    public void PrepareForEvaluation_SyncCount_UsesAsyncRuntimeWhenPreserveAsync()
+    {
+        const string snippet = "db.BusinessEntities.Count();";
+
+        var normalized = SnippetNormalizer.ForEvaluation(
+            snippet,
+            typeof(FakeAdventureWorksDbContext),
+            preserveAsyncQueries: true);
+
+        Assert.Contains("await ", normalized, StringComparison.Ordinal);
+        Assert.Contains("CountAsync", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReplQueryableRuntime.Count(", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
     public void PrepareForEvaluation_PreservesAsyncWhenRequested()
     {
         const string snippet = """

@@ -24,7 +24,7 @@ internal static class QueryEvaluator
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            var result = await session.EvaluateAsync(normalizedSnippet, cancellationToken);
+            var result = await session.EvaluateAsync(snippet, cancellationToken);
             stopwatch.Stop();
 
             var (kind, typeName, rowCount, isMaterialized, estimatedBytes, exportRows) =

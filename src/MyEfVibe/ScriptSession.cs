@@ -185,7 +185,7 @@ internal sealed class ScriptSession
 
         RecordSubmission(trimmed);
 
-        return _state.ReturnValue;
+        return await UnwrapTaskReturnValueAsync(_state.ReturnValue, cancellationToken);
     }
 
     /// <summary>
@@ -231,7 +231,28 @@ internal sealed class ScriptSession
                 : new Exception(state.Exception.ToString());
         }
 
-        return state.ReturnValue;
+        return await UnwrapTaskReturnValueAsync(state.ReturnValue, cancellationToken);
+    }
+
+    private static async Task<object?> UnwrapTaskReturnValueAsync(
+        object? returnValue,
+        CancellationToken cancellationToken)
+    {
+        if (returnValue is not Task task)
+        {
+            return returnValue;
+        }
+
+        await task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        var taskType = task.GetType();
+
+        if (!taskType.IsGenericType)
+        {
+            return null;
+        }
+
+        return taskType.GetProperty("Result")?.GetValue(task);
     }
 
     internal void RecordSubmission(string snippet)

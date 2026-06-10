@@ -42,7 +42,8 @@ internal static class DatabaseProbe
             return false;
         }
 
-        if (RelationalDatabaseFacadeInvoker.TryGetDbConnection(
+        if (!ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor)
+            && RelationalDatabaseFacadeInvoker.TryGetDbConnection(
                 database,
                 host.EnumerateLoadedAssemblies(),
                 out var connection)
@@ -83,15 +84,30 @@ internal static class DatabaseProbe
     {
         try
         {
-            var (_, metrics) = await QueryEvaluator.EvaluateAsync(
+            var requiresAsync = ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor);
+            var snippet = requiresAsync
+                ? "db.Products.Count();"
+                : "db.Products.Take(1).ToList();";
+
+            var (result, metrics) = await QueryEvaluator.EvaluateAsync(
                 dbContext,
                 scriptSession,
-                "db.Products.Take(1).ToList();",
+                snippet,
                 new DbLogSettings { Enabled = true },
                 host.EnumerateLoadedAssemblies(),
                 cancellationToken);
 
-            return metrics.Succeeded && metrics.RowCount is > 0;
+            if (!metrics.Succeeded)
+            {
+                return false;
+            }
+
+            if (requiresAsync && result is int count)
+            {
+                return count > 0;
+            }
+
+            return metrics.RowCount is > 0;
         }
         catch
         {
@@ -115,6 +131,7 @@ internal static class DatabaseProbe
             "npgsql" => providerName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase),
             "oracle" => providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase),
             "sqlite" => providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase),
+            "couchbase" => providerName.Contains("Couchbase", StringComparison.OrdinalIgnoreCase),
             _ => false
         };
     }

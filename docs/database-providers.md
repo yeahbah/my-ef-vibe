@@ -48,6 +48,10 @@ Pomelo MySQL/MariaDB uses a dedicated configurator for `ServerVersion` when the 
 
 ## Couchbase
 
+**EF Core version:** `Couchbase.EntityFrameworkCore` 1.0.x supports **EF Core 8** only ([compatibility guide](https://docs.couchbase.com/efcore-provider/current/entity-framework-core-compatibility-guide.html)). If `-p` references EF Core 9 or 10, DbContext construction fails with `LockReleaseBehavior` / `CouchbaseHistoryRepository` errors. Pin `Microsoft.EntityFrameworkCore` to `8.0.x` on the EF project and target `net8.0` until Couchbase ships a newer provider.
+
+Reference **only** `Couchbase.EntityFrameworkCore` on `-p` (remove other EF provider packages such as SQL Server from the same project).
+
 Couchbase uses a structured **`Couchbase`** config section on `-s` (not `ConnectionStrings`):
 
 ```json
@@ -62,6 +66,8 @@ Couchbase uses a structured **`Couchbase`** config section on `-s` (not `Connect
 ```
 
 efvibe also accepts a legacy top-level **`DefaultConnection`** object with the same fields (for older AdventureWorks CouchBase `appsettings.json` layouts).
+
+**Cluster bootstrap:** efvibe waits for the Couchbase SDK cluster (and configured bucket) to finish bootstrapping when the REPL session starts. If queries still fail with “Cluster has not yet bootstrapped”, check network access to Capella/on-prem and verify `ConnectionString`, credentials, `BucketName`, and `ScopeName`.
 
 **Async-only REPL:** Couchbase EF does not support sync query terminals. End queries with `*Async()`:
 

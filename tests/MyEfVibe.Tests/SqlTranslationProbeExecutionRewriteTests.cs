@@ -275,6 +275,55 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     }
 
     [Fact]
+    public void SnippetNormalizer_ForEvaluation_Count_UsesAsyncRuntimeWhenPreserveAsync()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.Count();",
+            typeof(FakeRewriterDbContext),
+            preserveAsyncQueries: true);
+
+        Assert.Contains("await ", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.CountAsync(db.Users)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReplQueryableRuntime.Count(", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
+    public void TryRewriteToEfStaticCalls_ScalarProjection_WithAsyncOptions_WrapsForCouchbaseAndUnwrapsAfterMaterialize()
+    {
+        const string snippet = "db.Users.Select(x => x.Name).Take(10).ToArray()";
+
+        var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(
+            snippet,
+            typeof(FakeRewriterDbContext),
+            EfReplQueryRewriteOptions.Async);
+
+        Assert.NotNull(rewritten);
+        Assert.Contains("new { Name = x.Name }", rewritten, StringComparison.Ordinal);
+        Assert.Contains("UnwrapScalarProjectionAsync", rewritten, StringComparison.Ordinal);
+        Assert.Contains("ToArrayAsync", rewritten, StringComparison.Ordinal);
+        Assert.StartsWith("await ", rewritten, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(rewritten);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_DoubleNormalization_PreservesAwaitForCouchbase()
+    {
+        var once = SnippetNormalizer.ForEvaluation(
+            "db.Users.Count();",
+            typeof(FakeRewriterDbContext),
+            preserveAsyncQueries: true);
+
+        Assert.Contains("await ", once, StringComparison.Ordinal);
+
+        var twice = SnippetNormalizer.ForEvaluation(once, typeof(FakeRewriterDbContext), preserveAsyncQueries: true);
+
+        Assert.Contains("await ", twice, StringComparison.Ordinal);
+        Assert.Contains("CountAsync", twice, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(twice);
+    }
+
+    [Fact]
     public void SnippetNormalizer_ForEvaluation_RewritesCountPredicateToQueryableRuntime()
     {
         var normalized = SnippetNormalizer.ForEvaluation(

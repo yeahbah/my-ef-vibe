@@ -137,6 +137,69 @@ internal static class CsprojInspector
         }
     }
 
+    internal static bool TryReadPackageReferenceVersion(
+        string csprojAbsolutePath,
+        string packageId,
+        out Version? version)
+    {
+        version = null;
+
+        if (string.IsNullOrWhiteSpace(csprojAbsolutePath) || string.IsNullOrWhiteSpace(packageId))
+        {
+            return false;
+        }
+
+        var dom = Load(csprojAbsolutePath);
+        var xmlns = dom.Root!.Name.Namespace;
+
+        foreach (var package in dom.Descendants(xmlns + "PackageReference"))
+        {
+            var include = package.Attribute("Include")?.Value;
+
+            if (!string.Equals(include, packageId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var versionText = package.Attribute("Version")?.Value?.Trim();
+
+            if (string.IsNullOrWhiteSpace(versionText))
+            {
+                return false;
+            }
+
+            if (Version.TryParse(NormalizeVersionText(versionText), out var parsed))
+            {
+                version = parsed;
+                return true;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeVersionText(string versionText)
+    {
+        var span = versionText.AsSpan().Trim();
+
+        if (span.Length >= 2
+            && (span[0] == '[' || span[0] == '(')
+            && span[^1] == ')')
+        {
+            var inner = span[1..^1];
+            var comma = inner.IndexOf(',');
+
+            if (comma >= 0)
+            {
+                return inner[..comma].Trim().ToString();
+            }
+        }
+
+        return versionText;
+    }
+
     private static string? ReadProperty(string csprojAbsolutePath, string propertyName)
     {
         var dom = Load(csprojAbsolutePath);

@@ -89,7 +89,8 @@ internal sealed class EfvibeIntegrationSession : IAsyncDisposable
             dbContext.GetType(),
             dbContext,
             workspaceBuild.ReferenceAssemblyPaths,
-            host.AssemblyLoader);
+            host.AssemblyLoader,
+            ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor));
 
         if (!await DatabaseProbe.CanConnectAsync(dbContext, scriptSession, host, cancellationToken))
         {

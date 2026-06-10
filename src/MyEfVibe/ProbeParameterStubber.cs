@@ -9,7 +9,10 @@ namespace MyEfVibe;
 /// </summary>
 internal static class ProbeParameterStubber
 {
-    internal static string Stub(string probeExpression, ProbeStubContext? context = null)
+    internal static string Stub(
+        string probeExpression,
+        ProbeStubContext? context = null,
+        bool preserveLeadingAwait = false)
     {
         if (string.IsNullOrWhiteSpace(probeExpression))
         {
@@ -18,7 +21,7 @@ internal static class ProbeParameterStubber
 
         try
         {
-            var singleLine = ProbeScriptFormatter.ToScriptExpression(probeExpression);
+            var singleLine = ProbeScriptFormatter.ToScriptExpression(probeExpression, preserveLeadingAwait);
             var wrapped = $"var __efProbe = {singleLine};";
 
             var tree = CSharpSyntaxTree.ParseText(
@@ -38,7 +41,7 @@ internal static class ProbeParameterStubber
         }
         catch (Exception)
         {
-            return ProbeScriptFormatter.ToScriptExpression(probeExpression);
+            return ProbeScriptFormatter.ToScriptExpression(probeExpression, preserveLeadingAwait);
         }
     }
 

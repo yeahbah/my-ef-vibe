@@ -12,7 +12,8 @@ internal static class ProviderAssemblyNames
             ["Microsoft.Data.SqlClient"] = "microsoft.data.sqlclient",
             ["Microsoft.Data.Sqlite"] = "microsoft.data.sqlite.core",
             ["Microsoft.EntityFrameworkCore.Sqlite"] = "microsoft.entityframeworkcore.sqlite.core",
-            ["SQLitePCLRaw.batteries_v2"] = "sqlitepclraw.bundle_e_sqlite3"
+            ["SQLitePCLRaw.batteries_v2"] = "sqlitepclraw.bundle_e_sqlite3",
+            ["Couchbase.NetClient"] = "couchbasenetclient"
         };
 
     internal static IEnumerable<string> For(ProviderDescriptor descriptor)
@@ -67,6 +68,12 @@ internal static class ProviderAssemblyNames
             [
                 "Pomelo.EntityFrameworkCore.MySql",
                 "MySql.EntityFrameworkCore"
+            ],
+            MyEfVibeProvider.Couchbase =>
+            [
+                "Couchbase.EntityFrameworkCore",
+                "Couchbase.NetClient",
+                "Microsoft.Extensions.ObjectPool"
             ],
             _ => []
         };

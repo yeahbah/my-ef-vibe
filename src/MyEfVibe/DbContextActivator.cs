@@ -51,10 +51,12 @@ internal static class DbContextActivator
             providerDescriptor ??= ProviderDescriptor.TryFromKnownProvider(MyEfVibeProvider.Sqlite);
         }
 
-        if (!string.IsNullOrWhiteSpace(connectionString) && providerDescriptor is null)
+        providerDescriptor ??= EntityFrameworkProviderDiscovery.TryDiscoverFromProject(host.ProjectPath);
+        provider ??= providerDescriptor?.KnownProvider;
+
+        if (!CouchbaseEntityFrameworkCompatibility.TryValidateEfCoreVersion(host.ProjectPath, out var couchbaseEfError))
         {
-            providerDescriptor = EntityFrameworkProviderDiscovery.TryDiscoverFromProject(host.ProjectPath);
-            provider ??= providerDescriptor?.KnownProvider;
+            throw new InvalidOperationException(couchbaseEfError);
         }
 
         if (providerDescriptor is not null)
@@ -83,6 +85,39 @@ internal static class DbContextActivator
             return Finish(host, providerDescriptor, explicitOptionsInstance);
         }
 
+        var prefersDesignTimeFactoryForCouchbase =
+            providerDescriptor?.IsCouchbase == true
+            || provider == MyEfVibeProvider.Couchbase;
+
+        if (prefersDesignTimeFactoryForCouchbase
+            && TryCreateUsingDesignTimeFactory(
+                selectedDbContextType,
+                host,
+                out var couchbaseDesignTimeInstance,
+                ref designTimeFactoryErrors))
+        {
+            if (providerDescriptor is not null || provider.HasValue)
+            {
+                TryApplyProviderHints(
+                    couchbaseDesignTimeInstance,
+                    host,
+                    provider,
+                    providerDescriptor);
+            }
+
+            return Finish(host, providerDescriptor, couchbaseDesignTimeInstance);
+        }
+
+        if (TryCreateUsingCouchbaseConfiguration(
+                host,
+                ref providerDescriptor,
+                ref provider,
+                selectedDbContextType,
+                out var couchbaseInstance))
+        {
+            return Finish(host, providerDescriptor, couchbaseInstance);
+        }
+
         if (TryCreateUsingDesignTimeFactory(selectedDbContextType, host, out var designTimeInstance,
                 ref designTimeFactoryErrors))
         {
@@ -98,16 +133,6 @@ internal static class DbContextActivator
             }
 
             return Finish(host, providerDescriptor, designTimeInstance);
-        }
-
-        if (TryCreateUsingCouchbaseConfiguration(
-                host,
-                ref providerDescriptor,
-                ref provider,
-                selectedDbContextType,
-                out var couchbaseInstance))
-        {
-            return Finish(host, providerDescriptor, couchbaseInstance);
         }
 
         var resolvedConnectionFromConfiguration = false;
@@ -553,6 +578,18 @@ internal static class DbContextActivator
         }
     }
 
+    private static string FormatDesignTimeFactoryError(string? factoryFullName, string invokeError)
+    {
+        var couchbaseHint = CouchbaseEntityFrameworkCompatibility.TryExplainTypeLoadFailure(invokeError);
+
+        if (couchbaseHint is null)
+        {
+            return $"{factoryFullName}: {invokeError}";
+        }
+
+        return $"{factoryFullName}: {invokeError}{Environment.NewLine}{couchbaseHint}";
+    }
+
     private static bool TryCreateUsingDesignTimeFactory(
         Type dbContextConcreteType,
         WorkspaceHost host,
@@ -590,7 +627,7 @@ internal static class DbContextActivator
                     out var invokeError))
             {
                 errors ??= [];
-                errors.Add($"{candidate.FullName}: {invokeError}");
+                errors.Add(FormatDesignTimeFactoryError(candidate.FullName, invokeError));
                 continue;
             }
 
@@ -1312,6 +1349,15 @@ internal static class DbContextActivator
         host.SetActiveProviderDescriptor(
             providerDescriptor
             ?? EntityFrameworkProviderDiscovery.TryDiscoverFromProject(host.ProjectPath));
+
+        if (host.ActiveProviderDescriptor?.IsCouchbase == true
+            && host.ActiveCouchbaseSettings is null
+            && CouchbaseSettingsResolver.TryResolve(host.StartupProjectPath, out var couchbaseSettings))
+        {
+            host.SetActiveCouchbaseSettings(couchbaseSettings);
+        }
+
+        CouchbaseClusterBootstrapper.TryBootstrap(instance, host);
 
         return instance;
     }

@@ -7,15 +7,15 @@ public sealed class ConfigurationManagerPreloadTests
     {
         IntegrationTestGuards.RequireEnabled();
 
-        var persistenceDll = FindPrebuiltDll("AdventureWorks.Infrastructure.Persistence.dll");
-        var startupDll = FindPrebuiltDll("AdventureWorks.API.dll");
-
-        Skip.If(persistenceDll is null || startupDll is null,
-            "No pre-built AdventureWorks output under /tmp/efvibe-integration.");
+        Skip.IfNot(
+            IntegrationPrebuiltArtifacts.TryFindRelationalBuildOutputs(
+                out var persistenceDll,
+                out var startupDll,
+                out var outputDirectory,
+                out var startupOutputDirectory),
+            "No pre-built AdventureWorks relational output under /tmp/efvibe-integration.");
 
         var scenario = IntegrationScenarioCatalog.Require("postgresql");
-        var outputDirectory = Path.GetDirectoryName(persistenceDll)!;
-        var startupOutputDirectory = Path.GetDirectoryName(startupDll)!;
 
         var workspaceBuild = new WorkspaceBuildResult(
             Path.Combine(Path.GetTempPath(), "efvibe-integration-smoke", Guid.NewGuid().ToString("N")),
@@ -37,20 +37,5 @@ public sealed class ConfigurationManagerPreloadTests
             false);
 
         Assert.Equal(scenario.Context, dbContext.GetType().Name);
-    }
-
-    private static string? FindPrebuiltDll(string fileName)
-    {
-        var root = Path.Combine(Path.GetTempPath(), "efvibe-integration");
-
-        if (!Directory.Exists(root))
-        {
-            return null;
-        }
-
-        return Directory
-            .EnumerateFiles(root, fileName, SearchOption.AllDirectories)
-            .FirstOrDefault(path => path.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}",
-                StringComparison.Ordinal));
     }
 }

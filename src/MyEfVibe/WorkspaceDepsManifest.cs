@@ -63,6 +63,31 @@ internal sealed class WorkspaceDepsManifest
         _providerAssemblyRegistry.RegisterAssemblyReferences(assembly);
     }
 
+    internal void RegisterProviderAssemblyReferencesFromPath(string assemblyPath)
+    {
+        if (!File.Exists(assemblyPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var assemblyName = AssemblyName.GetAssemblyName(assemblyPath);
+            var loaded = AssemblyResolutionHelpers.GetLoadedAssembly(assemblyName, assemblyPath);
+
+            if (loaded is not null)
+            {
+                RegisterProviderAssemblyReferences(loaded);
+            }
+        }
+        catch (BadImageFormatException)
+        {
+        }
+        catch (FileLoadException)
+        {
+        }
+    }
+
     internal static WorkspaceDepsManifest? TryLoad(string entryAssemblyPath)
     {
         var outputDirectory = Path.GetDirectoryName(entryAssemblyPath);

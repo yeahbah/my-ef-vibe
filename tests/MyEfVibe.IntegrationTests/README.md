@@ -3,8 +3,9 @@
 Live-database tests against [AdventureWorks](https://github.com/theMickster/AdventureWorks) on your machine. They are *
 *not** run in CI (see `.github/workflows/ci.yml`, which only runs `MyEfVibe.Tests`).
 
-All four providers use the **same** repo: `/home/adiaz/Projects/AdventureWorks`. Databases are provisioned from the SQL
-Server `AdventureWorks2022` backup via Docker.
+Relational providers use the **same** repo: `AdventureWorks`. Databases are provisioned from the SQL Server
+`AdventureWorks2022` backup via Docker. Couchbase uses a separate `AdventureWorksCouchBase` repo (EF Core 8 /
+`Couchbase.EntityFrameworkCore`).
 
 ## Quick setup
 
@@ -19,7 +20,8 @@ This script:
 2. Restores `AdventureWorks2022` into `adventureworks-sql` (port **1433**).
 3. Starts PostgreSQL and Oracle containers (`docker/docker-compose.yml`).
 4. Converts the SQL Server database to PostgreSQL (pgloader), SQLite (DuckDB), and Oracle (Python).
-5. Builds **myefvibe**.
+5. Starts Couchbase when `AdventureWorksCouchBase` is present (migrates data from SQL Server).
+6. Builds **myefvibe**.
 
 Integration scenarios pass a provider descriptor programmatically to exercise each engine explicitly. In normal CLI use, efvibe auto-discovers the provider from `-p` and works with most relational EF Core packages — see [docs/database-providers.md](../../docs/database-providers.md).
 
@@ -48,14 +50,16 @@ Without `EFVIBE_RUN_INTEGRATION=1`, all tests are skipped.
 | `postgresql` | `efvibe-integration-postgres`               | 5432 | pgloader from SQL Server → `adventureworks` DB                                                            |
 | `oracle`     | `efvibe-integration-oracle`                 | 1521 | copy from PostgreSQL; column/table names taken from SQL Server metadata (pgloader lowercases identifiers) |
 | `sqlite`     | `AdventureWorks/Source/AdventureWorksLT.db` | —    | copy from PostgreSQL via DuckDB                                                                           |
+| `couchbase`  | `aw-couchbase`                              | 8091 | migrate from SQL Server via `AdventureWorksCouchBase` docker-compose                                      |
 
 ## Scenarios
 
-| Id           | Provider   | Repo             | Notes                                                                                                  |
-|--------------|------------|------------------|--------------------------------------------------------------------------------------------------------|
-| `sqlserver`  | SQL Server | `AdventureWorks` | `AdventureWorks2022` on localhost:1433                                                                 |
-| `postgresql` | PostgreSQL | `AdventureWorks` | lowercase schemas (`production.product`); efvibe applies naming hints                                  |
-| `oracle`     | Oracle     | `AdventureWorks` | `AdvWorks` / `localhost:1521/FREEPDB1`                                                                 |
-| `sqlite`     | SQLite     | `AdventureWorks` | `Source/AdventureWorksLT.db`; tables named `Schema.Table`; efvibe maps EF schema/table to dotted names |
+| Id           | Provider   | Repo                      | Notes                                                                                                  |
+|--------------|------------|---------------------------|--------------------------------------------------------------------------------------------------------|
+| `sqlserver`  | SQL Server | `AdventureWorks`          | `AdventureWorks2022` on localhost:1433                                                                 |
+| `postgresql` | PostgreSQL | `AdventureWorks`          | lowercase schemas (`production.product`); efvibe applies naming hints                                  |
+| `oracle`     | Oracle     | `AdventureWorks`          | `AdvWorks` / `localhost:1521/FREEPDB1`                                                                 |
+| `sqlite`     | SQLite     | `AdventureWorks`          | `Source/AdventureWorksLT.db`; tables named `Schema.Table`; efvibe maps EF schema/table to dotted names |
+| `couchbase`  | Couchbase  | `AdventureWorksCouchBase` | `net8.0`; connection from startup `appsettings.json`; async queries required                           |
 
 Edit `integration-scenarios.json` to change paths, TFM (`framework`), or connection strings.

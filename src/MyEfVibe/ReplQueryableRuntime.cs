@@ -194,6 +194,75 @@ public static class ReplQueryableRuntime
         return InvokeEfAsync("CountAsync", source, cancellationToken, predicate);
     }
 
+    public static Task<object?> ToListAsync(object source, CancellationToken cancellationToken = default)
+    {
+        return InvokeEfAsync("ToListAsync", source, cancellationToken);
+    }
+
+    public static Task<object?> ToArrayAsync(object source, CancellationToken cancellationToken = default)
+    {
+        return InvokeEfAsync("ToArrayAsync", source, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Couchbase EF returns scalar projections as JSON objects; unwrap anonymous projection rows
+    ///     (e.g. <c>new { Name = x.Name }</c>) back to a typed array of the scalar member.
+    /// </summary>
+    public static object UnwrapScalarProjection(object materialized, string memberName)
+    {
+        if (materialized is not System.Collections.IEnumerable enumerable)
+        {
+            return materialized;
+        }
+
+        var items = new List<object?>();
+
+        foreach (var item in enumerable)
+        {
+            items.Add(item);
+        }
+
+        if (items.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var property = items[0]?.GetType().GetProperty(
+            memberName,
+            BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+        if (property is null)
+        {
+            return materialized;
+        }
+
+        var elementType = property.PropertyType;
+        var array = Array.CreateInstance(elementType, items.Count);
+
+        for (var index = 0; index < items.Count; index++)
+        {
+            var value = items[index] is null ? null : property.GetValue(items[index]);
+            array.SetValue(value, index);
+        }
+
+        return array;
+    }
+
+    public static async Task<object?> UnwrapScalarProjectionAsync(
+        Task<object?> materializedTask,
+        string memberName,
+        CancellationToken cancellationToken = default)
+    {
+        if (materializedTask is null)
+        {
+            return null;
+        }
+
+        _ = cancellationToken;
+
+        return UnwrapScalarProjection(await materializedTask.ConfigureAwait(false), memberName);
+    }
+
     private static object InvokeQueryableSelect(object source, Expression selector)
     {
         if (selector is not LambdaExpression lambda)

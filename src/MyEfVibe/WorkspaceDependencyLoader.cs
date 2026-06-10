@@ -35,10 +35,16 @@ internal static class WorkspaceDependencyLoader
                      "Pomelo.EntityFrameworkCore.MySql",
                      "MySql.EntityFrameworkCore",
                      "Couchbase.EntityFrameworkCore",
-                     "Couchbase.NetClient"
+                     "Couchbase.NetClient",
+                     "Microsoft.Extensions.ObjectPool"
                  })
         {
-            if (depsManifest.TryResolve(bootstrap, false, out var bootstrapPath))
+            if (!depsManifest.TryResolve(bootstrap, false, out var bootstrapPath))
+            {
+                depsManifest.TryResolve(bootstrap, true, out bootstrapPath);
+            }
+
+            if (!string.IsNullOrEmpty(bootstrapPath))
             {
                 TryLoad(loadContext, bootstrapPath);
             }
@@ -227,7 +233,9 @@ internal static class WorkspaceDependencyLoader
                      "Microsoft.EntityFrameworkCore.Sqlite",
                      "Oracle.EntityFrameworkCore",
                      "Pomelo.EntityFrameworkCore.MySql",
-                     "MySql.EntityFrameworkCore"
+                     "MySql.EntityFrameworkCore",
+                     "Couchbase.EntityFrameworkCore",
+                     "Couchbase.NetClient"
                  })
         {
             if (depsManifest.TryResolve(rootAssembly, false, out var rootPath))
@@ -287,7 +295,12 @@ internal static class WorkspaceDependencyLoader
                     continue;
                 }
 
-                if (depsManifest.TryResolve(reference, false, out var referencePath))
+                if (!depsManifest.TryResolve(reference, false, out var referencePath))
+                {
+                    depsManifest.TryResolve(reference, true, out referencePath);
+                }
+
+                if (!string.IsNullOrEmpty(referencePath))
                 {
                     Visit(referencePath);
                 }
@@ -296,6 +309,7 @@ internal static class WorkspaceDependencyLoader
             visiting.Remove(assemblyPath);
             visited.Add(assemblyPath);
             TryLoad(loadContext, assemblyPath);
+            depsManifest.RegisterProviderAssemblyReferencesFromPath(assemblyPath);
         }
     }
 
