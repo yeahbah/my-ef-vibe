@@ -60,4 +60,17 @@ public sealed class PostgreSqlAdventureWorksNamingApplierTests
 
         Assert.Equal("Rowguid", resolved);
     }
+
+    [Theory]
+    [InlineData(typeof(bool), "smallint", true)]
+    [InlineData(typeof(bool), "boolean", false)]
+    [InlineData(typeof(int), "smallint", false)]
+    [InlineData(typeof(bool), null, false)]
+    public void RequiresBoolSmallintConversion_matches_bool_smallint_pairs(
+        Type clrType,
+        string? dataType,
+        bool expected)
+    {
+        Assert.Equal(expected, PostgreSqlAdventureWorksNamingApplier.RequiresBoolSmallintConversion(clrType, dataType));
+    }
 }

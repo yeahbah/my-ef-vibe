@@ -48,7 +48,9 @@ internal static class EntityFrameworkProviderCatalog
             "Oracle.EntityFrameworkCore",
             "UseOracle",
             MyEfVibeProvider.Oracle,
-            ProviderCapabilities.SupportsAutoConstruction | ProviderCapabilities.SupportsQueryPlan),
+            ProviderCapabilities.SupportsAutoConstruction
+                | ProviderCapabilities.SupportsQueryPlan
+                | ProviderCapabilities.SupportsNamingConventionOverride),
         new(
             "MariaDB.EntityFrameworkCore",
             "MariaDB.EntityFrameworkCore",

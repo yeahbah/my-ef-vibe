@@ -132,6 +132,19 @@ internal static class RelationalMetadataReflection
 
     internal static void LowercaseColumnNames(RelationalMetadataMethods relationalMetadata, object entityType)
     {
+        TransformColumnNames(relationalMetadata, entityType, static name => name.ToLowerInvariant());
+    }
+
+    internal static void UppercaseColumnNames(RelationalMetadataMethods relationalMetadata, object entityType)
+    {
+        TransformColumnNames(relationalMetadata, entityType, static name => name.ToUpperInvariant());
+    }
+
+    private static void TransformColumnNames(
+        RelationalMetadataMethods relationalMetadata,
+        object entityType,
+        Func<string, string> transform)
+    {
         foreach (var property in EnumerateProperties(entityType))
         {
             var columnName = relationalMetadata.GetColumnName(property);
@@ -141,7 +154,7 @@ internal static class RelationalMetadataReflection
                 continue;
             }
 
-            relationalMetadata.SetColumnName(property, columnName.ToLowerInvariant());
+            relationalMetadata.SetColumnName(property, transform(columnName));
         }
     }
 

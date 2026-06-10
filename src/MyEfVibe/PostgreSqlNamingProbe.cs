@@ -58,11 +58,11 @@ internal static class PostgreSqlNamingProbe
         }
     }
 
-    internal static Dictionary<(string Schema, string Table), HashSet<string>> LoadColumnNameIndex(
+    internal static Dictionary<(string Schema, string Table), Dictionary<string, string>> LoadColumnMetadataIndex(
         WorkspaceHost host,
         string connectionString)
     {
-        var index = new Dictionary<(string Schema, string Table), HashSet<string>>(
+        var index = new Dictionary<(string Schema, string Table), Dictionary<string, string>>(
             StringTupleComparer.OrdinalIgnoreCase);
 
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -82,7 +82,7 @@ internal static class PostgreSqlNamingProbe
             using var command = connection.CreateCommand();
             command.CommandText =
                 """
-                SELECT table_schema, table_name, column_name
+                SELECT table_schema, table_name, column_name, data_type
                 FROM information_schema.columns
                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                 """;
@@ -91,7 +91,7 @@ internal static class PostgreSqlNamingProbe
 
             while (reader.Read())
             {
-                if (reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(2))
+                if (reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(2) || reader.IsDBNull(3))
                 {
                     continue;
                 }
@@ -99,15 +99,16 @@ internal static class PostgreSqlNamingProbe
                 var schema = reader.GetString(0);
                 var table = reader.GetString(1);
                 var column = reader.GetString(2);
+                var dataType = reader.GetString(3);
                 var key = (schema, table);
 
                 if (!index.TryGetValue(key, out var columns))
                 {
-                    columns = new HashSet<string>(StringComparer.Ordinal);
+                    columns = new Dictionary<string, string>(StringComparer.Ordinal);
                     index[key] = columns;
                 }
 
-                columns.Add(column);
+                columns[column] = dataType;
             }
         }
         catch

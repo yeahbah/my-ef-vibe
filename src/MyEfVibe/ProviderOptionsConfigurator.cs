@@ -87,8 +87,9 @@ internal static class ProviderOptionsConfigurator
                         return;
 
                     case PostgreSqlNamingStyle.AdventureWorksPascalCase:
-                        PostgreSqlAdventureWorksNamingApplier.SetColumnIndex(
-                            PostgreSqlNamingProbe.LoadColumnNameIndex(host, connectionString));
+                        var columnIndex = PostgreSqlNamingProbe.LoadColumnMetadataIndex(host, connectionString);
+
+                        PostgreSqlAdventureWorksNamingApplier.SetColumnIndex(columnIndex);
 
                         TryRegisterEfVibeModelCustomizer(
                             host,
@@ -107,6 +108,16 @@ internal static class ProviderOptionsConfigurator
                     dbContextOptionsBuilder,
                     typeof(SqliteRelationalNamingApplier).GetMethod(
                         nameof(SqliteRelationalNamingApplier.CustomizeAfterBase),
+                        BindingFlags.Static | BindingFlags.Public)!);
+                return;
+
+            case MyEfVibeProvider.Oracle
+                when OracleNamingProbe.Detect(host, connectionString) == OracleNamingStyle.NativeUppercase:
+                TryRegisterEfVibeModelCustomizer(
+                    host,
+                    dbContextOptionsBuilder,
+                    typeof(OracleRelationalNamingApplier).GetMethod(
+                        nameof(OracleRelationalNamingApplier.CustomizeAfterBase),
                         BindingFlags.Static | BindingFlags.Public)!);
                 return;
         }
