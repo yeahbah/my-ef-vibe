@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace MyEfVibe;
@@ -14,7 +15,7 @@ internal static class RelationalMetadataReflection
     private const string EntityTypeExtensionsTypeName = "Microsoft.EntityFrameworkCore.RelationalEntityTypeExtensions";
     private const string PropertyExtensionsTypeName = "Microsoft.EntityFrameworkCore.RelationalPropertyExtensions";
 
-    private static readonly Dictionary<string, RelationalMetadataMethods?> Cache =
+    private static readonly ConcurrentDictionary<string, RelationalMetadataMethods?> Cache =
         new(StringComparer.OrdinalIgnoreCase);
 
     internal static RelationalMetadataMethods? Resolve(object anchor)
@@ -48,24 +49,18 @@ internal static class RelationalMetadataReflection
 
         var cacheKey = relationalAssembly.FullName ?? RelationalAssemblyName;
 
-        if (Cache.TryGetValue(cacheKey, out var cached))
+        return Cache.GetOrAdd(cacheKey, _ =>
         {
-            return cached;
-        }
+            var entityExtensionsType = relationalAssembly.GetType(EntityTypeExtensionsTypeName, false);
+            var propertyExtensionsType = relationalAssembly.GetType(PropertyExtensionsTypeName, false);
 
-        var entityExtensionsType = relationalAssembly.GetType(EntityTypeExtensionsTypeName, false);
-        var propertyExtensionsType = relationalAssembly.GetType(PropertyExtensionsTypeName, false);
+            if (entityExtensionsType is null || propertyExtensionsType is null)
+            {
+                return null;
+            }
 
-        if (entityExtensionsType is null || propertyExtensionsType is null)
-        {
-            Cache[cacheKey] = null;
-            return null;
-        }
-
-        var resolved = RelationalMetadataMethods.TryCreate(entityExtensionsType, propertyExtensionsType);
-        Cache[cacheKey] = resolved;
-
-        return resolved;
+            return RelationalMetadataMethods.TryCreate(entityExtensionsType, propertyExtensionsType);
+        });
     }
 
     internal static IEnumerable<object> EnumerateEntityTypes(object modelBuilder)

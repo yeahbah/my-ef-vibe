@@ -9,29 +9,29 @@ namespace MyEfVibe;
 /// </summary>
 public static class PostgreSqlAdventureWorksNamingApplier
 {
-    private static Dictionary<(string Schema, string Table), Dictionary<string, string>>? _columnIndex;
-
-    internal static void SetColumnIndex(
-        Dictionary<(string Schema, string Table), Dictionary<string, string>> columnIndex)
-    {
-        _columnIndex = columnIndex;
-    }
-
     public static void CustomizeAfterBase(object modelBuilder, object context)
     {
-        ApplyBoolConversions(modelBuilder);
-        ApplyColumnRenames(modelBuilder);
+        CustomizeAfterBase(modelBuilder, context, registrationId: 0);
+    }
+
+    public static void CustomizeAfterBase(object modelBuilder, object context, long registrationId)
+    {
+        var columnIndex = AdventureWorksColumnMetadataCache.TryGet(registrationId);
+
+        ApplyBoolConversions(modelBuilder, columnIndex);
+        ApplyColumnRenames(modelBuilder, columnIndex);
     }
 
     internal static void Apply(object modelBuilder)
     {
-        ApplyBoolConversions(modelBuilder);
-        ApplyColumnRenames(modelBuilder);
+        ApplyBoolConversions(modelBuilder, columnIndex: null);
+        ApplyColumnRenames(modelBuilder, columnIndex: null);
     }
 
-    private static void ApplyColumnRenames(object modelBuilder)
+    private static void ApplyColumnRenames(
+        object modelBuilder,
+        Dictionary<(string Schema, string Table), Dictionary<string, string>>? columnIndex)
     {
-        var columnIndex = _columnIndex;
 
         if (columnIndex is null || columnIndex.Count == 0)
         {
@@ -81,10 +81,10 @@ public static class PostgreSqlAdventureWorksNamingApplier
         }
     }
 
-    private static void ApplyBoolConversions(object modelBuilder)
+    private static void ApplyBoolConversions(
+        object modelBuilder,
+        Dictionary<(string Schema, string Table), Dictionary<string, string>>? columnIndex)
     {
-        var columnIndex = _columnIndex;
-
         if (columnIndex is null || columnIndex.Count == 0)
         {
             return;

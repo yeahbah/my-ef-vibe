@@ -1,14 +1,211 @@
-# Plan: Standalone efvibe IDE
+# Plan: efvibe Studio — EF Core database client
 
-A dedicated desktop app for EF Core LINQ exploration — not another editor plugin. The **efvibe CLI remains the evaluation engine**; the IDE is orchestration, UX, and multi-project workspace management.
+A dedicated desktop app for **exploring and querying databases through Entity Framework Core** — the EF-native alternative to [DBeaver](https://dbeaver.io/).
+
+DBeaver is a universal database client: JDBC connections, SQL editor, data grid, metadata browser, DDL tools, and DBA workflows across dozens of providers. **efvibe Studio** occupies the same *job* for EF Core developers — connect, browse schema, run queries, inspect results, export data — but the connection is always **your real `DbContext`**, your build, your LINQ, and the SQL EF actually generates.
+
+The **interaction model** comes from **LINQPad**: fast scratchpad queries, many tabs, Ctrl+Enter run, rich result exploration, snippets, and notebooks — but scoped to EF Core (`db` completions, scan, translated SQL) instead of general C# or ad-hoc SQL.
+
+The **efvibe CLI remains the evaluation engine**; Studio is orchestration, UX, and multi-project workspace management.
+
+Full background: [ef-core-developer-challenges.md](ef-core-developer-challenges.md).
+
+---
+
+## Problem statement
+
+EF Core developers spend their days between **entity classes** and **production incidents** — but everyday tooling splits the problem across tools that do not share context.
+
+| Pain | What goes wrong today | How **efvibe** helps today | How **Studio** extends it |
+|------|----------------------|---------------------------|---------------------------|
+| **Opaque LINQ** | Deferred execution hides SQL, round-trips, and client eval until runtime | REPL + `ToQueryString()` + executed SQL (`--dblog`); `:plan` for EXPLAIN | SQL pane beside editor; live debounce; query history |
+| **Performance footguns** | N+1, unbounded `ToList()`, cartesian `Include`s compile fine | `:scan lite` / `:scan deep` + CI (`efvibe scan`); rule docs with Fix hints | Scan review UI; go-to-source; dismissals synced with CLI |
+| **Persistence + API split** | Wrong `-p` / `-s` → wrong secrets, provider, or connection | Auto-discovery; startup project for user secrets / appsettings | Connection wizard; named connections in `.efvibe-workspace` |
+| **Provider & naming gaps** | `ProductId` vs `PRODUCTID` vs `product_id`; `smallint` vs `bool` | Naming probes (PostgreSQL, Oracle, SQLite); provider auto-discovery from `-p` | Schema explorer shows **EF model**, not raw catalog; compare Dev vs Staging |
+| **Hard to explore through the model** | DBeaver shows tables; IDE shows C# — neither is “live `db`” | `:tables`, `:describe`, `:dbinfo`; Count / Sample from plugins | DbSet tree + model actions; Dump-style result explorer (Phase 2) |
+| **Fragmented scratchpad workflow** | LINQPad needs manual context setup; IDE needs run/debug cycle | `efvibe serve` daemon; Rider/VS Code Run Selection | LINQPad-style tabs, Ctrl+Enter, notebooks, snippets — multi-project window |
+| **Code-first drift** | Migrations vs manual DB edits; team merge conflicts | — (out of scope) | — (out of scope; use `dotnet ef` / IDE) |
+| **Database-first mapping** | Scaffold once, hand-edit forever; legacy schema glue | Run LINQ against real mapped model; see if query translates | SQL → LINQ draft assistant (Phase 2); table→DbSet mapping explain |
+| **Test doubles lie** | InMemory / SQLite tests miss provider SQL and types | Run against real provider with project build | Same connection model as prod/staging in workspace |
+
+### By development style
+
+**Code-first teams** own the model in C# but still cannot see what EF emits without running the app, enabling SQL logging, or opening a generic SQL client that ignores conventions and mappings. efvibe closes the loop: build the real project, construct the real `DbContext`, run LINQ, show SQL and plans. Studio makes that loop the primary UI instead of a plugin panel.
+
+**Database-first teams** inherit ugly schemas, casing wars, and mapping glue. DBeaver helps inspect raw tables; it does not show how `db.Products` maps to `production.product` with a `smallint` flag column. efvibe’s naming probes and describe metadata bridge catalog ↔ model. Studio adds side-by-side exploration and (later) SQL-from-logs → LINQ drafts validated via `ToQueryString()`.
+
+**Hybrid / brownfield** is the hardest case: legacy tables plus new migrations, multiple `DbContext`s, raw SQL islands. Generic tools force a choice between SQL-centric (DBeaver) or C#-centric (IDE). efvibe stays on the EF boundary — one engine for REPL, scan, and CI — and Studio unifies multiple connections and query scripts in one workspace.
+
+### What efvibe does *not* solve
+
+Be explicit so scope stays credible:
+
+- **Migrations** — generate, apply, squash, deploy (`dotnet ef`, CI pipelines)
+- **Scaffolding** — reverse engineer entities from database
+- **DBA operations** — backup, users, index maintenance, DDL authoring
+- **General C# scripting** — non-EF scratchpad (use LINQPad or an IDE)
+
+Studio targets the **daily EF loop**: connect with the right project context → explore the model → write LINQ → see SQL and plans → catch smells → export or share results.
+
+---
+
+## Product DNA: DBeaver shell + LINQPad feel
+
+Studio is not “pick one.” It combines what each tool does best for an EF developer:
+
+| Layer | Borrow from | What that means in Studio |
+|---|---|---|
+| **Workspace & connections** | DBeaver | Connection manager, schema navigator, result grid, export, multi-connection window |
+| **Query experience** | LINQPad | Scratchpad editor, query tabs, instant run, selection/statement run, history, folders |
+| **Results** | LINQPad | Dump-style object tree + grid (not flat JDBC rows only) |
+| **EF-only** | efvibe | Live `db`, `ToQueryString()`, `:plan`, scan, naming probes, project build |
+
+```mermaid
+flowchart LR
+    subgraph shell [DBeaver-like shell]
+        CM[Connections]
+        NAV[Schema navigator]
+        GRID[Result grid / export]
+    end
+
+    subgraph feel [LINQPad-like feel]
+        TABS[Query tabs]
+        RUN[Ctrl+Enter run]
+        DUMP[Result explorer]
+        SNIP[Snippets / notebooks]
+    end
+
+    subgraph ef [EF Core only]
+        DB[live db]
+        SQL[translated SQL]
+        SCAN[scan + plan]
+    end
+
+    shell --> feel --> ef
+```
+
+**Analogy:** DBeaver is the *database client* you’d open to poke at Postgres; LINQPad is the *scratchpad* you’d use to try a query in seconds. Studio is both — **if your scratchpad were wired to your app’s `DbContext`**.
+
+---
+
+## Positioning: DBeaver vs efvibe Studio
+
+| | **DBeaver** | **efvibe Studio** |
+|---|---|---|
+| **Audience** | DBAs, backend devs, data analysts — any SQL database | EF Core developers — one team’s app model |
+| **Connection** | JDBC URL, driver, credentials | EF project + startup project + `DbContext` (+ optional connection override) |
+| **Primary language** | SQL (plus scripts) | **C# LINQ** against live `db` |
+| **Schema view** | Catalog tables, columns, FKs from the server | **EF model** (DbSets, navigations) + live metadata (`:tables`, `:describe`) |
+| **Query execution** | Send SQL to the server | Evaluate LINQ → translated SQL (`ToQueryString`) + executed SQL + timings |
+| **Query plans** | Provider-specific EXPLAIN on ad-hoc SQL | **`:plan` / deep scan** on the same SQL EF would run from your LINQ |
+| **Data editing** | Full grid CRUD on tables | **Read-focused v1**; LINQ mutations possible where safe (expression guard) |
+| **Providers** | Universal (MySQL, Postgres, Oracle, …) | **EF relational providers** efvibe already supports (SQL Server, PostgreSQL, SQLite, Oracle, MySQL, Firebird, Couchbase, …) |
+| **Code quality** | None | **LINQ scan** (lite/deep), dismissals, notes, CI parity |
+| **Multi-database** | Many connections in one UI | Many **connections** (often multiple DbContexts / envs) in one **workspace** |
+| **Project context** | Optional project file; DB-centric | **First-class** — solutions, `.csproj`, user secrets, naming conventions |
+| **CLI / automation** | dbvr (new, 2026) for headless SQL | **`efvibe` CLI + `serve`** — same JSON protocols editors use today |
+
+### What we deliberately do *not* build (leave to DBeaver)
+
+- Universal JDBC/ODBC connectivity unrelated to an EF model
+- DBA maintenance (backup, user management, index tuning wizards)
+- Visual SQL query builder as the main workflow
+- NoSQL-first explorers (MongoDB, Redis, …) unless exposed via EF provider
+- ER diagram authoring as a primary feature (optional later; EF model tree is enough for v1)
+
+### What we *do* build (the “DBeaver for EF” checklist)
+
+| DBeaver-like capability | efvibe Studio interpretation |
+|---|---|
+| **Connection manager** | Named connections: `-p`, `-s`, `-c`, framework, secrets, env tags (Dev/Staging) |
+| **Database navigator** | Schema sidebar: DbSets → entities → columns, keys, navigations |
+| **SQL editor** | **LINQ editor** (Monaco) + read-only **SQL pane** (translated + executed) |
+| **Run query** | Run / Run Plan / Run selection; warm `efvibe serve` daemon |
+| **Result grid** | Tabular results + object explorer for nested shapes |
+| **Export** | CSV / JSON (existing export paths) |
+| **Metadata** | DbInfo, table list, describe entity, row count / sample |
+| **Compare environments** | Same LINQ against two connections; diff grid (Tier 2) |
+| **Script library** | `.efvibe-query` files, folders, notebooks, history |
+| **SSH / tunnels** | Out of scope in Studio — use connection string / VPN (same as today) |
+
+### One-line pitch
+
+> **DBeaver shows you the database. LINQPad lets you try code in seconds. efvibe Studio does both — through your EF Core model, with the SQL your LINQ becomes.**
+
+---
+
+## Positioning: LINQPad vs efvibe Studio
+
+| | **LINQPad** | **efvibe Studio** |
+|---|---|---|
+| **Scope** | General C# scratchpad + optional DB drivers | **EF Core only** — your project’s `DbContext` |
+| **Connection** | Built-in driver or custom `DbContext` template | Real `.csproj` + startup project + context discovery |
+| **`db` IntelliSense** | User configures context type | **Automatic** from built workspace |
+| **SQL visibility** | LINQ-to-SQL / EF translation varies by mode | **Always** translated + executed SQL from EF Core |
+| **Query quality** | None | **Scan** (N+1, client eval, deep probes) |
+| **Multi-project** | One connection per query file (typical) | **Workspace** with many projects and connections |
+| **Team / CI** | Personal tool | Same scan rules as `efvibe` CLI in CI |
+| **Notebooks** | Yes (recent) | `.efvibe-notebook` — compatible with Rider/VS Code |
+| **NuGet in script** | First-class `#r` | Tier 3 — possible via Roslyn; not v1 priority |
+| **Dump()** | Iconic nested object explorer | **Result explorer** — top LINQPad gap to close in Phase 2 |
+
+### LINQPad features we want (by phase)
+
+| LINQPad feature | Studio target | Phase |
+|---|---|---|
+| Query tabs + `.efvibe-query` files | Yes | **1** |
+| Connection dropdown per tab | Yes | **1** |
+| Ctrl+Enter / F5 run, run selection | Yes | **0–1** |
+| Schema browser (DbSets tree) | Yes | **1** |
+| SQL pane (generated SQL) | Yes | **1–2** (live debounce in **2**) |
+| Result grid | Yes (plugins today) | **0–1** |
+| **Dump-style result explorer** | Yes — nested objects, collections | **2** (highest LINQPad parity priority) |
+| Query folders, favorites, search | Yes | **2** |
+| My Snippets / snippet library | Yes | **2** |
+| Lambda / expression scratchpad | Yes | **2** |
+| Notebooks | Yes | **1** |
+| Benchmark / timing UI | Yes (`:benchmark`, `:chart`) | **2** |
+| Compare two runs / connections | Yes | **2** |
+| `#load`, extra usings per connection | Yes | **2** |
+| NuGet `#r` in script | Maybe | **3** |
+| C# Program mode (`Main`) | Defer | **3** |
+| Attach to running process | Defer | **3** |
+
+### What we take from LINQPad but adapt for EF
+
+- **Scratchpad speed** — warm daemon, sub-second re-run, no “open solution in IDE” friction.
+- **Exploratory workflow** — try `db.Orders.Where(...)`, tweak, re-run; history and pinned queries.
+- **Rich results** — not just a flat grid; expand navigations and anonymous projections like Dump.
+- **Script organization** — tabs, folders, notebooks; share `.efvibe-query` in git like LINQPad `.linq` files.
+
+### What we skip from LINQPad (stay EF-focused)
+
+- General-purpose C# scripting unrelated to a database
+- Built-in drivers without your app’s model, migrations, or conventions
+- LINQPad’s full extension/plugin ecosystem (team packs / snippet packs instead)
 
 ---
 
 ## Vision
 
-**efvibe Studio** (working name): a LINQPad-style environment built specifically for EF Core — live `db` context, translated SQL, query plans, scan review, and session analytics — with first-class support for **multiple solutions/projects** in one window.
+**efvibe Studio** (working name): a database exploration and query environment **for EF Core** — **DBeaver’s client workflows** (connect, browse, export) with **LINQPad’s scratchpad speed** (tabs, instant run, rich results) — centered on live `DbContext`, translated SQL, query plans, scan review, and session analytics, with first-class support for **multiple solutions/projects** in one window.
 
-| Plugin today | Standalone IDE |
+| Reference product | What Studio inherits |
+|---|---|
+| **DBeaver** | Connection manager, schema navigator, result grid, export, multi-connection window |
+| **LINQPad** | Query tabs, Ctrl+Enter run, Dump-style exploration, snippets, notebooks, script library |
+| **efvibe today** | Scan, `:plan`, REPL, daemon protocol, Rider/VS Code parity |
+
+| DBeaver / generic SQL client | efvibe Studio |
+|---|---|
+| Connect with JDBC URL | Connect with EF project + `DbContext` |
+| Write SQL in SQL editor | Write **LINQ**; SQL is an output you inspect |
+| Browse `information_schema` | Browse **DbSets** and EF metadata |
+| EXPLAIN your handwritten SQL | **`:plan`** on EF-translated SQL from your code |
+| One window, many databases | One window, many **connections** (projects/contexts/envs) |
+| No opinion on app code | **Scan** for N+1, client eval, and LINQ smells |
+
+| Plugin today | Standalone Studio |
 |---|---|
 | One Rider/VS Code project at a time | Many projects/connections in one workspace |
 | Tool window bolted onto an IDE | Purpose-built layout (editor + results + schema + scan) |
@@ -61,145 +258,51 @@ flowchart TB
 4. **Portable workspace format** — versioned JSON/YAML describing projects, connections, and UI state.
 5. **Cross-platform** — Linux, macOS, Windows from day one.
 
-### Recommended tech stack
+### UI stack: Tauri 2 (decided)
 
-| Layer | Recommendation | Why |
+| Layer | Choice | Why |
 |---|---|---|
-| Shell | **Tauri 2** or **Avalonia** | Native feel, smaller than Electron; C# team already owns the engine |
-| Editor | **Monaco** or **AvaloniaEdit** + Roslyn bridge | Reuse patterns from `vscode-extension` / Rider plugin |
+| Shell | **Tauri 2** | Native cross-platform desktop; small bundles; Rust sidecar for `efvibe` process management |
+| Frontend | **TypeScript** (React or Svelte — pick in Phase 0 spec) | Direct port of `vscode-extension/src/*` |
+| Editor | **Monaco** | Same editor surface as VS Code extension; trivial in a webview |
+| Daemon bridge | Rust `Command` or Tauri shell plugin | Spawn and pipe JSON lines to `efvibe serve` |
 | Protocol | stdin/stdout JSON lines (existing `serve`) | Zero migration cost |
 | State | SQLite + workspace files on disk | Session history, scan dismissals, favorites |
 | Packaging | Bundled `efvibe` binary + optional “use system dotnet tool” | Same model as editor extensions |
 
-### Tauri vs Avalonia
+**Why Tauri over Avalonia:** highest reuse from the VS Code extension (`daemonClient.ts`, `resultPanel.ts`, scan panels, Monaco setup); fastest path to plugin parity; proven pattern for custom “IDE-like” web UIs. Avalonia would mean rewriting UI in XAML with less extension code carryover.
 
-| | **Tauri** | **Avalonia** |
-|---|---|---|
-| Primary languages | TS/JS + Rust | C# |
-| UI paradigm | Web components | XAML controls |
-| Cross-platform | Yes (WebView + Rust) | Yes (Skia rendering) |
-| Reuse from VS Code extension | High | Low–medium |
-| Reuse from Rider plugin | Low (Kotlin/Swing) | Medium (desktop patterns) |
-| Calling `efvibe` CLI | Rust `Command` or shell out | `Process` in C# |
-| Rich text / code editor | Monaco is trivial | AvaloniaEdit or embedded webview |
-| Performance for big result grids | Good with virtualized web tables | Good with native grids |
-| Team skill match (.NET shop) | Need TS + some Rust | Mostly C# |
-| Maturity for “custom IDE” | Many examples (web IDEs) | Fewer, but solid for desktop apps |
-
-- Choose **Tauri** for fastest path to a VS Code–like experience (Monaco, port `daemonClient.ts` / `resultPanel.ts`).
-- Choose **Avalonia** for a single-stack C# desktop app and a more traditional native IDE feel.
-
-### Platform options: SharpIDE fork vs greenfield
-
-[SharpIDE](https://github.com/MattParkerDev/SharpIDE) is an open-source, cross-platform .NET IDE (MIT, .NET 10, Godot 4) with Roslyn completions, build/run/debug, solution picker, and a layered `SharpIDE.Application` + `SharpIDE.Godot` architecture. It is a credible alternative to building editor plumbing from scratch — but a **full fork is not the recommended default**.
-
-#### What SharpIDE provides
-
-| Already built | Relevance to efvibe Studio |
-|---|---|
-| Roslyn completions, signature help, refactorings | Strong for editing **project source** (`.cs` files) |
-| Build / run / debug (SharpDbg, netcoredbg) | Strong for “open solution and work” |
-| Solution picker, file tree, go-to-definition, decompile | Strong for scan “go to code” |
-| `SharpIDE.MsBuildHost` | Overlaps with efvibe’s `dotnet build`, but more IDE-native |
-| `SharpIDE.Application` feature modules | Potential host for efvibe integration logic |
-| Cross-platform releases (Linux/macOS/Windows) | Matches Studio goals |
-
-Rough architecture:
+Rough layout:
 
 ```
-Godot UI (scenes, editor, panels)
-    ↕
-SharpIDE.Application (Roslyn, Build, Run, Debug, Evaluation, …)
-    ↕
-MSBuild host / debugger processes
+studio/
+├── src/              # TypeScript UI (Monaco, panels, workspace)
+├── src-tauri/        # Rust: window, menus, efvibe process I/O, file dialogs
+└── package.json
 ```
 
-#### Where SharpIDE does not map cleanly
+### Greenfield shell + “Open in IDE”
 
-efvibe Studio is primarily a **LINQ/EF execution environment**, not a general code editor.
+Studio is a **focused EF client**, not a general C# IDE. Build the shell greenfield with **Tauri 2**; do not fork or embed inside another IDE.
 
-**1. Two different Roslyn worlds**
-
-| Context | What IntelliSense needs |
+| Responsibility | Where it lives |
 |---|---|
-| SharpIDE project editor | Solution/project analysis (`db` does not exist) |
-| efvibe query editor | Scripting session with live `db`, DbSets, entity types from loaded workspace |
+| LINQ scratchpad, results, SQL/plan, scan, notebooks | **efvibe Studio** |
+| Edit `.cs` project source, refactor, debug app | **Rider / VS Code / Visual Studio** (user’s choice) |
+| Ad-hoc SQL, DBA tasks | **DBeaver** or provider tools |
 
-SharpIDE’s Roslyn stack does not automatically provide `db.Products.` completions in a query tab. That still requires **`efvibe serve`** (or direct `MyEfVibe` integration).
+**`db.*` completions** in the query editor come from **`efvibe serve`** (Roslyn scripting session with live `db`) — not from bolting Studio onto a project-level Roslyn IDE.
 
-**2. Godot cost**
+**Scan “go to code”** opens the finding’s file and line in the user’s configured editor (`code`, `rider`, `devenv`, etc.). Optional LSP in Studio is Phase 3 at earliest.
 
-- Development flows through the **Godot Editor** and scene files (`IdeRoot.tscn`)
-- UI work is Godot nodes/scenes, not XAML or web components
-- Bundles are large (~85–170 MB per release)
-- Project is explicitly **WIP** (NuGet UI, test explorer, debugger edge cases)
+#### Shell decision record
 
-**3. Fork maintenance**
-
-Upstream moves quickly (frequent releases). A full fork implies ongoing merge pain or falling behind fixes.
-
-**4. Product identity**
-
-Forking SharpIDE positions the product as **“another C# IDE with an efvibe panel”** rather than **“LINQPad for EF Core”**.
-
-#### Strategy comparison
-
-| Approach | When it makes sense |
+| | |
 |---|---|
-| **Full fork of SharpIDE** | General .NET IDE first, efvibe second |
-| **Greenfield Studio (Tauri/Avalonia)** | EF/LINQ-first product (default recommendation) |
-| **Hybrid** | Focused Studio + optional IDE integration or upstream panel |
-
-**Recommendation: hybrid, not full fork.**
-
-- **SharpIDE / Rider / VS Code** → editing and navigating `.cs` project code
-- **efvibe Studio** → running LINQ against live `db`, SQL, plans, scan, notebooks, multi-connection workspaces
-
-#### Three practical options
-
-**Option A — efvibe Studio + “Open in IDE” (lowest risk, default)**
-
-- Build the focused Studio from this plan (Tauri or Avalonia)
-- Scan “go to code” opens SharpIDE, Rider, or VS Code via file path + line
-- No fork, no Godot dependency
-
-**Option B — efvibe panel inside SharpIDE (medium risk)**
-
-- Contribute or maintain an **efvibe tool panel** in SharpIDE (MIT allows this)
-- Panel talks to `efvibe serve` like the Rider extension
-- Upstream owns editor/build/debug; efvibe owns EF query UX
-- Requires Godot UI work and coordination with upstream
-
-**Option C — Reuse `SharpIDE.Application` only (medium-high risk)**
-
-- Do not fork the Godot shell
-- New shell (Photino, Tauri, or Avalonia) hosts query/result UI
-- Borrow MSBuild/Roslyn patterns from `Features/Analysis`, `MsBuildHost` where useful
-- Avoids Godot; still significant integration work
-
-#### SharpIDE spike checklist (1–2 days, before Phase 0 commit)
-
-Run this before locking the shell decision:
-
-1. Clone [SharpIDE](https://github.com/MattParkerDev/SharpIDE), build per `CONTRIBUTING.md` (.NET 10 SDK + Godot 4.5+)
-2. Open a solution with an EF Core project; verify completions, build, run, debug
-3. Inspect `src/SharpIDE.Application/Features/Evaluation` for overlap with scratchpad/query eval
-4. Sketch a bottom or side panel that spawns `efvibe serve` and renders evaluation JSON
-5. Measure friction: Godot scene edits, panel layout, daemon lifecycle, go-to-code from scan
-6. **Decision gate:**
-   - Low friction → consider Option B (upstream panel or fork branch `efvibe-studio`)
-   - High friction → proceed Option A (greenfield Tauri/Avalonia)
-
-#### Decision record (fill after spike)
-
-| Criterion | Greenfield (Tauri/Avalonia) | SharpIDE fork/panel |
-|---|---|---|
-| Time to efvibe feature parity | Faster for query/result/scan UX | Slower (Godot + IDE surface) |
-| `db.*` completions in query editor | Via `efvibe serve` either way | Via `efvibe serve` either way |
-| Project `.cs` editing | Defer or “open in IDE” | Built-in |
-| Team skills | TS/Rust or C#/XAML | C# + Godot |
-| Bundle size | Smaller | Larger |
-| Maintenance | Self-contained | Upstream dependency |
+| **Decision** | **Tauri 2** |
+| **Date** | 2026-06-09 |
+| **Primary driver** | Port VS Code extension TypeScript + Monaco with minimal rewrite |
+| **Trade-off accepted** | TS + Rust shell around C# `efvibe` engine (not single-language C# UI) |
 
 ---
 
@@ -323,46 +426,52 @@ Everything from Rider + VS Code extensions should land in v1.
 
 ---
 
-## LINQPad-inspired additions (differentiators)
+## LINQPad-inspired features (explicit roadmap)
 
-Pick features that fit EF workflows — not a full LINQPad clone.
+These are **planned product features**, not nice-to-haves. DBeaver gives the shell; LINQPad gives the daily “try this query” loop. Both are required for Studio to feel complete.
 
-### Tier 1 — high value, fits existing engine
+Pick features that fit EF workflows — not a full LINQPad clone (no general C# REPL product), and not a DBeaver clone (no JDBC DBA suite).
+
+### Tier 1 — LINQPad essentials (Phase 0–1)
 
 | LINQPad idea | efvibe Studio interpretation |
 |---|---|
 | **Query tabs** | Many `.efvibe-query` files; each tab binds to a connection |
+| **Connection dropdown** | LINQPad-style toolbar picker across workspace connections |
 | **Schema browser** | Left sidebar: DbSets → columns/navigations (`:tables` + `:describe` as live tree) |
 | **Ctrl+Enter run** | Default keybinding; run current statement or selection |
-| **SQL pane** | Split view: LINQ left, generated SQL right (live on idle debounce) |
-| **Result explorer** | Tree/grid hybrid for nested objects (biggest UX gap vs LINQPad Dump) |
-| **Query folders** | Organize scripts under workspace; tags, favorites, search |
-| **Connection manager** | Named connections with env tags (Dev/Staging/Prod) + secret references |
-| **Recent & pinned queries** | SQLite index of runs + snippets |
-| **Benchmark panel** | Visual wrapper around `:benchmark N` + charts (`:chart`) |
-| **Compare runs** | UI for `:compare set` / `:compare` side-by-side |
+| **F5 / Run Plan** | Same as plugins; plan tab beside results |
+| **SQL pane** | Split view: LINQ left, generated + executed SQL right |
+| **Result grid** | Tabular view for flat projections (shipped in plugins) |
+| **Query history** | Recent runs per connection; re-open prior expression |
+| **Notebooks** | Multi-cell `.efvibe-notebook`; run all cells |
 
-### Tier 2 — medium effort, strong appeal
+### Tier 2 — LINQPad depth (Phase 2 — high priority)
 
 | LINQPad idea | efvibe Studio interpretation |
 |---|---|
-| **My Snippets / Extensions** | User snippet library + shared team packs |
-| **#load / additional usings** | Extend scripting globals per connection (Roslyn already supports submissions) |
-| **Raw SQL mode** | Separate editor mode using `FromSqlRaw` wrapper or future `efvibe sql` command |
-| **Lambda scratchpad** | Small expression-only buffer (no `;` required) |
-| **Password / secret vault** | Integrate with OS keychain; map to user-secrets paths |
-| **Diff two connections** | Same query against Dev vs Staging (two daemons, diff grid) |
-| **Export to GitHub gist / share link** | Query + SQL + plan as markdown bundle |
-| **SQL → LINQ** | EF-model-aware converter with validation loop — see below |
+| **Dump() / result explorer** | Tree/grid hybrid for nested objects — **#1 LINQPad parity gap** |
+| **Live SQL preview** | Debounced `ToQueryString()` while typing (bidirectional with SQL → LINQ) |
+| **Query folders** | Organize scripts under workspace; tags, favorites, search |
+| **My Snippets** | User snippet library + shared team packs |
+| **Lambda scratchpad** | Expression-only buffer (no `;` required) for quick `db.Products.Count()` |
+| **#load / additional usings** | Extend scripting globals per connection (Roslyn submissions) |
+| **Recent & pinned queries** | SQLite index of runs + snippets |
+| **Benchmark panel** | Visual wrapper around `:benchmark N` + charts (`:chart`) |
+| **Compare runs** | UI for `:compare set` / `:compare` side-by-side |
+| **Diff two connections** | Same LINQ against Dev vs Staging (two daemons, diff grid) |
+| **Export / share** | Query + SQL + plan as markdown bundle or gist |
+| **SQL → LINQ** | EF-model-aware converter — see below |
+| **Raw SQL mode** | Secondary pane for log SQL → draft LINQ; not the primary workflow |
 
-### Tier 3 — later / optional
+### Tier 3 — LINQPad optional / later
 
 | LINQPad idea | Notes |
 |---|---|
-| **NuGet references in script** | Possible via Roslyn `#r`; needs careful isolation per connection |
-| **C# Program mode** | Full `Main()` scripts — lower priority for EF-focused users |
+| **NuGet references in script** | `#r` via Roslyn; needs isolation per connection |
+| **C# Program mode** | Full `Main()` scripts — lower priority than EF scratchpad |
 | **Attach to running app** | Hard; defer unless strong demand |
-| **ORM-agnostic ADO** | Out of scope; stay EF Core focused |
+| **ORM-agnostic ADO** | Out of scope; stay EF Core focused (use DBeaver) |
 
 ---
 
@@ -489,20 +598,22 @@ JSON response shape (sketch):
 ├──────────┬──────────────────────────────────────────────┬───────────────┤
 │          │  Query tabs: *Products.linq  Orders.linq  ... │               │
 │ Workspace│──────────────────────────────────────────────│ Schema        │
-│          │                                              │ ├ Products    │
-│ Projects │  C# Editor (Monaco)                          │ ├ Orders      │
-│ ├ API    │  db.Products.Where(...).Take(10).ToList()   │ └ ...         │
-│ └ Persist│                                              │               │
+│          │                                              │ (EF model)    │
+│ Projects │  C# / LINQ Editor (Monaco)                   │ ├ Products    │
+│ ├ API    │  db.Products.Where(...).Take(10).ToList()   │ ├ Orders      │
+│ └ Persist│                                              │ └ ...         │
 │          │──────────────────────────────────────────────│ Model actions │
-│ Queries  │  [Run] [Run Plan] [Scan] [Export] [Benchmark]│ Count Sample  │
-│ Notebooks│                                              │ Describe      │
-│ Scan     ├──────────────────────────────────────────────┤               │
-│ History  │ Result | SQL | Plan | Messages | Explorer    │               │
-│          │ (grid + object tree)                         │               │
+│ Connections│ [Run] [Run Plan] [Scan] [Export] [Benchmark]│ Count Sample  │
+│ Queries  │                                              │ Describe      │
+│ Notebooks├──────────────────────────────────────────────┤               │
+│ Scan     │ Result | SQL | Plan | Messages | Explorer    │               │
+│ History  │ (grid + object tree)                         │               │
 ├──────────┴──────────────────────────────────────────────┴───────────────┤
 │ Ready · AdventureWorksDbContext · PostgreSQL · 42ms · 1 SQL · 10 rows   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Compared to DBeaver:** left tree = EF model (not raw catalog); center = LINQ not SQL; bottom tabs = translated + executed SQL and plans from EF, not ad-hoc EXPLAIN.
 
 **Optional bottom dock**: embedded REPL terminal for power users (`:scan deep`, `:compare`, etc.).
 
@@ -566,17 +677,20 @@ New CLI surface (small additions, not a rewrite):
 
 ### Phase 0 — Foundation (4–6 weeks)
 
-- **SharpIDE spike** (1–2 days) — complete checklist above; record shell decision
-- Desktop shell (Tauri/Avalonia, or SharpIDE panel if spike favors Option B) with Monaco or host editor
+- **Tauri 2 scaffold** — `studio/` app with Monaco, basic layout, Rust sidecar spawning `efvibe serve`
 - Workspace open/save (`.efvibe-workspace`)
 - Single connection: Run, Run Plan, results/SQL/plan tabs
 - Daemon client ported from `vscode-extension/src/daemonClient.ts`
 - Prerequisites check, settings page
-- “Open in IDE” hook for scan go-to-code (SharpIDE / Rider / VS Code)
+- “Open in IDE” hook for scan go-to-code (Rider / VS Code / Visual Studio)
 
-**Exit criteria:** parity with VS Code result panel for one project; platform decision documented.
+**Exit criteria:** parity with VS Code result panel for one project; Tauri app runs on Linux, macOS, and Windows.
 
-### Phase 1 — Multi-project + plugin parity (6–8 weeks)
+### Phase 1 — Multi-project + plugin parity + LINQPad basics (6–8 weeks)
+
+**DBeaver Community parity (EF slice):** connection manager, schema navigator, query + results, export.
+
+**LINQPad basics:** query tabs, connection dropdown, Ctrl+Enter, notebooks, query history.
 
 - Connection manager (add/edit/duplicate connections)
 - Multiple query tabs with per-tab connection binding
@@ -587,11 +701,15 @@ New CLI surface (small additions, not a rewrite):
 - Session/history sidebar
 - Export CSV/JSON
 
-**Exit criteria:** everything in `rider-extension/README.md` Features section works without Rider.
+**Exit criteria:** everything in `rider-extension/README.md` Features section works without Rider; LINQPad-style tab + run loop feels natural; an EF developer can replace “DBeaver + guess the SQL” for daily LINQ exploration.
 
-### Phase 2 — LINQPad-style polish (6–10 weeks)
+### Phase 2 — LINQPad depth + beyond DBeaver (6–10 weeks)
 
-- Result explorer (object tree)
+**LINQPad parity focus:** Dump-style result explorer, live SQL pane, snippets, lambda scratchpad, query folders.
+
+Features neither DBeaver nor stock LINQPad offer for EF:
+
+- **Result explorer (Dump parity)** — nested object tree; top UX priority
 - Live SQL preview pane (bidirectional with SQL → LINQ convert)
 - **SQL → LINQ** converter (Tier A–C, validation via `ToQueryString()` diff)
 - Query folders, search, favorites
@@ -615,9 +733,8 @@ New CLI surface (small additions, not a rewrite):
 | Asset | Reuse strategy |
 |---|---|
 | `efvibe serve` protocol | Direct — canonical API |
-| `vscode-extension/src/*` | Port TypeScript → C#/TypeScript in new shell (daemon, scan, export, notebooks) |
+| `vscode-extension/src/*` | Port TypeScript into Tauri frontend (daemon, scan, export, notebooks) |
 | `rider-extension/.../EfvibeToolWindowPanel.kt` | UX reference for layout and tab structure |
-| [SharpIDE](https://github.com/MattParkerDev/SharpIDE) `Application` | Optional: MSBuild host, solution model, project-editor patterns (not a required fork) |
 | `features.md` | Command catalog for REPL terminal + roadmap checklist |
 | Evaluation JSON schema | Single source of truth for result rendering |
 | Session paths (`~/.efvibe/...`) | Unchanged — IDE reads same scan/history files |
@@ -630,20 +747,22 @@ New CLI surface (small additions, not a rewrite):
 |---|---|
 | Building another IDE is expensive | Strict engine/UI split; port VS Code extension logic, don’t reinvent |
 | Multi-daemon memory use | LRU pool, lazy start, one active connection default |
-| No “go to definition” without Roslyn in UI | Phase 1: open file at line in SharpIDE/Rider/VS Code; Phase 3: optional LSP in Studio |
-| SharpIDE fork scope creep | Default to greenfield Studio; fork only after spike validates Option B |
-| Godot dependency (if SharpIDE path) | Prefer Option A or C over full Godot fork unless panel integration is smooth |
-| LINQPad expectations (Dump, NuGet) | Market as **EF Core specialist**, not general C# scratchpad |
-| Licensing | Keep engine Apache 2.0; Studio can be commercial with OSS engine; SharpIDE is MIT |
+| No “go to definition” without Roslyn in UI | Phase 1: open file at line in Rider/VS Code/VS; Phase 3: optional LSP in Studio |
+| Scope creep into general IDE | Stay EF-client-only; defer `.cs` editing to host IDE |
+| LINQPad expectations (Dump, NuGet) | **Dump-style explorer in Phase 2**; market as EF client + scratchpad, not full LINQPad |
+| Users expect full DBeaver DBA suite | Document scope: **query & explore via EF**, not server administration |
+| Licensing | Keep engine Apache 2.0; Studio can be commercial with OSS engine |
 
 ---
 
 ## Success metrics
 
+- **DBeaver parity (EF slice):** connect, browse schema, run query, view results, export — without leaving the EF model
+- **LINQPad parity (EF slice):** query tabs, Ctrl+Enter, connection picker, notebooks; **Dump-style explorer** by Phase 2
 - Open workspace with 3+ projects in under 30 seconds
 - Run query → result in <500ms after daemon warm (same as today)
 - 100% plugin feature checklist covered by Phase 1
-- Users can work a full day across multiple APIs without switching Rider/VS Code windows
+- Users can work a full day across multiple APIs/DbContexts without switching Rider/VS Code windows or opening DBeaver for “what SQL did EF send?”
 
 ---
 
@@ -651,8 +770,9 @@ New CLI surface (small additions, not a rewrite):
 
 Before writing code, produce a **Phase 0 spec** with:
 
-1. **SharpIDE spike** — complete checklist; choose Option A, B, or C
+1. Tauri frontend framework choice (React vs Svelte) and `studio/` repo layout
 2. Exact JSON schema for `.efvibe-workspace`
 3. Screen wireframes (3: connection manager, query workspace, scan review)
-4. Decision record: **Tauri vs Avalonia** (or SharpIDE panel, per spike outcome)
-5. Parity checklist copied from `rider-extension/README.md` + `vscode-extension/package.json` commands
+4. Rust sidecar design: spawn `efvibe serve`, stdin/stdout JSON lines, bundled vs PATH binary
+5. “Open in IDE” integration (editor command + file/line protocol)
+6. Parity checklist copied from `rider-extension/README.md` + `vscode-extension/package.json` commands

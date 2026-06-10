@@ -89,14 +89,18 @@ internal static class ProviderOptionsConfigurator
                     case PostgreSqlNamingStyle.AdventureWorksPascalCase:
                         var columnIndex = PostgreSqlNamingProbe.LoadColumnMetadataIndex(host, connectionString);
 
-                        PostgreSqlAdventureWorksNamingApplier.SetColumnIndex(columnIndex);
+                        var postgresRegistrationId = AdventureWorksColumnMetadataCache.Store(connectionString, columnIndex);
 
                         TryRegisterEfVibeModelCustomizer(
                             host,
                             dbContextOptionsBuilder,
                             typeof(PostgreSqlAdventureWorksNamingApplier).GetMethod(
                                 nameof(PostgreSqlAdventureWorksNamingApplier.CustomizeAfterBase),
-                                BindingFlags.Static | BindingFlags.Public)!);
+                                BindingFlags.Static | BindingFlags.Public,
+                                null,
+                                [typeof(object), typeof(object)],
+                                null)!,
+                            postgresRegistrationId);
                         return;
                 }
 
@@ -113,12 +117,20 @@ internal static class ProviderOptionsConfigurator
 
             case MyEfVibeProvider.Oracle
                 when OracleNamingProbe.Detect(host, connectionString) == OracleNamingStyle.NativeUppercase:
+                var oracleColumnIndex = OracleNamingProbe.LoadColumnMetadataIndex(host, connectionString);
+
+                var oracleRegistrationId = AdventureWorksColumnMetadataCache.Store(connectionString, oracleColumnIndex);
+
                 TryRegisterEfVibeModelCustomizer(
                     host,
                     dbContextOptionsBuilder,
                     typeof(OracleRelationalNamingApplier).GetMethod(
                         nameof(OracleRelationalNamingApplier.CustomizeAfterBase),
-                        BindingFlags.Static | BindingFlags.Public)!);
+                        BindingFlags.Static | BindingFlags.Public,
+                        null,
+                        [typeof(object), typeof(object)],
+                        null)!,
+                    oracleRegistrationId);
                 return;
         }
     }
@@ -126,7 +138,8 @@ internal static class ProviderOptionsConfigurator
     private static void TryRegisterEfVibeModelCustomizer(
         WorkspaceHost host,
         object dbContextOptionsBuilder,
-        MethodInfo afterBaseMethod)
+        MethodInfo afterBaseMethod,
+        long registrationId = 0)
     {
         host.PreloadPackageByName("Microsoft.EntityFrameworkCore");
         host.PreloadPackageByName("Microsoft.EntityFrameworkCore.Relational");
@@ -138,7 +151,7 @@ internal static class ProviderOptionsConfigurator
             return;
         }
 
-        var replacementType = EfVibeModelCustomizerEmitter.TryGetOrCreate(host, afterBaseMethod);
+        var replacementType = EfVibeModelCustomizerEmitter.TryGetOrCreate(host, afterBaseMethod, registrationId);
 
         if (replacementType is null)
         {

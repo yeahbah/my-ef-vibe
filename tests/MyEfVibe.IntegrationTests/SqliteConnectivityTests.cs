@@ -56,7 +56,7 @@ public sealed class SqliteConnectivityTests
 
         Skip.If(persistenceDll is null || startupDll is null,
             "No pre-built AdventureWorks output under /tmp/efvibe-integration.");
-        Skip.If(!File.Exists("/home/adiaz/Projects/AdventureWorks/Source/AdventureWorksLT.db"),
+        Skip.If(!File.Exists("/home/yeahbah/Projects/AdventureWorksSqlite/database/sqlite/AdventureWorks.db"),
             "SQLite database not found.");
 
         var scenario = IntegrationScenarioCatalog.Require("sqlite");

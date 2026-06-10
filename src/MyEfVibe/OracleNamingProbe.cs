@@ -14,6 +14,67 @@ internal static class OracleNamingProbe
     private const string PascalCaseProbeOwner = "Production";
     private const string PascalCaseProbeTable = "Product";
 
+    internal static Dictionary<(string Schema, string Table), Dictionary<string, string>> LoadColumnMetadataIndex(
+        WorkspaceHost host,
+        string connectionString)
+    {
+        var index = new Dictionary<(string Schema, string Table), Dictionary<string, string>>(
+            StringTupleComparer.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return index;
+        }
+
+        try
+        {
+            using var connection = TryOpenConnection(host, connectionString);
+
+            if (connection is null)
+            {
+                return index;
+            }
+
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT owner, table_name, column_name, data_type
+                FROM all_tab_columns
+                WHERE owner IN ('PRODUCTION', 'PERSON', 'SALES', 'HUMANRESOURCES', 'PURCHASING')
+                """;
+
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(2) || reader.IsDBNull(3))
+                {
+                    continue;
+                }
+
+                var schema = reader.GetString(0);
+                var table = reader.GetString(1);
+                var column = reader.GetString(2);
+                var dataType = reader.GetString(3);
+                var key = (schema, table);
+
+                if (!index.TryGetValue(key, out var columns))
+                {
+                    columns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    index[key] = columns;
+                }
+
+                columns[column] = dataType;
+            }
+        }
+        catch
+        {
+            index.Clear();
+        }
+
+        return index;
+    }
+
     internal static OracleNamingStyle Detect(WorkspaceHost host, string connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -99,6 +160,24 @@ internal static class OracleNamingProbe
         var count = Convert.ToInt32(command.ExecuteScalar());
 
         return count > 0;
+    }
+
+    private sealed class StringTupleComparer : IEqualityComparer<(string Schema, string Table)>
+    {
+        internal static readonly StringTupleComparer OrdinalIgnoreCase = new();
+
+        public bool Equals((string Schema, string Table) x, (string Schema, string Table) y)
+        {
+            return string.Equals(x.Schema, y.Schema, StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(x.Table, y.Table, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public int GetHashCode((string Schema, string Table) obj)
+        {
+            return HashCode.Combine(
+                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Schema),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Table));
+        }
     }
 }
 

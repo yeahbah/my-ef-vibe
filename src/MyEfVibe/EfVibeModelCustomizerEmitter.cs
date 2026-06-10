@@ -10,9 +10,10 @@ namespace MyEfVibe;
 /// </summary>
 internal static class EfVibeModelCustomizerEmitter
 {
-    private static readonly ConcurrentDictionary<(Assembly EfAssembly, string ApplierTypeName), Type?> Cache = new();
+    private static readonly ConcurrentDictionary<(Assembly EfAssembly, string ApplierTypeName, long RegistrationId), Type?>
+        Cache = new();
 
-    internal static Type? TryGetOrCreate(WorkspaceHost host, MethodInfo afterBaseMethod)
+    internal static Type? TryGetOrCreate(WorkspaceHost host, MethodInfo afterBaseMethod, long registrationId = 0)
     {
         var efAssembly = host.LoadAssembly("Microsoft.EntityFrameworkCore");
 
@@ -26,11 +27,11 @@ internal static class EfVibeModelCustomizerEmitter
                               ?? afterBaseMethod.Name;
 
         return Cache.GetOrAdd(
-            (efAssembly, applierTypeName),
-            key => EmitCustomizer(key.EfAssembly, afterBaseMethod));
+            (efAssembly, applierTypeName, registrationId),
+            key => EmitCustomizer(key.EfAssembly, afterBaseMethod, key.RegistrationId));
     }
 
-    private static Type? EmitCustomizer(Assembly efAssembly, MethodInfo afterBaseMethod)
+    private static Type? EmitCustomizer(Assembly efAssembly, MethodInfo afterBaseMethod, long registrationId)
     {
         var modelCustomizerType = efAssembly.GetType(
             "Microsoft.EntityFrameworkCore.Infrastructure.ModelCustomizer",
@@ -61,12 +62,19 @@ internal static class EfVibeModelCustomizerEmitter
             return null;
         }
 
+        var afterBaseCall = ResolveAfterBaseMethod(afterBaseMethod, modelBuilderType, dbContextType, registrationId);
+
+        if (afterBaseCall is null)
+        {
+            return null;
+        }
+
         var assemblyName = new AssemblyName(
-            $"MyEfVibe.ModelCustomizer_{afterBaseMethod.DeclaringType!.Name}_{efAssembly.GetName().Version}");
+            $"MyEfVibe.ModelCustomizer_{afterBaseMethod.DeclaringType!.Name}_{registrationId}_{efAssembly.GetName().Version}");
         var asmBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
         var moduleBuilder = asmBuilder.DefineDynamicModule("MainModule");
         var typeBuilder = moduleBuilder.DefineType(
-            $"MyEfVibe.{afterBaseMethod.DeclaringType.Name}Customizer",
+            $"MyEfVibe.{afterBaseMethod.DeclaringType.Name}Customizer_{registrationId}",
             TypeAttributes.Public | TypeAttributes.Class,
             modelCustomizerType);
 
@@ -95,9 +103,34 @@ internal static class EfVibeModelCustomizerEmitter
         il.Emit(OpCodes.Call, baseCustomize);
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldarg_2);
-        il.Emit(OpCodes.Call, afterBaseMethod);
+
+        if (registrationId > 0)
+        {
+            il.Emit(OpCodes.Ldc_I8, registrationId);
+        }
+
+        il.Emit(OpCodes.Call, afterBaseCall);
         il.Emit(OpCodes.Ret);
 
         return typeBuilder.CreateType();
+    }
+
+    private static MethodInfo? ResolveAfterBaseMethod(
+        MethodInfo afterBaseMethod,
+        Type modelBuilderType,
+        Type dbContextType,
+        long registrationId)
+    {
+        if (registrationId <= 0)
+        {
+            return afterBaseMethod;
+        }
+
+        return afterBaseMethod.DeclaringType?.GetMethod(
+            afterBaseMethod.Name,
+            BindingFlags.Public | BindingFlags.Static,
+            null,
+            [modelBuilderType, dbContextType, typeof(long)],
+            null);
     }
 }
