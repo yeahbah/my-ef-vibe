@@ -1,5 +1,5 @@
 {
-  "integrationRoot": "/home/adiaz/Projects",
+  "integrationRoot": "/home/yeahbah/Projects",
   "scenarios": [
     {
       "id": "sqlserver",
@@ -9,7 +9,7 @@
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
       "framework": "net10.0",
-      "connectionString": "Server=localhost,1433;Database=AdventureWorks2022;User Id=sa;Password=Your_strong_Password123!;Encrypt=true;TrustServerCertificate=true;Application Name=AdventureWorks.API;"
+      "connectionString": "Server=localhost,1433;Database=AdventureWorks;User Id=sa;Password=AdventureWorks_Dev_2026!;Encrypt=false;TrustServerCertificate=true"
     },
     {
       "id": "postgresql",
@@ -19,7 +19,7 @@
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
       "framework": "net10.0",
-      "connectionString": "Host=localhost;Port=5432;Database=adventureworks;Username=postgres;Password=Your_strong_Password123!;Include Error Detail=true"
+      "connectionString": "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=AdventureWorks_Dev_2026!;Application Name=AdventureWorks.API"
     },
     {
       "id": "oracle",
@@ -29,7 +29,7 @@
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
       "framework": "net10.0",
-      "connectionString": "User Id=AdvWorks;Password=Oracle1;Data Source=localhost:1521/FREEPDB1;Connection Timeout=60"
+      "connectionString": "User Id=ADVENTUREWORKS;Password=AdventureWorks123;Data Source=localhost:1521/FREEPDB1"
     },
     {
       "id": "sqlite",
@@ -39,7 +39,7 @@
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
       "framework": "net10.0",
-      "connectionString": "Data Source=/home/adiaz/Projects/AdventureWorks/Source/AdventureWorksLT.db"
+      "connectionString": "Data Source=/home/yeahbah/Projects/AdventureWorksSqlite/database/sqlite/AdventureWorks.db"
     }
   ]
 }
