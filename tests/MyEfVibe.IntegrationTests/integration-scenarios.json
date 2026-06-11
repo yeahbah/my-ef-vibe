@@ -40,6 +40,15 @@
       "context": "AdventureWorksDbContext",
       "framework": "net10.0",
       "connectionString": "Data Source=/home/yeahbah/Projects/AdventureWorksSqlite/database/sqlite/AdventureWorks.db"
+    },
+    {
+      "id": "mysql",
+      "provider": "mysql",
+      "repoRoot": "AdventureWorksMySql",
+      "efProject": "apps/api-dotnet/src/AdventureWorks.Infrastructure.Persistence/AdventureWorks.Infrastructure.Persistence.csproj",
+      "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
+      "context": "AdventureWorksDbContext",
+      "framework": "net10.0"
     }
   ]
 }

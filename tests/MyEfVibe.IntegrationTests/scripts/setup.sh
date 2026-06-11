@@ -9,6 +9,7 @@ INTEGRATION_ROOT="${EFVIBE_INTEGRATION_ROOT:-/home/adiaz/Projects}"
 DOCKER_DIR="${ROOT}/docker"
 AW_REPO="${INTEGRATION_ROOT}/AdventureWorks"
 CB_REPO="${INTEGRATION_ROOT}/AdventureWorksCouchBase"
+MYSQL_REPO="${INTEGRATION_ROOT}/AdventureWorksMySql"
 SQLSERVER_DIR="${INTEGRATION_ROOT}/adventureworks"
 AW_URL="${ADVENTUREWORKS_REPO_URL:-https://github.com/theMickster/AdventureWorks.git}"
 CB_URL="${ADVENTUREWORKS_COUCHBASE_REPO_URL:-}"
@@ -104,6 +105,24 @@ setup_couchbase() {
   done
 }
 
+setup_mysql() {
+  if [[ ! -f "${MYSQL_REPO}/docker-compose.yml" ]]; then
+    warn "MySQL docker-compose not found at ${MYSQL_REPO}; skipping MySQL."
+    return 0
+  fi
+
+  info "Starting MySQL (aw-mysql)"
+  docker compose -f "${MYSQL_REPO}/docker-compose.yml" up -d mysql
+
+  info "Waiting for MySQL..."
+  for _ in $(seq 1 60); do
+    if docker inspect -f '{{.State.Health.Status}}' aw-mysql 2>/dev/null | grep -qx healthy; then
+      break
+    fi
+    sleep 2
+  done
+}
+
 setup_docker_targets() {
   require_cmd docker
 
@@ -142,6 +161,7 @@ main() {
   ensure_adventureworks_couchbase_repo
   setup_sqlserver
   setup_docker_targets
+  setup_mysql
   setup_couchbase
   "${ROOT}/scripts/convert-databases.sh"
 

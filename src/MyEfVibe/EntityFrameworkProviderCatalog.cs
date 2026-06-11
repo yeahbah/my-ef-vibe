@@ -74,6 +74,14 @@ internal static class EntityFrameworkProviderCatalog
             MyEfVibeProvider.MySql,
             ProviderCapabilities.SupportsAutoConstruction | ProviderCapabilities.SupportsQueryPlan),
         new(
+            "Microting.EntityFrameworkCore.MySql",
+            "Microting.EntityFrameworkCore.MySql",
+            "UseMySql",
+            MyEfVibeProvider.MySql,
+            ProviderCapabilities.SupportsAutoConstruction
+                | ProviderCapabilities.SupportsQueryPlan
+                | ProviderCapabilities.RequiresServerVersion),
+        new(
             "Couchbase.EntityFrameworkCore",
             "Couchbase.EntityFrameworkCore",
             "UseCouchbase",

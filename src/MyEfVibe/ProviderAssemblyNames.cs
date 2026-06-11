@@ -67,6 +67,7 @@ internal static class ProviderAssemblyNames
             MyEfVibeProvider.MySql or MyEfVibeProvider.MariaDb =>
             [
                 "Pomelo.EntityFrameworkCore.MySql",
+                "Microting.EntityFrameworkCore.MySql",
                 "MySql.EntityFrameworkCore"
             ],
             MyEfVibeProvider.Couchbase =>

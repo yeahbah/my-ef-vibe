@@ -131,6 +131,7 @@ internal static class DatabaseProbe
             "npgsql" => providerName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase),
             "oracle" => providerName.Contains("Oracle", StringComparison.OrdinalIgnoreCase),
             "sqlite" => providerName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase),
+            "mysql" => providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase),
             "couchbase" => providerName.Contains("Couchbase", StringComparison.OrdinalIgnoreCase),
             _ => false
         };
