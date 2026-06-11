@@ -17,7 +17,7 @@ internal sealed class EfvibeCliOptions
     [Option('c', "context", HelpText = "DbContext type name or fully qualified name.")]
     public string? Context { get; set; }
 
-    [Option("connection-string|cs", HelpText = "Connection string for manual DbContextOptions construction.")]
+    [Option("connection-string", HelpText = "Connection string for manual DbContextOptions construction.")]
     public string? ConnectionString { get; set; }
 
     [Option('e', "expression", HelpText = "Run a single expression and exit (non-interactive).")]

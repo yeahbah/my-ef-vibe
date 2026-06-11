@@ -16,7 +16,7 @@ internal sealed class LanguageServerCliOptions
     [Option('c', "context", HelpText = "DbContext type name or fully qualified name.")]
     public string? Context { get; set; }
 
-    [Option("connection-string|cs", HelpText = "Connection string for manual DbContextOptions construction.")]
+    [Option("connection-string", HelpText = "Connection string for manual DbContextOptions construction.")]
     public string? ConnectionString { get; set; }
 
     [Option('f', "framework", HelpText = "Target framework moniker (e.g. net8.0).")]

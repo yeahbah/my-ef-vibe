@@ -40,6 +40,6 @@ internal sealed class ScanCliOptions
     [Option("no-banner", HelpText = "Suppress build/status banners (recommended with --json).")]
     public bool NoBanner { get; set; }
 
-    [Option("connection-string|cs", HelpText = "Connection string for deep scan.")]
+    [Option("connection-string", HelpText = "Connection string for deep scan.")]
     public string? ConnectionString { get; set; }
 }
