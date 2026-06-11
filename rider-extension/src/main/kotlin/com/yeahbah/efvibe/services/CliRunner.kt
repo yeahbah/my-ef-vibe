@@ -213,8 +213,8 @@ class CliRunner(private val project: Project) {
 
     private fun resolveInvocation(): CliInvocation {
         val toolPath = PathResolver.resolve(settings.toolPath, project)
-        if (toolPath.isNotBlank() && java.nio.file.Path.of(toolPath).exists()) {
-            return CliInvocation(toolPath)
+        if (toolPath.isNotBlank()) {
+            resolveRunnableTool(java.nio.file.Path.of(toolPath))?.let { return CliInvocation(it) }
         }
 
         if (findDotnetToolsManifest() != null) {
@@ -233,8 +233,9 @@ class CliRunner(private val project: Project) {
             ?.split(File.pathSeparatorChar)
             ?.asSequence()
             ?.mapNotNull { dir -> dir.takeIf { it.isNotBlank() }?.let { java.nio.file.Path.of(it, "efvibe") } }
-            ?.firstOrNull { p -> Files.exists(p) && Files.isRegularFile(p) && Files.isExecutable(p) }
-            ?.let { return it.toAbsolutePath().normalize().toString() }
+            ?.mapNotNull(::resolveRunnableTool)
+            ?.firstOrNull()
+            ?.let { return it }
 
         val home = System.getProperty("user.home").orEmpty()
         if (home.isNotBlank()) {
@@ -242,19 +243,42 @@ class CliRunner(private val project: Project) {
                 java.nio.file.Path.of(home, ".dotnet", "tools", "efvibe"),
                 java.nio.file.Path.of(home, ".local", "bin", "efvibe"),
             )
-            candidates.firstOrNull { p -> Files.exists(p) && Files.isRegularFile(p) && Files.isExecutable(p) }
-                ?.let { return it.toAbsolutePath().normalize().toString() }
+            candidates.mapNotNull(::resolveRunnableTool).firstOrNull()?.let { return it }
         }
 
         val systemCandidates = listOf(
             java.nio.file.Path.of("/usr/local/bin/efvibe"),
             java.nio.file.Path.of("/usr/bin/efvibe"),
         )
-        systemCandidates.firstOrNull { p -> Files.exists(p) && Files.isRegularFile(p) && Files.isExecutable(p) }
-            ?.let { return it.toAbsolutePath().normalize().toString() }
+        systemCandidates.mapNotNull(::resolveRunnableTool).firstOrNull()?.let { return it }
 
         return null
     }
+
+    private fun resolveRunnableTool(path: java.nio.file.Path): String? {
+        if (Files.exists(path) && Files.isRegularFile(path) && Files.isExecutable(path)) {
+            return path.toAbsolutePath().normalize().toString()
+        }
+
+        if (!isWindows()) {
+            return null
+        }
+
+        val exePath = if (path.fileName.toString().endsWith(".exe", ignoreCase = true)) {
+            path
+        } else {
+            path.resolveSibling("${path.fileName}.exe")
+        }
+
+        return if (Files.exists(exePath) && Files.isRegularFile(exePath)) {
+            exePath.toAbsolutePath().normalize().toString()
+        } else {
+            null
+        }
+    }
+
+    private fun isWindows(): Boolean =
+        System.getProperty("os.name").orEmpty().contains("windows", ignoreCase = true)
 
     private fun baseArgs(): List<String> = buildList {
         addOption("-w", PathResolver.resolve(settings.workspaceRoot, project))

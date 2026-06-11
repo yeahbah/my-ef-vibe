@@ -25,18 +25,14 @@ class EfvibeDaemonClient(private val project: Project) {
     private var daemon: DaemonState? = null
     private var sessionKey: String? = null
 
-    fun isReady(): Boolean =
-        requestLock.withLock {
-            lifecycleLock.withLock {
-                daemon?.takeIf { !it.handler.isProcessTerminated && it.ready } != null
-            }
-        }
+    fun isReady(): Boolean {
+        val state = daemon ?: return false
+        return state.ready && !state.handler.isProcessTerminated
+    }
 
     fun warmup() {
-        requestLock.withLock {
-            lifecycleLock.withLock {
-                ensureStartedLocked()
-            }
+        lifecycleLock.withLock {
+            runCatching { ensureStartedLocked() }
         }
     }
 
@@ -72,9 +68,9 @@ class EfvibeDaemonClient(private val project: Project) {
     }
 
     private fun runCommand(requestJson: String, timeoutMinutes: Long = COMMAND_TIMEOUT_MINUTES): String =
-        requestLock.withLock {
-            lifecycleLock.withLock {
-                val state = ensureStartedLocked()
+        lifecycleLock.withLock {
+            val state = ensureStartedLocked()
+            requestLock.withLock {
                 val input = state.handler.processInput
                     ?: throw IllegalStateException("efvibe daemon stdin is not available.")
                 input.write("$requestJson\n".toByteArray(StandardCharsets.UTF_8))
@@ -90,8 +86,8 @@ class EfvibeDaemonClient(private val project: Project) {
         }
 
     fun invalidate() {
-        requestLock.withLock {
-            lifecycleLock.withLock {
+        lifecycleLock.withLock {
+            requestLock.withLock {
                 invalidateLocked()
             }
         }
