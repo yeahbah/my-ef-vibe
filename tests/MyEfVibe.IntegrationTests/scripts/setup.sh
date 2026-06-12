@@ -10,6 +10,7 @@ DOCKER_DIR="${ROOT}/docker"
 AW_REPO="${INTEGRATION_ROOT}/AdventureWorks"
 CB_REPO="${INTEGRATION_ROOT}/AdventureWorksCouchBase"
 MYSQL_REPO="${INTEGRATION_ROOT}/AdventureWorksMySql"
+MULTICONTEXT_REPO="${INTEGRATION_ROOT}/SampleEfProjectMultiContext"
 SQLSERVER_DIR="${INTEGRATION_ROOT}/adventureworks"
 AW_URL="${ADVENTUREWORKS_REPO_URL:-https://github.com/theMickster/AdventureWorks.git}"
 CB_URL="${ADVENTUREWORKS_COUCHBASE_REPO_URL:-}"
@@ -167,6 +168,13 @@ main() {
 
   info "Building MyEfVibe"
   dotnet build "${MY_EF_VIBE_ROOT}/src/MyEfVibe/MyEfVibe.csproj" -c Debug --verbosity quiet
+
+  if [[ -f "${MULTICONTEXT_REPO}/SampleEfProjectMultiContext.sln" ]]; then
+    info "Building SampleEfProjectMultiContext"
+    dotnet build "${MULTICONTEXT_REPO}/SampleEfProjectMultiContext.sln" -c Release --verbosity quiet
+  else
+    warn "SampleEfProjectMultiContext not found at ${MULTICONTEXT_REPO}; multicontext integration tests will skip until present."
+  fi
 
   info "Setup complete."
   echo ""

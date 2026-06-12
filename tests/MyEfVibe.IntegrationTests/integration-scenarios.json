@@ -49,6 +49,26 @@
       "startupProject": "apps/api-dotnet/src/AdventureWorks.API/AdventureWorks.API.csproj",
       "context": "AdventureWorksDbContext",
       "framework": "net10.0"
+    },
+    {
+      "id": "multicontext-postgresql",
+      "provider": "npgsql",
+      "repoRoot": "SampleEfProjectMultiContext",
+      "efProject": "src/SampleEfProjectMultiContext/SampleEfProjectMultiContext.csproj",
+      "startupProject": "src/SampleEfProjectMultiContext.App/SampleEfProjectMultiContext.App.csproj",
+      "context": "PostgresAdventureWorksDbContext",
+      "framework": "net10.0",
+      "connectionString": "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=AdventureWorks_Dev_2026!;Application Name=SampleEfProjectMultiContext"
+    },
+    {
+      "id": "multicontext-oracle",
+      "provider": "oracle",
+      "repoRoot": "SampleEfProjectMultiContext",
+      "efProject": "src/SampleEfProjectMultiContext/SampleEfProjectMultiContext.csproj",
+      "startupProject": "src/SampleEfProjectMultiContext.App/SampleEfProjectMultiContext.App.csproj",
+      "context": "OracleAdventureWorksDbContext",
+      "framework": "net10.0",
+      "connectionString": "User Id=ADVENTUREWORKS;Password=AdventureWorks123;Data Source=localhost:1521/FREEPDB1"
     }
   ]
 }

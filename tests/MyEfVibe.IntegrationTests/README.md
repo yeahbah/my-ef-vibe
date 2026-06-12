@@ -64,5 +64,9 @@ Without `EFVIBE_RUN_INTEGRATION=1`, all tests are skipped.
 | `sqlite`     | SQLite     | `AdventureWorks`          | `Source/AdventureWorksLT.db`; tables named `Schema.Table`; efvibe maps EF schema/table to dotted names |
 | `couchbase`  | Couchbase  | `AdventureWorksCouchBase` | `net8.0`; connection from startup `appsettings.json`; async queries required                           |
 | `mysql`      | MySQL      | `AdventureWorksMySql`     | `Microting.EntityFrameworkCore.MySql`; connection from API `appsettings.Development.json`              |
+| `multicontext-postgresql` | PostgreSQL | `SampleEfProjectMultiContext` | `PostgresAdventureWorksDbContext`; same Docker Postgres as `postgresql` (port **5433**)            |
+| `multicontext-oracle`     | Oracle     | `SampleEfProjectMultiContext` | `OracleAdventureWorksDbContext`; same Docker Oracle as `oracle` (port **1521**)                    |
+
+The multi-context sample lives at `~/Projects/SampleEfProjectMultiContext` (local project, not cloned by setup). Place it beside `AdventureWorks` under `EFVIBE_INTEGRATION_ROOT` before running `multicontext-*` scenarios.
 
 Edit `integration-scenarios.json` to change paths, TFM (`framework`), or connection strings.
