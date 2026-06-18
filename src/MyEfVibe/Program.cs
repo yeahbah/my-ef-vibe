@@ -1,4 +1,6 @@
 using CommandLine;
+using MyEfVibe.Reporters;
+using MyEfVibe.Workspace;
 using Spectre.Console;
 
 namespace MyEfVibe;

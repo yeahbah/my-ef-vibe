@@ -1,3 +1,5 @@
+using MyEfVibe.Workspace;
+
 namespace MyEfVibe.Tests;
 
 public sealed class SqliteBootstrapTests

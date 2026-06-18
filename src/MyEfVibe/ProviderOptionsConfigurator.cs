@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using MyEfVibe.Workspace;
 
 namespace MyEfVibe;
 
@@ -89,13 +90,13 @@ internal static class ProviderOptionsConfigurator
                     case PostgreSqlNamingStyle.AdventureWorksPascalCase:
                         var columnIndex = PostgreSqlNamingProbe.LoadColumnMetadataIndex(host, connectionString);
 
-                        var postgresRegistrationId = AdventureWorksColumnMetadataCache.Store(connectionString, columnIndex);
+                        var postgresRegistrationId = ColumnMetadataCache.Store(connectionString, columnIndex);
 
                         TryRegisterEfVibeModelCustomizer(
                             host,
                             dbContextOptionsBuilder,
-                            typeof(PostgreSqlAdventureWorksNamingApplier).GetMethod(
-                                nameof(PostgreSqlAdventureWorksNamingApplier.CustomizeAfterBase),
+                            typeof(PostgreSqlNamingApplier).GetMethod(
+                                nameof(PostgreSqlNamingApplier.CustomizeAfterBase),
                                 BindingFlags.Static | BindingFlags.Public,
                                 null,
                                 [typeof(object), typeof(object)],
@@ -119,7 +120,7 @@ internal static class ProviderOptionsConfigurator
                 when OracleNamingProbe.Detect(host, connectionString) == OracleNamingStyle.NativeUppercase:
                 var oracleColumnIndex = OracleNamingProbe.LoadColumnMetadataIndex(host, connectionString);
 
-                var oracleRegistrationId = AdventureWorksColumnMetadataCache.Store(connectionString, oracleColumnIndex);
+                var oracleRegistrationId = ColumnMetadataCache.Store(connectionString, oracleColumnIndex);
 
                 TryRegisterEfVibeModelCustomizer(
                     host,
@@ -283,7 +284,7 @@ internal static class ProviderOptionsConfigurator
             MyEfVibeProvider.SqlServer => SqlServerExtensions,
             MyEfVibeProvider.Npgsql => NpgsqlExtensions,
             MyEfVibeProvider.MySql or MyEfVibeProvider.MariaDb => MySqlExtensions,
-            _ => Array.Empty<OptionalProviderExtension>()
+            _ => []
         };
     }
 

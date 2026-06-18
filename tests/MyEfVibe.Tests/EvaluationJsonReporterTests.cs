@@ -1,3 +1,5 @@
+using MyEfVibe.Reporters;
+
 namespace MyEfVibe.Tests;
 
 public sealed class EvaluationJsonReporterTests
@@ -18,7 +20,7 @@ public sealed class EvaluationJsonReporterTests
             RowCount = 1,
             IsMaterialized = true,
             EstimatedBytes = 8,
-            Warnings = Array.Empty<string>(),
+            Warnings = [],
             Succeeded = true,
         };
 

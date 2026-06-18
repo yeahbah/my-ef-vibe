@@ -29,7 +29,7 @@ internal sealed class ReplCompletionService
     {
         if (cursorPosition < 0 || cursorPosition > currentLine.Length)
         {
-            return Array.Empty<CompletionSuggestion>();
+            return [];
         }
 
         var (source, position, lineStartInDocument) = _session.CreateCompletionSource(currentLine, cursorPosition);

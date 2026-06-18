@@ -16,7 +16,7 @@ internal sealed class ScriptSession
     private readonly Type _globalsType;
     private readonly ImmutableArray<string> _importNamespaces;
     private readonly ScriptOptions _options;
-    private readonly List<string> _submissionHistory = new();
+    private readonly List<string> _submissionHistory = [];
     private Script? _script;
     private ScriptState? _state;
 
@@ -64,9 +64,10 @@ internal sealed class ScriptSession
         importNamespaces.AddRange(
             ScriptNamespaceImports.FilterWorkspaceNamespaces(CollectWorkspaceNamespaces(workspaceAssemblyPaths)));
 
-        _importNamespaces = importNamespaces
-            .Distinct(StringComparer.Ordinal)
-            .ToImmutableArray();
+        _importNamespaces = [
+            ..importNamespaces
+                .Distinct(StringComparer.Ordinal)
+        ];
 
         _options = ScriptOptions.Default
             .AddReferences(MetadataReferences)

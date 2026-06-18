@@ -233,7 +233,7 @@ internal static class VisualizationPresenter
         out IReadOnlyList<double> values)
     {
         column = string.Empty;
-        values = Array.Empty<double>();
+        values = [];
 
         var first = rows.FirstOrDefault(static row => row is not null);
 

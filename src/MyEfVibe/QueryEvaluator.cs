@@ -31,7 +31,7 @@ internal static class QueryEvaluator
                 ResultAnalyzer.Analyze(result);
 
             var executedSql = sqlCapture?.Commands.Select(EfSqlCapture.FormatEntry).ToArray()
-                              ?? Array.Empty<string>();
+                              ?? [];
 
             ExecutedSqlWarningRules.AddExecutedSqlWarnings(snippet, executedSql, warnings);
 

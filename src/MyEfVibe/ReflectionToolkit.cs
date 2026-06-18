@@ -16,15 +16,15 @@ internal static class ReflectionToolkit
         }
         catch (FileNotFoundException)
         {
-            return Array.Empty<Type>();
+            return [];
         }
         catch (FileLoadException)
         {
-            return Array.Empty<Type>();
+            return [];
         }
         catch (TypeLoadException)
         {
-            return Array.Empty<Type>();
+            return [];
         }
     }
 
@@ -40,15 +40,15 @@ internal static class ReflectionToolkit
         }
         catch (FileNotFoundException)
         {
-            return Array.Empty<Type>();
+            return [];
         }
         catch (FileLoadException)
         {
-            return Array.Empty<Type>();
+            return [];
         }
         catch (TypeLoadException)
         {
-            return Array.Empty<Type>();
+            return [];
         }
     }
 }

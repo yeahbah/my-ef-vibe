@@ -10,7 +10,7 @@ internal static class ResultAnalyzer
     {
         if (value is null)
         {
-            return (ResultKind.Null, "null", null, true, null, Array.Empty<object?>());
+            return (ResultKind.Null, "null", null, true, null, []);
         }
 
         var type = value.GetType();
@@ -18,12 +18,12 @@ internal static class ResultAnalyzer
 
         if (value is string)
         {
-            return (ResultKind.String, typeName, 1, true, value.ToString()!.Length * 2L, new[] { value });
+            return (ResultKind.String, typeName, 1, true, value.ToString()!.Length * 2L, [value]);
         }
 
         if (value is IQueryable)
         {
-            return (ResultKind.Queryable, FormatType(type), null, false, null, Array.Empty<object?>());
+            return (ResultKind.Queryable, FormatType(type), null, false, null, []);
         }
 
         if (value is IEnumerable enumerable and not string)

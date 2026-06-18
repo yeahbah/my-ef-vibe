@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
+using MyEfVibe.Workspace;
 
 namespace MyEfVibe;
 
@@ -312,7 +313,7 @@ internal static class DbContextActivator
         if (!string.IsNullOrWhiteSpace(preferredContextFullName)
             && TryResolveContextType(host, preferredContextFullName, out var preferred))
         {
-            return ImmutableArray.Create(preferred);
+            return [preferred];
         }
 
         var distinctConcreteContexts = new HashSet<Type>();
@@ -329,7 +330,7 @@ internal static class DbContextActivator
             AddDbContextTypesFromAssembly(assembly, distinctConcreteContexts);
         }
 
-        return distinctConcreteContexts.ToImmutableArray();
+        return [..distinctConcreteContexts];
     }
 
     private static void AddDbContextTypesFromAssembly(Assembly assembly, HashSet<Type> distinctConcreteContexts)
@@ -950,7 +951,7 @@ internal static class DbContextActivator
             return false;
         }
 
-        var builderInstance = builderCtor.Invoke(Array.Empty<object?>());
+        var builderInstance = builderCtor.Invoke([]);
 
         if (builderInstance is null)
         {
@@ -1021,7 +1022,7 @@ internal static class DbContextActivator
             return false;
         }
 
-        var createdContextInstance = matchingCtor.Invoke(new[] { compiledOptionsConcreteInstance });
+        var createdContextInstance = matchingCtor.Invoke([compiledOptionsConcreteInstance]);
 
         if (createdContextInstance is null)
         {
@@ -1230,7 +1231,7 @@ internal static class DbContextActivator
             return false;
         }
 
-        var builderInstance = builderCtor.Invoke(Array.Empty<object?>());
+        var builderInstance = builderCtor.Invoke([]);
 
         if (builderInstance is null)
         {
@@ -1290,7 +1291,7 @@ internal static class DbContextActivator
             return false;
         }
 
-        var createdContextInstance = matchingCtor.Invoke(new[] { compiledOptionsConcreteInstance });
+        var createdContextInstance = matchingCtor.Invoke([compiledOptionsConcreteInstance]);
 
         if (createdContextInstance is null)
         {

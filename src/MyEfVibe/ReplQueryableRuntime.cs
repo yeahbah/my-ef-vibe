@@ -347,10 +347,10 @@ public static class ReplQueryableRuntime
     {
         if (predicate is null)
         {
-            return new[] { source, cancellationToken };
+            return [source, cancellationToken];
         }
 
-        return new[] { source, predicate, cancellationToken };
+        return [source, predicate, cancellationToken];
     }
 
     private static object InvokeEnumerable(string methodName, object source)

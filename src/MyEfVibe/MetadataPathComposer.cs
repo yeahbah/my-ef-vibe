@@ -32,7 +32,7 @@ internal static class MetadataPathComposer
         AddSharedRuntimeAssembly(discovered, "System.Linq.Queryable.dll");
         AddSharedRuntimeAssembly(discovered, "System.Linq.Expressions.dll");
 
-        return discovered.ToImmutableArray();
+        return [..discovered];
     }
 
     private static void AddSharedRuntimeAssembly(HashSet<string> discovered, string assemblyFileName)

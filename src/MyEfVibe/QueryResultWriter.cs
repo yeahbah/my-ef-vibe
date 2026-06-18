@@ -1,3 +1,6 @@
+using MyEfVibe.Reporters;
+using MyEfVibe.Workspace;
+
 namespace MyEfVibe;
 
 internal static class QueryResultWriter
@@ -54,7 +57,7 @@ internal static class QueryResultWriter
         }
         catch (EvaluationFailedException failure)
         {
-            analytics.Record(failure.Metrics, null, Array.Empty<object?>());
+            analytics.Record(failure.Metrics, null, []);
             throw;
         }
     }

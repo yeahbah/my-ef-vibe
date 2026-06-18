@@ -153,7 +153,7 @@ internal static class EntityFrameworkReflectionCache
                 return false;
             }
 
-            sqlLiteral = candidate.Invoke(null, new[] { queryable }) as string;
+            sqlLiteral = candidate.Invoke(null, [queryable]) as string;
 
             return !string.IsNullOrWhiteSpace(sqlLiteral);
         }

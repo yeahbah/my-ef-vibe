@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MyEfVibe.Workspace;
 
 namespace MyEfVibe;
 
@@ -193,7 +194,7 @@ internal static class DbInfoJsonReporter
     {
         public string DbContext { get; init; } = string.Empty;
 
-        public DbInfoJsonEntry[] Entries { get; init; } = Array.Empty<DbInfoJsonEntry>();
+        public DbInfoJsonEntry[] Entries { get; init; } = [];
     }
 
     internal sealed class DbInfoJsonEntry

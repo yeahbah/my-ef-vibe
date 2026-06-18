@@ -18,7 +18,7 @@ public static class OracleRelationalNamingApplier
     public static void CustomizeAfterBase(object modelBuilder, object context, long registrationId)
     {
         Apply(modelBuilder);
-        ApplyGuidConversions(modelBuilder, AdventureWorksColumnMetadataCache.TryGet(registrationId));
+        ApplyGuidConversions(modelBuilder, ColumnMetadataCache.TryGet(registrationId));
     }
 
     internal static void Apply(object modelBuilder)

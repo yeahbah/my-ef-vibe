@@ -79,7 +79,7 @@ internal static class RelationalDatabaseFacadeInvoker
 
                 try
                 {
-                    connection = method.Invoke(null, new[] { databaseFacade }) as DbConnection;
+                    connection = method.Invoke(null, [databaseFacade]) as DbConnection;
 
                     if (connection is not null)
                     {
@@ -120,7 +120,7 @@ internal static class RelationalDatabaseFacadeInvoker
 
                     try
                     {
-                        connection = method.Invoke(null, new[] { databaseFacade }) as DbConnection;
+                        connection = method.Invoke(null, [databaseFacade]) as DbConnection;
 
                         if (connection is not null)
                         {

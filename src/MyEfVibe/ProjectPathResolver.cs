@@ -1,3 +1,5 @@
+using MyEfVibe.Workspace;
+
 namespace MyEfVibe;
 
 internal static class ProjectPathResolver

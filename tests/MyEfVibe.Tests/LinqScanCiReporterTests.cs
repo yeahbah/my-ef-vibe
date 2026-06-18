@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MyEfVibe.Linq;
 
 namespace MyEfVibe.Tests;
 
@@ -10,8 +11,7 @@ public sealed class LinqScanCiReporterTests
         var result = new LinqLiteScanResult(
             3,
             1,
-            new[]
-            {
+            [
                 new LinqScanFinding(
                     "/tmp/ProductsController.cs",
                     42,
@@ -19,7 +19,7 @@ public sealed class LinqScanCiReporterTests
                     "client-eval",
                     "Client evaluation detected.",
                     LinqScanSeverity.Warning)
-            });
+            ]);
 
         var summary = LinqScanCiGate.Summarize(result.Findings, null);
         var originalOut = Console.Out;

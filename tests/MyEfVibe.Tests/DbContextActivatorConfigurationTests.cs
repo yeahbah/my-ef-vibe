@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MyEfVibe.Workspace;
 
 namespace MyEfVibe.Tests;
 

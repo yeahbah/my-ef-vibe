@@ -6,7 +6,7 @@ internal static class ArtifactResolver
     {
         if (!Directory.Exists(workspaceOutputDirectory))
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         return Directory.EnumerateFiles(workspaceOutputDirectory, "*.dll", SearchOption.TopDirectoryOnly)

@@ -1,3 +1,5 @@
+using MyEfVibe.Linq;
+
 namespace MyEfVibe.IntegrationTests;
 
 [Trait("Category", "Integration")]

@@ -1,3 +1,5 @@
+using MyEfVibe.Workspace;
+
 namespace MyEfVibe.IntegrationTests;
 
 public sealed class SqliteConnectivityTests

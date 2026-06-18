@@ -1,3 +1,5 @@
+using MyEfVibe.Linq;
+
 namespace MyEfVibe.Tests;
 
 public sealed class LinqDeepExpressionAdapterTests

@@ -2,8 +2,8 @@ namespace MyEfVibe;
 
 internal sealed class SessionAnalytics
 {
-    private readonly List<EvaluationMetrics> _evaluations = new();
-    private readonly List<object?> _exportRows = new();
+    private readonly List<EvaluationMetrics> _evaluations = [];
+    private readonly List<object?> _exportRows = [];
 
     internal EvaluationMetrics? LastMetrics { get; private set; }
 

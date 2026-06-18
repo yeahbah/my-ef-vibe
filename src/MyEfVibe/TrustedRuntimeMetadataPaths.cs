@@ -13,7 +13,7 @@ internal static class TrustedRuntimeMetadataPaths
 
         var builder = ImmutableArray.CreateBuilder<string>();
 
-        foreach (var token in payload.Split(new[] { '|', ';' }, StringSplitOptions.RemoveEmptyEntries))
+        foreach (var token in payload.Split(['|', ';'], StringSplitOptions.RemoveEmptyEntries))
         {
             var trimmed = token.Trim();
 

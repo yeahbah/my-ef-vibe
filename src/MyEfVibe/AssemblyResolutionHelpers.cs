@@ -20,7 +20,7 @@ internal static class AssemblyResolutionHelpers
 
     internal static bool IsZeroVersion(Version version)
     {
-        return version.Major == 0 && version.Minor == 0 && version.Build == 0 && version.Revision == 0;
+        return version is { Major: 0, Minor: 0, Build: 0, Revision: 0 };
     }
 
     internal static bool VersionMatches(AssemblyName requested, Assembly loaded)

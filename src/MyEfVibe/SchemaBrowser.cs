@@ -112,6 +112,6 @@ internal static class SchemaBrowser
             .Single(method => method.Name == nameof(Queryable.Count) && method.GetParameters().Length == 1)
             .MakeGenericMethod(elementType);
 
-        return (int?)countMethod.Invoke(null, new[] { queryable });
+        return (int?)countMethod.Invoke(null, [queryable]);
     }
 }

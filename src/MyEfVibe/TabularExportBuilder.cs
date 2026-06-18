@@ -78,7 +78,7 @@ internal static class TabularExportBuilder
                 .Select(static row => new[] { FormatScalar(row) })
                 .ToList();
 
-            return new ExportTable(new[] { "value" }, scalarRows);
+            return new ExportTable(["value"], scalarRows);
         }
 
         var columns = columnSet.ToArray();
@@ -109,14 +109,14 @@ internal static class TabularExportBuilder
     {
         if (row is null)
         {
-            return Array.Empty<(string, PropertyInfo)>();
+            return [];
         }
 
         var type = row.GetType();
 
         if (IsScalarType(type))
         {
-            return Array.Empty<(string, PropertyInfo)>();
+            return [];
         }
 
         return type

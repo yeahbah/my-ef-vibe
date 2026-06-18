@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using MyEfVibe.Linq;
 
 namespace MyEfVibe.Tests;
 

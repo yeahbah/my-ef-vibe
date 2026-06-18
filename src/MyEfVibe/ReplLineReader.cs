@@ -1,4 +1,5 @@
 using System.Text;
+using MyEfVibe.Linq;
 using Spectre.Console;
 
 namespace MyEfVibe;
@@ -472,7 +473,7 @@ internal sealed class ReplLineReader
     private static void RenderMultiline(string primaryPrompt, StringBuilder buffer, int cursor)
     {
         var text = buffer.ToString();
-        var lines = text.Length == 0 ? new[] { string.Empty } : InputLineUtilities.SplitLines(text);
+        var lines = text.Length == 0 ? [string.Empty] : InputLineUtilities.SplitLines(text);
 
         var lineIndex = 0;
         var column = 0;

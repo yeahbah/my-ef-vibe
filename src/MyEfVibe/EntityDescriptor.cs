@@ -374,7 +374,7 @@ internal static class EntityDescriptor
 
             try
             {
-                return method.Invoke(model, new object[] { entityType });
+                return method.Invoke(model, [entityType]);
             }
             catch
             {

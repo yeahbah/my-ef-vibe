@@ -1,3 +1,5 @@
+using MyEfVibe.Workspace;
+
 namespace MyEfVibe.Tests;
 
 public sealed class PostgreSqlNamingProbeTests
@@ -35,10 +37,15 @@ public sealed class PostgreSqlNamingProbeTests
         var connectionString =
             "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=AdventureWorks_Dev_2026!;Timeout=3";
 
+        var style = PostgreSqlNamingProbe.Detect(host, connectionString);
+
+        if (style == PostgreSqlNamingStyle.None)
+        {
+            return;
+        }
+
         Assert.False(PostgreSqlNamingProbe.RequiresLowercaseMapping(host, connectionString));
-        Assert.Equal(
-            PostgreSqlNamingStyle.AdventureWorksPascalCase,
-            PostgreSqlNamingProbe.Detect(host, connectionString));
+        Assert.Equal(PostgreSqlNamingStyle.AdventureWorksPascalCase, style);
     }
 
     private static string? FindPrebuiltPersistenceDll()

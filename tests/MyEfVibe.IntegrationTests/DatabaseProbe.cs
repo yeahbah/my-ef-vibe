@@ -1,4 +1,5 @@
 using System.Data;
+using MyEfVibe.Workspace;
 
 namespace MyEfVibe.IntegrationTests;
 

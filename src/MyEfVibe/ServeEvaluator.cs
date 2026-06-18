@@ -1,3 +1,6 @@
+using MyEfVibe.Reporters;
+using MyEfVibe.Workspace;
+
 namespace MyEfVibe;
 
 internal static class ServeEvaluator
@@ -40,7 +43,7 @@ internal static class ServeEvaluator
         }
         catch (EvaluationFailedException evaluationFailure)
         {
-            runtime.Analytics.Record(evaluationFailure.Metrics, null, Array.Empty<object?>());
+            runtime.Analytics.Record(evaluationFailure.Metrics, null, []);
             EvaluationJsonReporter.WriteFailure(evaluationFailure.Metrics, evaluationFailure.Message);
         }
         catch (CompilationEvaluationException compilationFailure)

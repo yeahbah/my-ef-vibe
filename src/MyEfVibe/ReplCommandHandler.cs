@@ -1,3 +1,6 @@
+using MyEfVibe.Linq;
+using MyEfVibe.Reporters;
+using MyEfVibe.Workspace;
 using Spectre.Console;
 
 namespace MyEfVibe;

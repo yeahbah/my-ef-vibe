@@ -2,7 +2,7 @@ namespace MyEfVibe;
 
 internal sealed class InputHistory
 {
-    private readonly List<string> _entries = new();
+    private readonly List<string> _entries = [];
     private int _navigationIndex;
 
     internal int Count => _entries.Count;

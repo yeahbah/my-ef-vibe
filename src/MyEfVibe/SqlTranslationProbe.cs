@@ -1,3 +1,5 @@
+using MyEfVibe.Linq;
+
 namespace MyEfVibe;
 
 internal static class SqlTranslationProbe

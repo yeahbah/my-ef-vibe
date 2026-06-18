@@ -10,8 +10,8 @@ internal sealed class EfSqlCapture : IDisposable
 {
     private readonly object _dbContextInstance;
     private readonly DiagnosticSqlCaptureBinding? _diagnosticBinding;
-    private readonly List<SqlCommandEntry> _entries = new();
-    private readonly List<IDisposable> _listenerSubscriptions = new();
+    private readonly List<SqlCommandEntry> _entries = [];
+    private readonly List<IDisposable> _listenerSubscriptions = [];
     private readonly DbLogSettings _settings;
     private IDisposable? _logSubscription;
 
@@ -201,7 +201,7 @@ internal sealed class EfSqlCapture : IDisposable
             RecordCommand(
                 message,
                 durationMs,
-                command is null ? Array.Empty<string>() : ExtractDbCommandParameters(command));
+                command is null ? [] : ExtractDbCommandParameters(command));
         }
         catch
         {
@@ -357,7 +357,7 @@ internal sealed class EfSqlCapture : IDisposable
     {
         if (command is null)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         if (command is DbCommand dbCommand)
@@ -369,7 +369,7 @@ internal sealed class EfSqlCapture : IDisposable
 
         if (parametersObject is not IEnumerable parameters)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var values = new List<string>();
@@ -480,7 +480,7 @@ internal sealed class EfSqlCapture : IDisposable
 
             if (parameters.Length == 2)
             {
-                subscription = binding.Method.Invoke(null, new[] { databaseFacade, logAction }) as IDisposable;
+                subscription = binding.Method.Invoke(null, [databaseFacade, logAction]) as IDisposable;
 
                 return subscription is not null;
             }
@@ -489,20 +489,19 @@ internal sealed class EfSqlCapture : IDisposable
             {
                 subscription = binding.Method.Invoke(
                     null,
-                    new[] { databaseFacade, logAction, logLevelValue }) as IDisposable;
+                    [databaseFacade, logAction, logLevelValue]) as IDisposable;
 
                 return subscription is not null;
             }
 
             subscription = binding.Method.Invoke(
                 null,
-                new[]
-                {
+                [
                     databaseFacade,
                     logAction,
                     logLevelValue,
                     new[] { binding.CommandCategory }
-                }) as IDisposable;
+                ]) as IDisposable;
 
             return subscription is not null;
         }
@@ -547,7 +546,7 @@ internal sealed class EfSqlCapture : IDisposable
     private static string NormalizeLogMessage(string message)
     {
         var lines = message
-            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         if (lines.Length == 0)
         {
