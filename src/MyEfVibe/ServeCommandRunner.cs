@@ -52,7 +52,7 @@ internal static class ServeCommandRunner
                 if (request is null || string.IsNullOrWhiteSpace(request.Type))
                 {
                     ServeProtocol.WriteError(
-                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|completions|ping|shutdown\",...}.");
+                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|completions|sqlToLinq|ping|shutdown\",...}.");
                     continue;
                 }
 
@@ -130,6 +130,32 @@ internal static class ServeCommandRunner
                         }
 
                         CompletionsJsonReporter.Write(runtime.DbContext, request.Prefix);
+                        break;
+
+                    case "sqltolinq":
+                        if (string.IsNullOrWhiteSpace(request.Sql))
+                        {
+                            ServeProtocol.WriteError("sqlToLinq requires \"sql\".");
+                            break;
+                        }
+
+                        try
+                        {
+                            var draft = await SqlToLinqService.ConvertAndValidateAsync(
+                                runtime.DbContext,
+                                runtime.Session,
+                                runtime.Host.EnumerateLoadedAssemblies(),
+                                runtime.DbLogSettings,
+                                request.Sql,
+                                cancellationToken);
+
+                            SqlToLinqJsonReporter.Write(draft);
+                        }
+                        catch (Exception failure)
+                        {
+                            ServeProtocol.WriteError(failure.Message);
+                        }
+
                         break;
 
                     default:

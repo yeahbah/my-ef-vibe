@@ -75,6 +75,8 @@ internal static class ServeProtocol
         public string? MinSeverity { get; init; }
 
         public string? Prefix { get; init; }
+
+        public string? Sql { get; init; }
     }
 
     private sealed class ServeReadyResponse

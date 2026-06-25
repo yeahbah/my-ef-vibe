@@ -92,6 +92,18 @@ efvibe serve -p ./MyApp.Persistence.csproj -s ./MyApp.Api.csproj -c AppDbContext
 
 Each `eval` response is the same JSON shape as `-e --format json`. Build and `DbContext` stay loaded until the process exits.
 
+### `efvibe sql-to-linq` (SQL → LINQ draft)
+
+EF-model-aware draft assistant for simple `SELECT` queries. Output includes confidence, table→DbSet mappings, and optional round-trip validation via `ToQueryString()`:
+
+```bash
+efvibe sql-to-linq -p ./MyApp.Persistence.csproj -c AppDbContext \
+  --sql "SELECT TOP 10 * FROM Products WHERE Name = 'Helmet'" \
+  --format json --no-banner
+```
+
+`serve` also accepts `{"type":"sqlToLinq","sql":"SELECT ..."}` for editor and Studio use.
+
 Install as a .NET tool: `dotnet tool install --global efvibe`, then run `efvibe`.
 Requires .NET 8+ (package includes net8.0, net9.0, and net10.0 tool assets).
 Local repo: `dotnet tool restore` (see `.config/dotnet-tools.json`).

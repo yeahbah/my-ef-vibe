@@ -50,6 +50,14 @@ internal static class Program
                         options => LanguageServerCommandRunner.RunFromOptionsAsync(options),
                         errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
             }
+
+            if (string.Equals(args[0], "sql-to-linq", StringComparison.OrdinalIgnoreCase))
+            {
+                return Parser.Default.ParseArguments<SqlToLinqCliOptions>(args[1..])
+                    .MapResult(
+                        options => SqlToLinqCommandRunner.RunFromOptionsAsync(options),
+                        errors => Task.FromResult(CliParseHelper.PrintErrorsAndReturnFailure(errors)));
+            }
         }
 
 
