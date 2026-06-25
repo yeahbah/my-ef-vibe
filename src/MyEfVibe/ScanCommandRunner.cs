@@ -23,6 +23,8 @@ internal static class ScanCommandRunner
             options.Json,
             options.NoBanner,
             options.ConnectionString,
+            options.NoBuild,
+            options.ForceBuild,
             cancellationToken);
     }
 
@@ -39,6 +41,8 @@ internal static class ScanCommandRunner
         bool jsonOutput,
         bool noBanner,
         string? connectionString,
+        bool noBuild,
+        bool forceBuild,
         CancellationToken cancellationToken = default)
     {
         CliUi.Configure();
@@ -115,29 +119,35 @@ internal static class ScanCommandRunner
         else
         {
             WorkspaceBuildResult workspaceBuild;
+            WorkspaceBuildReport workspaceBuildReport;
             var pendingSessionDirectory = SessionPaths.EnsurePendingSessionDirectory(workspaceRoot);
+            var buildPolicy = WorkspaceBuildPolicyResolver.Resolve(noBuild, forceBuild);
 
             try
             {
-                workspaceBuild = quietOutput
+                workspaceBuildReport = quietOutput
                     ? WorkspaceBuilder.BuildResolvedProject(
                         pendingSessionDirectory,
                         resolvedProject,
                         resolvedStartup,
-                        frameworkOrNull)
+                        frameworkOrNull,
+                        buildPolicy)
                     : CliUi.RunWithStatus(
-                        "Building EF project for deep scan…",
+                        "Preparing EF project for deep scan…",
                         () => WorkspaceBuilder.BuildResolvedProject(
                             pendingSessionDirectory,
                             resolvedProject,
                             resolvedStartup,
-                            frameworkOrNull));
+                            frameworkOrNull,
+                            buildPolicy));
             }
             catch (WorkspaceException workspaceFailure)
             {
                 CliUi.WriteErrorPanel("Workspace failure", workspaceFailure.Message);
                 return 10;
             }
+
+            workspaceBuild = workspaceBuildReport.Result;
 
             using var host = WorkspaceHost.Load(workspaceBuild);
 

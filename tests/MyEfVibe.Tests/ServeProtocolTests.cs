@@ -55,6 +55,18 @@ public sealed class ServeProtocolTests
     }
 
     [Fact]
+    public void TryParseRequest_parses_executeSql()
+    {
+        var request = ServeProtocol.TryParseRequest(
+            """{"type":"executeSql","sql":"SELECT 1","withPlan":true}""");
+
+        Assert.NotNull(request);
+        Assert.Equal("executeSql", request!.Type);
+        Assert.Equal("SELECT 1", request.Sql);
+        Assert.True(request.WithPlan);
+    }
+
+    [Fact]
     public void TryParseRequest_returns_null_for_invalid_json()
     {
         Assert.Null(ServeProtocol.TryParseRequest("not json"));

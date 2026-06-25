@@ -89,7 +89,7 @@ internal sealed record WorkspaceBuildResult(
         return true;
     }
 
-    private static bool TryLocateBuiltAssembly(
+    internal static bool TryLocateBuiltAssembly(
         string binRoot,
         string assemblyName,
         string targetFrameworkMoniker,

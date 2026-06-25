@@ -67,6 +67,13 @@ internal sealed class EfvibeCliOptions
     [Option('f', "framework", HelpText = "Target framework moniker for building the workspace project (e.g. net8.0).")]
     public string? Framework { get; set; }
 
+    [Option("no-build",
+        HelpText = "Reuse isolated build output; fail when it is missing or stale (default: rebuild only when inputs changed).")]
+    public bool NoBuild { get; set; }
+
+    [Option("force-build", HelpText = "Always run dotnet build, even when isolated output is still fresh.")]
+    public bool ForceBuild { get; set; }
+
     [Value(0, MetaName = "expression", HelpText = "Optional one-shot expression when -e is omitted.")]
     public IEnumerable<string>? ExpressionParts { get; set; }
 }

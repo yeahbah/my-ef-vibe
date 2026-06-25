@@ -31,6 +31,56 @@ internal static class EvaluationJsonReporter
         Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
     }
 
+    internal static void WriteSqlSuccess(
+        object? result,
+        IReadOnlyList<Dictionary<string, string>>? rows,
+        EvaluationMetrics metrics,
+        QueryPlanResult? plan = null)
+    {
+        var payload = new EvaluationJsonPayload
+        {
+            Success = true,
+            Value = FormatSqlValue(result, rows),
+            Rows = rows is { Count: > 0 } ? rows : null,
+            Sql = BuildSql(metrics),
+            TranslatedSql = metrics.TranslatedSql,
+            QueryPlan = string.IsNullOrWhiteSpace(plan?.PlanText) ? null : plan.PlanText,
+            QueryPlanNote = string.IsNullOrWhiteSpace(plan?.PlanText) ? plan?.Note : null,
+            Metrics = EvaluationJsonMetrics.From(metrics),
+            Warnings = metrics.Warnings,
+            Snippet = metrics.Snippet
+        };
+
+        Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
+    }
+
+    private static string? FormatSqlValue(
+        object? result,
+        IReadOnlyList<Dictionary<string, string>>? rows)
+    {
+        if (result is string text)
+        {
+            return text;
+        }
+
+        if (rows is { Count: > 0 })
+        {
+            return rows.Count == 1 ? FormatSingleRowSummary(rows[0]) : $"{rows.Count} rows";
+        }
+
+        return result?.ToString();
+    }
+
+    private static string FormatSingleRowSummary(IReadOnlyDictionary<string, string> row)
+    {
+        if (row.Count == 1)
+        {
+            return row.Values.First();
+        }
+
+        return string.Join(", ", row.Select(static pair => $"{pair.Key}={pair.Value}"));
+    }
+
     internal static EvaluationJsonPayload BuildSuccess(
         object? result,
         EvaluationMetrics metrics,

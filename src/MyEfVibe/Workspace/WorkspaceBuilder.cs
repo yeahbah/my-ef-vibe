@@ -4,6 +4,14 @@ using System.Text;
 
 namespace MyEfVibe.Workspace;
 
+internal sealed record WorkspaceBuildReport(
+    WorkspaceBuildResult Result,
+    bool UsedCachedProjectBuild,
+    bool UsedCachedStartupBuild)
+{
+    internal bool UsedCachedBuild => UsedCachedProjectBuild && UsedCachedStartupBuild;
+}
+
 internal static class WorkspaceBuilder
 {
     internal static WorkspaceBuildResult Build(
@@ -11,28 +19,35 @@ internal static class WorkspaceBuilder
         string searchDirectory,
         string? explicitProjectPathOrNull,
         string? explicitStartupPathOrNull,
-        string? frameworkOrNull = null)
+        string? frameworkOrNull = null,
+        WorkspaceBuildPolicy buildPolicy = WorkspaceBuildPolicy.Auto)
     {
         var projectFile = WorkspaceProjectLocator.ResolveProject(searchDirectory, explicitProjectPathOrNull);
         var startupProject = StartupProjectResolver.Resolve(searchDirectory, projectFile, explicitStartupPathOrNull);
 
-        return BuildResolvedProject(sessionDirectory, projectFile, startupProject, frameworkOrNull);
+        return BuildResolvedProject(sessionDirectory, projectFile, startupProject, frameworkOrNull, buildPolicy).Result;
     }
 
-    internal static WorkspaceBuildResult BuildResolvedProject(
+    internal static WorkspaceBuildReport BuildResolvedProject(
         string sessionDirectory,
         FileInfo projectFile,
         FileInfo startupProject,
-        string? frameworkOrNull)
+        string? frameworkOrNull,
+        WorkspaceBuildPolicy buildPolicy = WorkspaceBuildPolicy.Auto)
     {
         var projectFramework = ProjectTargetFrameworkResolver.ResolveBuildFramework(
             projectFile.FullName,
             frameworkOrNull);
 
         var projectOutput = GetIsolatedBuildOutput(sessionDirectory, projectFile.FullName, projectFramework);
-        RunDotnetBuild(projectFile.FullName, projectFramework, projectOutput);
+        var usedCachedProjectBuild = EnsureProjectBuilt(
+            projectFile.FullName,
+            projectFramework,
+            projectOutput,
+            buildPolicy);
 
         ProjectBuildOutput? startupOutput = null;
+        var usedCachedStartupBuild = true;
 
         if (!string.Equals(projectFile.FullName, startupProject.FullName, StringComparison.OrdinalIgnoreCase))
         {
@@ -41,16 +56,59 @@ internal static class WorkspaceBuilder
                 frameworkOrNull);
 
             startupOutput = GetIsolatedBuildOutput(sessionDirectory, startupProject.FullName, startupFramework);
-            RunDotnetBuild(startupProject.FullName, startupFramework, startupOutput);
+            usedCachedStartupBuild = EnsureProjectBuilt(
+                startupProject.FullName,
+                startupFramework,
+                startupOutput,
+                buildPolicy);
         }
 
-        return WorkspaceBuildResult.RequirePrimaryAssembly(
-            sessionDirectory,
-            projectFile,
-            startupProject,
-            projectFramework,
-            projectOutput,
-            startupOutput);
+        return new WorkspaceBuildReport(
+            WorkspaceBuildResult.RequirePrimaryAssembly(
+                sessionDirectory,
+                projectFile,
+                startupProject,
+                projectFramework,
+                projectOutput,
+                startupOutput),
+            usedCachedProjectBuild,
+            usedCachedStartupBuild);
+    }
+
+    internal static bool EnsureProjectBuilt(
+        string csprojFullPath,
+        string targetFrameworkMoniker,
+        ProjectBuildOutput isolatedOutput,
+        WorkspaceBuildPolicy buildPolicy = WorkspaceBuildPolicy.Auto)
+    {
+        var fresh = WorkspaceBuildFreshness.IsIsolatedOutputFresh(
+            csprojFullPath,
+            targetFrameworkMoniker,
+            isolatedOutput);
+
+        switch (buildPolicy)
+        {
+            case WorkspaceBuildPolicy.Auto when fresh:
+                return true;
+
+            case WorkspaceBuildPolicy.NoBuild:
+                if (!fresh)
+                {
+                    throw new WorkspaceException(
+                        "Project build output is missing or stale."
+                        + " Remove --no-build, or run with --force-build to rebuild.");
+                }
+
+                return true;
+
+            case WorkspaceBuildPolicy.Force:
+            case WorkspaceBuildPolicy.Auto:
+                RunDotnetBuild(csprojFullPath, targetFrameworkMoniker, isolatedOutput);
+                return false;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(buildPolicy), buildPolicy, null);
+        }
     }
 
     internal static void RunDotnetBuild(

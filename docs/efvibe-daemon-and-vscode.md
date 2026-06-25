@@ -90,7 +90,7 @@ flowchart TB
 
 1. **Short term:** Use **Start REPL** for iterative work; Run Selection for occasional checks.
 2. **Right fix:** **`efvibe serve`** + extension process manager — fast runs **and** result tab.
-3. **Partial help:** `--no-build` on `-e` when artifacts are fresh — still pays process + DbContext per run.
+3. **Partial help:** build cache is automatic when isolated output is newer than project inputs; use `--force-build` to rebuild anyway.
 
 ## Implementation status
 

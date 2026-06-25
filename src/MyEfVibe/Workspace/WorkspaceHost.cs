@@ -555,7 +555,10 @@ internal sealed class WorkspaceHost : IDisposable
             SessionDirectory,
             StartupProjectPath,
             startupFramework);
-        WorkspaceBuilder.RunDotnetBuild(StartupProjectPath, startupFramework, _startupBuildOutput);
+        WorkspaceBuilder.EnsureProjectBuilt(
+            StartupProjectPath,
+            startupFramework,
+            _startupBuildOutput);
 
         if (WorkspaceBuildResult.TryLocateStartupOutput(
                 StartupProjectPath,

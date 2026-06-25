@@ -23,6 +23,13 @@ internal sealed class ScanCliOptions
     [Option('f', "framework", HelpText = "Target framework moniker for building the project (e.g. net10.0).")]
     public string? Framework { get; set; }
 
+    [Option("no-build",
+        HelpText = "Reuse isolated build output; fail when it is missing or stale (default: rebuild only when inputs changed).")]
+    public bool NoBuild { get; set; }
+
+    [Option("force-build", HelpText = "Always run dotnet build, even when isolated output is still fresh.")]
+    public bool ForceBuild { get; set; }
+
     [Option("fail-on",
         HelpText = "Exit 1 when any finding has this severity or higher (info | warning | error | critical).")]
     public string? FailOn { get; set; }

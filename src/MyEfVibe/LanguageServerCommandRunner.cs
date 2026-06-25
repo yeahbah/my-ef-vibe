@@ -41,7 +41,7 @@ internal static class LanguageServerCommandRunner
             null,
             false,
             options.Framework,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         if (runtime is null)
         {

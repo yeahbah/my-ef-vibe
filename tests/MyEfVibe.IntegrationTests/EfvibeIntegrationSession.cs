@@ -62,7 +62,7 @@ internal sealed class EfvibeIntegrationSession : IAsyncDisposable
             Path.Combine(workspaceRoot, "pending"),
             efProject,
             startupProject,
-            scenario.Framework);
+            scenario.Framework).Result;
 
         var host = WorkspaceHost.Load(workspaceBuild);
 

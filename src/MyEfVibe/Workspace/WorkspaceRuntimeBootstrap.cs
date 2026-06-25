@@ -13,6 +13,7 @@ internal static class WorkspaceRuntimeBootstrap
         string? dbLogLevelRaw,
         bool dbLogVerbose,
         string? frameworkOrNull,
+        WorkspaceBuildPolicy buildPolicy = WorkspaceBuildPolicy.Auto,
         CancellationToken cancellationToken = default)
     {
         var dbLogSettings = new DbLogSettings
@@ -63,7 +64,8 @@ internal static class WorkspaceRuntimeBootstrap
                     pendingSessionDirectory,
                     resolvedProject,
                     resolvedStartup,
-                    frameworkOrNull),
+                    frameworkOrNull,
+                    buildPolicy).Result,
                 cancellationToken);
         }
         catch (WorkspaceException workspaceFailure)

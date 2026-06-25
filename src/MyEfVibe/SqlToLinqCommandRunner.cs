@@ -55,7 +55,7 @@ internal static class SqlToLinqCommandRunner
             dbLogLevelRaw,
             dbLogVerbose,
             frameworkOrNull,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         if (runtime is null)
         {

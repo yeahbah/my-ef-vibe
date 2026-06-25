@@ -46,7 +46,7 @@ public sealed class WorkspaceBuilderTests
                 sessionDirectory,
                 new FileInfo(projectPath),
                 new FileInfo(projectPath),
-                "net10.0");
+                "net10.0").Result;
 
             Assert.True(File.Exists(result.PrimaryAssemblyDll));
             Assert.StartsWith(Path.Combine(sessionDirectory, ".build"), result.PrimaryAssemblyDll);
@@ -111,7 +111,7 @@ public sealed class WorkspaceBuilderTests
                 sessionDirectory,
                 new FileInfo(efProjectPath),
                 new FileInfo(startupProjectPath),
-                "net10.0");
+                "net10.0").Result;
 
             Assert.NotNull(result.StartupOutputDirectory);
             Assert.StartsWith(Path.Combine(sessionDirectory, ".build"), result.PrimaryAssemblyDll);

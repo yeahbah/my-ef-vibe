@@ -33,4 +33,11 @@ internal sealed class ServeCliOptions
 
     [Option('f', "framework", HelpText = "Target framework moniker (e.g. net8.0).")]
     public string? Framework { get; set; }
+
+    [Option("no-build",
+        HelpText = "Reuse isolated build output; fail when it is missing or stale (default: rebuild only when inputs changed).")]
+    public bool NoBuild { get; set; }
+
+    [Option("force-build", HelpText = "Always run dotnet build, even when isolated output is still fresh.")]
+    public bool ForceBuild { get; set; }
 }

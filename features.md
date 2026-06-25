@@ -12,7 +12,7 @@ Licensed under [Apache 2.0](LICENSE).
 
 1. Use the default workspace root (`~/.efvibe` or `%APPDATA%\efvibe`) or pass **`-w`**. Session files live under **`<ProjectName>/<DbContextName>/`** (e.g. `~/.efvibe/AdventureWorks.Infrastructure.Persistence/AdventureWorksDbContext/`).
 2. MyEfVibe resolves the **EF project** to build (`-p`, auto-select, or prompt) and the **startup project** for configuration (`-s` / `--startup-project`, auto-inferred from project references, or same as EF project).
-3. It runs `dotnet build` on the EF project and loads assemblies from the output folder and `.deps.json` (including NuGet package paths and RID-specific runtimes such as `runtimes/unix/...` on macOS).
+3. It runs `dotnet build` on the EF project when inputs changed (reuses the previous isolated build when sources are unchanged) and loads assemblies from the output folder and `.deps.json` (including NuGet package paths and RID-specific runtimes such as `runtimes/unix/...` on macOS).
 4. It locates a concrete `DbContext` type and constructs an instance when possible.
 5. It attaches workspace assemblies to a Roslyn scripting session so entity types, extension methods, and project types are available in scripts.
 6. You run LINQ in the REPL, a one-shot expression (`-e`), or **`efvibe serve`** (long-running daemon for editors); results, SQL, and metrics are shown in the terminal or JSON for tools.
@@ -75,6 +75,8 @@ db.JsonBlobDocuments
 | `--with-plan` | With `-e --format json`, include EXPLAIN / SHOWPLAN for the evaluated SQL |
 | `--dblog` | Show executed SQL via EF database logging (default: **on**; use `--no-dblog` to disable; toggle in REPL with `:dblog`) |
 | `--no-dblog` | Disable database command logging for this run |
+| `--no-build` | Reuse isolated build output; fail when missing or stale (default: rebuild only when project inputs changed) |
+| `--force-build` | Always run `dotnet build`, even when isolated output is still fresh |
 | `--about-json` | Write tool metadata as JSON to stdout and exit (no workspace or DbContext required) |
 
 ### `efvibe serve` (editor daemon)

@@ -113,7 +113,6 @@ internal static class Program
 
         FileInfo resolvedProject;
         FileInfo resolvedStartup;
-        WorkspaceBuildResult workspaceBuild;
         try
         {
             resolvedProject = WorkspaceProjectLocator.ResolveProject(
@@ -151,21 +150,26 @@ internal static class Program
         }
 
         var pendingSessionDirectory = SessionPaths.EnsurePendingSessionDirectory(workspaceRoot);
+        WorkspaceBuildReport workspaceBuildReport;
         try
         {
-            workspaceBuild = quietOutput
+            var buildPolicy = WorkspaceBuildPolicyResolver.Resolve(options.NoBuild, options.ForceBuild);
+
+            workspaceBuildReport = quietOutput
                 ? WorkspaceBuilder.BuildResolvedProject(
                     pendingSessionDirectory,
                     resolvedProject,
                     resolvedStartup,
-                    options.Framework)
+                    options.Framework,
+                    buildPolicy)
                 : CliUi.RunWithStatus(
-                    "Building EF project…",
+                    "Preparing EF project…",
                     () => WorkspaceBuilder.BuildResolvedProject(
                         pendingSessionDirectory,
                         resolvedProject,
                         resolvedStartup,
-                        options.Framework));
+                        options.Framework,
+                        buildPolicy));
         }
         catch (WorkspaceException workspaceFailure)
         {
@@ -181,9 +185,18 @@ internal static class Program
             return 10;
         }
 
+        var workspaceBuild = workspaceBuildReport.Result;
+
         if (!quietOutput)
         {
-            AnsiConsole.MarkupLine($"[green]✓[/] Built [cyan]{Markup.Escape(projectLabel)}[/]");
+            if (workspaceBuildReport.UsedCachedBuild)
+            {
+                AnsiConsole.MarkupLine($"[green]✓[/] Using cached build for [cyan]{Markup.Escape(projectLabel)}[/]");
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[green]✓[/] Built [cyan]{Markup.Escape(projectLabel)}[/]");
+            }
         }
 
         using var host = WorkspaceHost.Load(workspaceBuild);

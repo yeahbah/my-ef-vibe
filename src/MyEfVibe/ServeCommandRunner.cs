@@ -15,6 +15,17 @@ internal static class ServeCommandRunner
             return 1;
         }
 
+        WorkspaceBuildPolicy buildPolicy;
+        try
+        {
+            buildPolicy = WorkspaceBuildPolicyResolver.Resolve(options.NoBuild, options.ForceBuild);
+        }
+        catch (WorkspaceException failure)
+        {
+            ServeProtocol.WriteError(failure.Message);
+            return 1;
+        }
+
         var (runtime, exitCode, error) = await WorkspaceRuntimeBootstrap.LoadAsync(
             CliPathHelper.ResolveWorkspace(options.Workspace),
             CliPathHelper.ToFileInfo(options.Project),
@@ -26,6 +37,7 @@ internal static class ServeCommandRunner
             options.DbLogLevel,
             options.DbLogVerbose,
             options.Framework,
+            buildPolicy,
             cancellationToken);
 
         if (runtime is null)
@@ -52,7 +64,7 @@ internal static class ServeCommandRunner
                 if (request is null || string.IsNullOrWhiteSpace(request.Type))
                 {
                     ServeProtocol.WriteError(
-                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|completions|sqlToLinq|ping|shutdown\",...}.");
+                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|completions|sqlToLinq|executeSql|ping|shutdown\",...}.");
                     continue;
                 }
 
@@ -155,6 +167,21 @@ internal static class ServeCommandRunner
                         {
                             ServeProtocol.WriteError(failure.Message);
                         }
+
+                        break;
+
+                    case "executesql":
+                        if (string.IsNullOrWhiteSpace(request.Sql))
+                        {
+                            ServeProtocol.WriteError("executeSql requires \"sql\".");
+                            break;
+                        }
+
+                        await ServeSqlEvaluator.ExecuteAndWriteJsonAsync(
+                            runtime,
+                            request.Sql,
+                            request.WithPlan,
+                            cancellationToken);
 
                         break;
 
