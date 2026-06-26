@@ -56,23 +56,27 @@ internal static class TabularExportBuilder
 
     private static ExportTable BuildTable(IReadOnlyList<object?> rows)
     {
-        var columnSet = new SortedSet<string>(StringComparer.Ordinal);
+        var columns = new List<string>();
+        var columnSet = new HashSet<string>(StringComparer.Ordinal);
         var propertyMaps = new List<IReadOnlyDictionary<string, PropertyInfo>>();
 
         foreach (var row in rows)
         {
-            var properties = GetReadableProperties(row);
+            var properties = GetReadableProperties(row).ToList();
 
             propertyMaps.Add(properties.ToDictionary(static pair => pair.Name, static pair => pair.Property,
                 StringComparer.Ordinal));
 
             foreach (var name in properties.Select(static pair => pair.Name))
             {
-                columnSet.Add(name);
+                if (columnSet.Add(name))
+                {
+                    columns.Add(name);
+                }
             }
         }
 
-        if (columnSet.Count == 0)
+        if (columns.Count == 0)
         {
             var scalarRows = rows
                 .Select(static row => new[] { FormatScalar(row) })
@@ -81,16 +85,15 @@ internal static class TabularExportBuilder
             return new ExportTable(["value"], scalarRows);
         }
 
-        var columns = columnSet.ToArray();
         var tableRows = new List<string[]>(rows.Count);
 
         for (var index = 0; index < rows.Count; index++)
         {
             var row = rows[index];
             var map = propertyMaps[index];
-            var values = new string[columns.Length];
+            var values = new string[columns.Count];
 
-            for (var columnIndex = 0; columnIndex < columns.Length; columnIndex++)
+            for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
             {
                 var column = columns[columnIndex];
 
@@ -122,8 +125,7 @@ internal static class TabularExportBuilder
         return type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(static property => property.CanRead && property.GetIndexParameters().Length == 0)
-            .Select(static property => (property.Name, property))
-            .OrderBy(static pair => pair.Name, StringComparer.Ordinal);
+            .Select(static property => (property.Name, property));
     }
 
     private static object? ReadProperty(object? row, PropertyInfo property)

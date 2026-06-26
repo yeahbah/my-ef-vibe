@@ -1,5 +1,7 @@
 namespace MyEfVibe.Tests;
 
+using Microsoft.EntityFrameworkCore;
+
 public sealed class SqlToLinqConverterTests
 {
     private sealed class FakeProduct
@@ -14,6 +16,33 @@ public sealed class SqlToLinqConverterTests
         public IQueryable<FakeProduct> Products => Array.Empty<FakeProduct>().AsQueryable();
     }
 
+    private sealed class SchemaProduct
+    {
+        public int ProductId { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class SchemaDbContext : DbContext
+    {
+        public SchemaDbContext(DbContextOptions<SchemaDbContext> options)
+            : base(options)
+        {
+        }
+
+        public DbSet<SchemaProduct> Products => Set<SchemaProduct>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<SchemaProduct>(entity =>
+            {
+                entity.HasKey(product => product.ProductId);
+                entity.ToTable("Product", "Production");
+                entity.Property(product => product.ProductId).HasColumnName("ProductID");
+            });
+        }
+    }
+
     [Fact]
     public void Convert_maps_simple_select_with_where_and_top()
     {
@@ -25,6 +54,30 @@ public sealed class SqlToLinqConverterTests
         Assert.Contains(".Where(x => x.Name == \"Helmet\")", draft.Linq, StringComparison.Ordinal);
         Assert.Contains(".Take(10)", draft.Linq, StringComparison.Ordinal);
         Assert.Equal("high", draft.Confidence);
+    }
+
+    [Fact]
+    public void Convert_maps_postgres_quoted_schema_table_with_limit_and_projection()
+    {
+        var options = new DbContextOptionsBuilder<SchemaDbContext>()
+            .UseSqlite($"Data Source=sqltolinq-{Guid.NewGuid():N};Mode=Memory;Cache=Shared")
+            .Options;
+
+        using var dbContext = new SchemaDbContext(options);
+
+        var draft = SqlToLinqConverter.Convert(
+            dbContext,
+            """
+            select "ProductID", "Name" FROM "Production"."Product"
+            limit 10
+            """);
+
+        Assert.Contains("db.Products", draft.Linq, StringComparison.Ordinal);
+        Assert.Contains(".Take(10)", draft.Linq, StringComparison.Ordinal);
+        Assert.Contains("ProductId", draft.Linq, StringComparison.Ordinal);
+        Assert.Contains("Name", draft.Linq, StringComparison.Ordinal);
+        Assert.Equal("high", draft.Confidence);
+        Assert.Contains(draft.Mappings, mapping => mapping.Table == "Production.Product");
     }
 
     [Fact]

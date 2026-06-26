@@ -70,13 +70,14 @@ internal static partial class SqlToLinqConverter
             };
         }
 
-        var tableToken = NormalizeTableToken(fromMatch.Groups[1].Value);
+        var tableToken = fromMatch.Groups[1].Value;
         if (!TryResolveDbSet(dbContext, tableToken, out var dbSet, out var entityType, out var mappingNote))
         {
-            unsupported.Add(mappingNote ?? $"Could not map table `{tableToken}` to a DbSet.");
+            var displayName = FormatQualifiedSqlName(tableToken);
+            unsupported.Add(mappingNote ?? $"Could not map table `{displayName}` to a DbSet.");
             return new SqlToLinqDraft
             {
-                Linq = $"// TODO: map `{tableToken}` to db.<DbSet>",
+                Linq = $"// TODO: map `{displayName}` to db.<DbSet>",
                 Confidence = "low",
                 Unsupported = unsupported,
                 Mappings = mappings
@@ -85,7 +86,7 @@ internal static partial class SqlToLinqConverter
 
         mappings.Add(new SqlToLinqMapping
         {
-            Table = tableToken,
+            Table = FormatQualifiedSqlName(tableToken),
             DbSet = $"db.{dbSet}",
             Entity = entityType!.Name
         });
@@ -141,6 +142,11 @@ internal static partial class SqlToLinqConverter
         {
             builder.Append(".ToList();");
         }
+        else if (TryBuildSelectClause(trimmed, entityType!, lambdaParam, out var selectClause, out var projectionNotes))
+        {
+            builder.Append(selectClause);
+            unsupported.AddRange(projectionNotes);
+        }
         else if (HasExplicitProjection(trimmed))
         {
             builder.Append("\n    .Select(x => new { /* map columns */ })\n    .ToList();");
@@ -175,15 +181,41 @@ internal static partial class SqlToLinqConverter
 
         var index = BuildTableIndex(dbContext);
 
-        if (index.TryGetValue(tableToken, out var match))
+        foreach (var candidate in BuildTableLookupKeys(tableToken))
         {
-            dbSetName = match.DbSetName;
-            entityType = match.EntityType;
-            return true;
+            if (index.TryGetValue(candidate, out var match))
+            {
+                dbSetName = match.DbSetName;
+                entityType = match.EntityType;
+                return true;
+            }
         }
 
-        note = $"No DbSet matches table `{tableToken}`.";
+        note = $"No DbSet matches table `{FormatQualifiedSqlName(tableToken)}`.";
         return false;
+    }
+
+    private static IEnumerable<string> BuildTableLookupKeys(string tableToken)
+    {
+        var parts = SplitQualifiedSqlName(tableToken);
+        if (parts.Count == 0)
+        {
+            yield return StripSqlIdentifier(tableToken);
+            yield break;
+        }
+
+        if (parts.Count >= 2)
+        {
+            yield return string.Join('.', parts);
+        }
+
+        yield return parts[^1];
+    }
+
+    private static string FormatQualifiedSqlName(string tableToken)
+    {
+        var parts = SplitQualifiedSqlName(tableToken);
+        return parts.Count == 0 ? StripSqlIdentifier(tableToken) : string.Join('.', parts);
     }
 
     private static Dictionary<string, (string DbSetName, Type EntityType)> BuildTableIndex(object dbContext)
@@ -198,10 +230,16 @@ internal static partial class SqlToLinqConverter
 
             var modelEntity = EntityDescriptor.TryFindModelEntity(dbContext, entry.EntityType);
             var tableName = modelEntity is not null ? relational?.GetTableName(modelEntity) : null;
+            var schema = modelEntity is not null ? relational?.GetSchema(modelEntity) : null;
 
             if (!string.IsNullOrWhiteSpace(tableName))
             {
                 index[tableName] = entry;
+
+                if (!string.IsNullOrWhiteSpace(schema))
+                {
+                    index[$"{schema}.{tableName}"] = entry;
+                }
 
                 var schemaSeparator = tableName.IndexOf('.');
                 if (schemaSeparator >= 0 && schemaSeparator < tableName.Length - 1)
@@ -209,9 +247,71 @@ internal static partial class SqlToLinqConverter
                     index[tableName[(schemaSeparator + 1)..]] = entry;
                 }
             }
+
+            if (entry.DbSetName.EndsWith("s", StringComparison.OrdinalIgnoreCase) && entry.DbSetName.Length > 1)
+            {
+                index[entry.DbSetName[..^1]] = entry;
+            }
         }
 
         return index;
+    }
+
+    private static bool TryBuildSelectClause(
+        string sql,
+        Type entityType,
+        string lambdaParam,
+        out string clause,
+        out IReadOnlyList<string> notes)
+    {
+        var issues = new List<string>();
+        clause = string.Empty;
+
+        var match = SelectClauseRegex().Match(sql);
+        if (!match.Success)
+        {
+            notes = issues;
+            return false;
+        }
+
+        var columns = match.Groups[1].Value
+            .Split(',')
+            .Select(static column => NormalizeColumnToken(column))
+            .Where(static column => column.Length > 0)
+            .ToArray();
+
+        if (columns.Length == 0 || columns.Any(static column => column == "*"))
+        {
+            notes = issues;
+            return false;
+        }
+
+        var projections = new List<string>();
+        foreach (var column in columns)
+        {
+            var property = ResolvePropertyName(entityType, column);
+            if (property is null)
+            {
+                issues.Add($"Column `{column}` was not found on `{entityType.Name}`.");
+                projections.Clear();
+                break;
+            }
+
+            projections.Add($"{lambdaParam}.{property}");
+        }
+
+        if (projections.Count == 0)
+        {
+            notes = issues;
+            return false;
+        }
+
+        clause = projections.Count == 1
+            ? $".Select({lambdaParam} => {projections[0]}).ToList();"
+            : $".Select({lambdaParam} => new {{ {string.Join(", ", projections)} }}).ToList();";
+
+        notes = issues;
+        return true;
     }
 
     private static bool TryBuildWhereClause(
@@ -286,12 +386,43 @@ internal static partial class SqlToLinqConverter
 
     private static string NormalizeTableToken(string token)
     {
-        return token.Trim().Trim('[', ']').Split('.').Last();
+        var parts = SplitQualifiedSqlName(token);
+        return parts.Count == 0 ? StripSqlIdentifier(token) : parts[^1];
     }
 
     private static string NormalizeColumnToken(string token)
     {
-        return token.Trim().Trim('[', ']').Split('.').Last();
+        return StripSqlIdentifier(token.Trim().Split('.').Last());
+    }
+
+    private static IReadOnlyList<string> SplitQualifiedSqlName(string token)
+    {
+        return token.Split('.')
+            .Select(StripSqlIdentifier)
+            .Where(static part => part.Length > 0)
+            .ToArray();
+    }
+
+    private static string StripSqlIdentifier(string value)
+    {
+        var trimmed = value.Trim();
+
+        if (trimmed.Length >= 2 && trimmed.StartsWith('"') && trimmed.EndsWith('"'))
+        {
+            return trimmed[1..^1];
+        }
+
+        if (trimmed.Length >= 2 && trimmed.StartsWith('\'') && trimmed.EndsWith('\''))
+        {
+            return trimmed[1..^1];
+        }
+
+        if (trimmed.Length >= 2 && trimmed.StartsWith('[') && trimmed.EndsWith(']'))
+        {
+            return trimmed[1..^1];
+        }
+
+        return trimmed;
     }
 
     private static string ToPascalCase(string value)
@@ -307,7 +438,7 @@ internal static partial class SqlToLinqConverter
     [GeneratedRegex(@"^\s*with\b", RegexOptions.IgnoreCase)]
     private static partial Regex CteRegex();
 
-    [GeneratedRegex(@"\bfrom\s+([^\s,;]+)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bfrom\s+((?:[^\s,;]|""[^""]*"")+)", RegexOptions.IgnoreCase)]
     private static partial Regex FromRegex();
 
     [GeneratedRegex(@"\bwhere\s+(.+?)(?:\border\s+by\b|\blimit\b|\boffset\b|\btop\b|$)", RegexOptions.IgnoreCase)]
