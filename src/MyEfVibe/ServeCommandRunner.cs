@@ -64,7 +64,7 @@ internal static class ServeCommandRunner
                 if (request is null || string.IsNullOrWhiteSpace(request.Type))
                 {
                     ServeProtocol.WriteError(
-                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|completions|sqlToLinq|executeSql|ping|shutdown\",...}.");
+                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|completions|sqlToLinq|executeSql|applyResultChanges|ping|shutdown\",...}.");
                     continue;
                 }
 
@@ -181,6 +181,22 @@ internal static class ServeCommandRunner
                             runtime,
                             request.Sql,
                             request.WithPlan,
+                            cancellationToken);
+
+                        break;
+
+                    case "applyresultchanges":
+                        if (string.IsNullOrWhiteSpace(request.Entity))
+                        {
+                            ServeProtocol.WriteError("applyResultChanges requires \"entity\".");
+                            break;
+                        }
+
+                        await ServeResultChangesApplier.ApplyAndWriteJsonAsync(
+                            runtime,
+                            request.Entity,
+                            ApplyResultChangesJsonReporter.ParseChanges(request.Updates),
+                            ApplyResultChangesJsonReporter.ParseChanges(request.Deletes),
                             cancellationToken);
 
                         break;

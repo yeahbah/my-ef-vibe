@@ -1,5 +1,7 @@
 namespace MyEfVibe.Tests;
 
+using System.Text.Json;
+
 public sealed class ServeProtocolTests
 {
     [Fact]
@@ -64,6 +66,19 @@ public sealed class ServeProtocolTests
         Assert.Equal("executeSql", request!.Type);
         Assert.Equal("SELECT 1", request.Sql);
         Assert.True(request.WithPlan);
+    }
+
+    [Fact]
+    public void TryParseRequest_parses_applyResultChanges()
+    {
+        var request = ServeProtocol.TryParseRequest(
+            """{"type":"applyResultChanges","entity":"Products","updates":[{"keys":{"Id":"1"},"values":{"Name":"Bike"}}],"deletes":[{"keys":{"Id":"2"}}]}""");
+
+        Assert.NotNull(request);
+        Assert.Equal("applyResultChanges", request!.Type);
+        Assert.Equal("Products", request.Entity);
+        Assert.Equal(JsonValueKind.Array, request.Updates?.ValueKind);
+        Assert.Equal(JsonValueKind.Array, request.Deletes?.ValueKind);
     }
 
     [Fact]

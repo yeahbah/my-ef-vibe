@@ -77,6 +77,10 @@ internal static class ServeProtocol
         public string? Prefix { get; init; }
 
         public string? Sql { get; init; }
+
+        public JsonElement? Updates { get; init; }
+
+        public JsonElement? Deletes { get; init; }
     }
 
     private sealed class ServeReadyResponse
