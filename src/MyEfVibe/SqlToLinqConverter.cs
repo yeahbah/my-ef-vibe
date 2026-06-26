@@ -179,7 +179,7 @@ internal static partial class SqlToLinqConverter
         entityType = null;
         note = null;
 
-        var index = BuildTableIndex(dbContext);
+        var index = DbSetTableIndexBuilder.Build(dbContext);
 
         foreach (var candidate in BuildTableLookupKeys(tableToken))
         {
@@ -191,8 +191,31 @@ internal static partial class SqlToLinqConverter
             }
         }
 
-        note = $"No DbSet matches table `{FormatQualifiedSqlName(tableToken)}`.";
+        note = BuildUnresolvedTableNote(tableToken, index.Values);
         return false;
+    }
+
+    private static string BuildUnresolvedTableNote(
+        string tableToken,
+        IEnumerable<DbSetTableIndexBuilder.DbSetTableEntry> knownEntries)
+    {
+        var displayName = FormatQualifiedSqlName(tableToken);
+        var knownTables = knownEntries
+            .Select(static entry => string.IsNullOrWhiteSpace(entry.Schema)
+                ? entry.TableName ?? entry.DbSetName
+                : $"{entry.Schema}.{entry.TableName}")
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToArray();
+
+        if (knownTables.Length == 0)
+        {
+            return $"No DbSet matches table `{displayName}`.";
+        }
+
+        return $"No DbSet matches table `{displayName}`. Known mapped tables: {string.Join(", ", knownTables)}.";
     }
 
     private static IEnumerable<string> BuildTableLookupKeys(string tableToken)
@@ -216,45 +239,6 @@ internal static partial class SqlToLinqConverter
     {
         var parts = SplitQualifiedSqlName(tableToken);
         return parts.Count == 0 ? StripSqlIdentifier(tableToken) : string.Join('.', parts);
-    }
-
-    private static Dictionary<string, (string DbSetName, Type EntityType)> BuildTableIndex(object dbContext)
-    {
-        var index = new Dictionary<string, (string DbSetName, Type EntityType)>(StringComparer.OrdinalIgnoreCase);
-        var relational = RelationalMetadataReflection.Resolve(dbContext);
-
-        foreach (var entry in EntityDescriptor.EnumerateDbSetEntities(dbContext))
-        {
-            index[entry.DbSetName] = entry;
-            index[entry.EntityType.Name] = entry;
-
-            var modelEntity = EntityDescriptor.TryFindModelEntity(dbContext, entry.EntityType);
-            var tableName = modelEntity is not null ? relational?.GetTableName(modelEntity) : null;
-            var schema = modelEntity is not null ? relational?.GetSchema(modelEntity) : null;
-
-            if (!string.IsNullOrWhiteSpace(tableName))
-            {
-                index[tableName] = entry;
-
-                if (!string.IsNullOrWhiteSpace(schema))
-                {
-                    index[$"{schema}.{tableName}"] = entry;
-                }
-
-                var schemaSeparator = tableName.IndexOf('.');
-                if (schemaSeparator >= 0 && schemaSeparator < tableName.Length - 1)
-                {
-                    index[tableName[(schemaSeparator + 1)..]] = entry;
-                }
-            }
-
-            if (entry.DbSetName.EndsWith("s", StringComparison.OrdinalIgnoreCase) && entry.DbSetName.Length > 1)
-            {
-                index[entry.DbSetName[..^1]] = entry;
-            }
-        }
-
-        return index;
     }
 
     private static bool TryBuildSelectClause(

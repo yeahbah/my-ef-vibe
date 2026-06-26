@@ -22,7 +22,6 @@ internal static class SnippetNormalizer
         {
             return RepositorySnippetAdapter.PrepareForEvaluation(trimmed, dbContextType, preserveAsyncQueries);
         }
-
         var lines = InputLineUtilities.SplitLines(trimmed);
         var lastNonEmptyIndex = IndexOfLastNonEmptyLine(lines);
 
@@ -202,6 +201,11 @@ internal static class SnippetNormalizer
 
     private static bool LooksLikeRepositorySnippet(string snippet)
     {
+        if (LooksLikeQueryComprehension(snippet))
+        {
+            return false;
+        }
+
         return snippet.Contains("await ", StringComparison.Ordinal)
                || snippet.Contains("DbContext", StringComparison.Ordinal)
                || snippet.Contains("dbContext", StringComparison.Ordinal)
@@ -209,6 +213,26 @@ internal static class SnippetNormalizer
                || snippet.Contains("cancellationToken", StringComparison.OrdinalIgnoreCase)
                || SqlTranslationProbe.ContainsEagerLoad(snippet)
                || InputLineUtilities.SplitLines(snippet).Length > 1;
+    }
+
+    private static bool LooksLikeQueryComprehension(string snippet)
+    {
+        foreach (var line in InputLineUtilities.SplitLines(snippet))
+        {
+            var trimmed = line.Trim();
+
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                continue;
+            }
+
+            if (trimmed.StartsWith("from ", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool LooksLikeTypeDeclaration(string text)
