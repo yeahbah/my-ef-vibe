@@ -111,7 +111,6 @@ internal static class LinqLiteScanner
             }
 
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-            var preview = ToPreviewLine(statement);
 
             foreach (var (ruleId, message) in LinqQueryWarningRules.AnalyzeSnippet(statement, containingMethodName))
             {
@@ -125,7 +124,7 @@ internal static class LinqLiteScanner
                 findings.Add(LinqScanFinding.Create(
                     absolutePath,
                     line,
-                    preview,
+                    statement,
                     ruleId,
                     message));
             }
@@ -185,7 +184,7 @@ internal static class LinqLiteScanner
         findings.Add(LinqScanFinding.Create(
             absolutePath,
             line,
-            ToPreviewLine(bodyText),
+            bodyText,
             ruleId,
             message));
     }
@@ -228,14 +227,5 @@ internal static class LinqLiteScanner
     private static string? GetContainingMethodName(SyntaxNode node)
     {
         return node.FirstAncestorOrSelf<MethodDeclarationSyntax>()?.Identifier.Text;
-    }
-
-    private static string ToPreviewLine(string text)
-    {
-        var singleLine = text.ReplaceLineEndings(" ").Trim();
-
-        return singleLine.Length <= 120
-            ? singleLine
-            : singleLine[..117] + "...";
     }
 }

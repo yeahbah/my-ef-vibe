@@ -111,7 +111,7 @@ internal static class LinqDeepScanner
             findings.Add(LinqScanFinding.Create(
                 site.FilePath,
                 site.Line,
-                site.Code,
+                site.Statement,
                 ruleId,
                 message,
                 translatedSql: translation.Sql,
