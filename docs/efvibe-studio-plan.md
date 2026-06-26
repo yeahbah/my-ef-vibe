@@ -726,6 +726,13 @@ Features neither DBeaver nor stock LINQPad offer for EF:
 - Optional cloud sync of queries (not DB credentials)
 - Marketplace for snippet packs
 
+### Phase 5 — Ecosystem & polish (current)
+
+- **Cloud sync** — favorite queries as `.efvibe-query` files + pack manifest in a user-chosen cloud folder
+- **Pack registry** — install community packs from GitHub/registry URLs; install any pack from a direct link
+- **Charts depth** — `:chart`-style timing breakdown, compare baseline, benchmark visualization in Studio
+- **Release polish** — connection form split, folder pickers, grid writeback, embedded REPL, Linux packaging
+
 ---
 
 ## What to reuse from the repo
