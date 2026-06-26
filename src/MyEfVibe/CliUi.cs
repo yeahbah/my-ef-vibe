@@ -136,6 +136,9 @@ internal static class CliUi
         table.AddRow("[cyan]:tables[/]", "List DbSets and entity types");
         table.AddRow("[cyan]:dbinfo[/]", "Database, provider, and connection details");
         table.AddRow("[cyan]:describe <entity>[/]", "Entity properties (DbSet name or type)");
+        table.AddRow(
+            "[cyan]:diagram[/] [[entity]] [[path]]",
+            "Export Mermaid ER diagram (.mmd) to the session directory");
         table.AddRow("[cyan]:scan lite[/]", "Static LINQ performance scan of EF project sources");
         table.AddRow("[cyan]:scan deep[/]", "Lite scan + ToQueryString + EXPLAIN per call site (live db)");
         table.AddRow("[cyan]:next[/] · [cyan]:prev[/]", "Step through scan findings (also → / ← on empty prompt)");

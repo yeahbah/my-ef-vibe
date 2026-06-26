@@ -64,7 +64,7 @@ internal static class ServeCommandRunner
                 if (request is null || string.IsNullOrWhiteSpace(request.Type))
                 {
                     ServeProtocol.WriteError(
-                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|scan|completions|sqlToLinq|executeSql|applyResultChanges|ping|shutdown\",...}.");
+                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|diagram|scan|completions|sqlToLinq|executeSql|applyResultChanges|ping|shutdown\",...}.");
                     continue;
                 }
 
@@ -109,6 +109,10 @@ internal static class ServeCommandRunner
                         }
 
                         DescribeJsonReporter.Write(runtime.DbContext, request.Entity);
+                        break;
+
+                    case "diagram":
+                        DiagramJsonReporter.Write(runtime.DbContext, request.Entity);
                         break;
 
                     case "scan":

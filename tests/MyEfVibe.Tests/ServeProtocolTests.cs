@@ -44,6 +44,7 @@ public sealed class ServeProtocolTests
     {
         Assert.Equal("dbinfo", ServeProtocol.TryParseRequest("""{"type":"dbinfo"}""")!.Type);
         Assert.Equal("tables", ServeProtocol.TryParseRequest("""{"type":"tables"}""")!.Type);
+        Assert.Equal("diagram", ServeProtocol.TryParseRequest("""{"type":"diagram"}""")!.Type);
     }
 
     [Fact]

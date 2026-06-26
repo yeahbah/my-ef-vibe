@@ -161,6 +161,11 @@ internal sealed class ReplCommandHandler
                 HandleExport(parts);
                 return true;
 
+            case "diagram":
+            case "er":
+                HandleDiagram(parts);
+                return true;
+
             case "warnings":
                 if (_analytics.LastMetrics is null)
                 {
@@ -443,5 +448,26 @@ internal sealed class ReplCommandHandler
         var path = parts.Length > 2 ? parts[2] : null;
 
         ResultExporter.Export(_analytics.ExportRows, _host.SessionDirectory, format, path);
+    }
+
+    private void HandleDiagram(string[] parts)
+    {
+        string? entityName = null;
+        string? path = null;
+
+        if (parts.Length > 1)
+        {
+            if (parts.Length == 2 && ErDiagramExporter.LooksLikeExportPath(parts[1]))
+            {
+                path = parts[1];
+            }
+            else
+            {
+                entityName = parts[1];
+                path = parts.Length > 2 ? parts[2] : null;
+            }
+        }
+
+        ErDiagramExporter.Export(_dbContext, _host.SessionDirectory, entityName, path);
     }
 }

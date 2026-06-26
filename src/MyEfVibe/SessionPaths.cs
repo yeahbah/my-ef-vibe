@@ -91,4 +91,27 @@ internal static class SessionPaths
             ? pathOrNull
             : Path.Combine(sessionDirectory, pathOrNull);
     }
+
+    internal static string ResolveDiagramExportPath(
+        string sessionDirectory,
+        string? pathOrNull,
+        string dbContextName,
+        string? entityName = null)
+    {
+        if (!string.IsNullOrWhiteSpace(pathOrNull))
+        {
+            return Path.IsPathRooted(pathOrNull)
+                ? pathOrNull
+                : Path.Combine(sessionDirectory, pathOrNull);
+        }
+
+        var baseName = SanitizeFolderName(dbContextName);
+
+        if (!string.IsNullOrWhiteSpace(entityName))
+        {
+            baseName += $"-{SanitizeFolderName(entityName)}";
+        }
+
+        return Path.Combine(sessionDirectory, $"{baseName}-er-diagram.mmd");
+    }
 }
