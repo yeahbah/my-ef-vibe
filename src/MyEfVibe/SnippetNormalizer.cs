@@ -85,7 +85,7 @@ internal static class SnippetNormalizer
         Type? dbContextType,
         bool preserveAsyncQueries = false)
     {
-        if (dbContextType is null)
+        if (dbContextType is null || ScriptDirectiveSyntax.ContainsScriptDirectives(snippet))
         {
             return snippet;
         }
@@ -207,6 +207,11 @@ internal static class SnippetNormalizer
 
     private static bool LooksLikeRepositorySnippet(string snippet)
     {
+        if (ScriptDirectiveSyntax.ContainsScriptDirectives(snippet))
+        {
+            return false;
+        }
+
         if (QueryComprehensionSyntax.LooksLikeQueryComprehension(snippet))
         {
             return false;

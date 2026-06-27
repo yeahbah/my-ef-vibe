@@ -251,12 +251,38 @@ internal static class Program
             return 14;
         }
 
+        var scriptConfiguration = ScriptSessionConfigurationFactory.FromCliOptions(
+            options.ScriptSearchPath,
+            options.ScriptLoad,
+            options.ScriptUsing,
+            searchDirectory);
+
         var session = new ScriptSession(
             dbContextInstance.GetType(),
             dbContextInstance,
             workspaceBuild.ReferenceAssemblyPaths,
             host.AssemblyLoader,
-            ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor));
+            ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor),
+            scriptConfiguration,
+            searchDirectory);
+
+        try
+        {
+            await session.InitializeAsync(searchDirectory);
+        }
+        catch (Exception bootstrapFailure)
+        {
+            if (quietOutput)
+            {
+                await Console.Error.WriteLineAsync(bootstrapFailure.Message);
+            }
+            else
+            {
+                CliUi.WriteErrorPanel("Script bootstrap failed", bootstrapFailure.Message);
+            }
+
+            return 10;
+        }
 
         if (options.TablesJson)
         {

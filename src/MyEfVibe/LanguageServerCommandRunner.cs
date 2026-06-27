@@ -22,6 +22,15 @@ internal sealed class LanguageServerCliOptions
 
     [Option('f', "framework", HelpText = "Target framework moniker (e.g. net8.0).")]
     public string? Framework { get; set; }
+
+    [Option("script-search-path", HelpText = "Directory for resolving #load paths and relative script files.")]
+    public IEnumerable<string>? ScriptSearchPath { get; set; }
+
+    [Option("script-load", HelpText = "Script file(s) to #load when the session starts (repeatable).")]
+    public IEnumerable<string>? ScriptLoad { get; set; }
+
+    [Option("script-using", HelpText = "Additional namespace(s) to import in the script session (repeatable).")]
+    public IEnumerable<string>? ScriptUsing { get; set; }
 }
 
 internal static class LanguageServerCommandRunner
@@ -41,6 +50,11 @@ internal static class LanguageServerCommandRunner
             null,
             false,
             options.Framework,
+            scriptConfiguration: ScriptSessionConfigurationFactory.FromCliOptions(
+                options.ScriptSearchPath,
+                options.ScriptLoad,
+                options.ScriptUsing,
+                null),
             cancellationToken: cancellationToken);
 
         if (runtime is null)

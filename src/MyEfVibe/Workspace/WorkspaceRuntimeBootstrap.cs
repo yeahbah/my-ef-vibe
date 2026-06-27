@@ -14,6 +14,7 @@ internal static class WorkspaceRuntimeBootstrap
         bool dbLogVerbose,
         string? frameworkOrNull,
         WorkspaceBuildPolicy buildPolicy = WorkspaceBuildPolicy.Auto,
+        ScriptSessionConfiguration? scriptConfiguration = null,
         CancellationToken cancellationToken = default)
     {
         var dbLogSettings = new DbLogSettings
@@ -118,7 +119,19 @@ internal static class WorkspaceRuntimeBootstrap
             dbContextInstance,
             workspaceBuild.ReferenceAssemblyPaths,
             host.AssemblyLoader,
-            ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor));
+            ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor),
+            scriptConfiguration ?? ScriptSessionConfiguration.Empty,
+            searchDirectory);
+
+        try
+        {
+            await session.InitializeAsync(searchDirectory, cancellationToken);
+        }
+        catch (Exception bootstrapFailure)
+        {
+            host.Dispose();
+            return (null, 10, bootstrapFailure.Message);
+        }
 
         return (
             new WorkspaceRuntime(

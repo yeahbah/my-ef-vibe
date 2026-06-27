@@ -14,9 +14,13 @@ internal sealed class ScriptSession
     private readonly InteractiveAssemblyLoader _assemblyLoader;
     private readonly object _globals;
     private readonly Type _globalsType;
+    private readonly ImmutableArray<string> _searchPaths;
+    private readonly ScriptSessionConfiguration _configuration;
     private readonly ImmutableArray<string> _importNamespaces;
     private readonly ScriptOptions _options;
+    private readonly string _scriptBasePath;
     private readonly List<string> _submissionHistory = [];
+    private bool _bootstrapCompleted;
     private Script? _script;
     private ScriptState? _state;
 
@@ -25,8 +29,11 @@ internal sealed class ScriptSession
         object dbContextInstance,
         ImmutableHashSet<string> workspaceAssemblyPaths,
         InteractiveAssemblyLoader assemblyLoader,
-        bool preserveAsyncQueries = false)
+        bool preserveAsyncQueries = false,
+        ScriptSessionConfiguration? configuration = null,
+        string? scriptSearchBasePath = null)
     {
+        _configuration = configuration ?? ScriptSessionConfiguration.Empty;
         _assemblyLoader = assemblyLoader;
         DbContextType = dbContextType;
         PreserveAsyncQueries = preserveAsyncQueries;
@@ -61,6 +68,7 @@ internal sealed class ScriptSession
             "Microsoft.EntityFrameworkCore.Infrastructure"
         };
 
+        importNamespaces.AddRange(_configuration.AdditionalUsings);
         importNamespaces.AddRange(
             ScriptNamespaceImports.FilterWorkspaceNamespaces(CollectWorkspaceNamespaces(workspaceAssemblyPaths)));
 
@@ -69,9 +77,18 @@ internal sealed class ScriptSession
                 .Distinct(StringComparer.Ordinal)
         ];
 
+        var fallbackSearchBasePath = string.IsNullOrWhiteSpace(scriptSearchBasePath)
+            ? Directory.GetCurrentDirectory()
+            : scriptSearchBasePath;
+        var searchPaths = _configuration.ResolveSearchPaths(fallbackSearchBasePath);
+        _scriptBasePath = _configuration.ResolveBasePath(fallbackSearchBasePath);
+        _searchPaths = searchPaths;
+
         _options = ScriptOptions.Default
             .AddReferences(MetadataReferences)
-            .WithImports(_importNamespaces);
+            .WithImports(_importNamespaces)
+            .WithFilePath(Path.Combine(_scriptBasePath, "__efvibe_query__.csx"))
+            .WithSourceResolver(new SourceFileResolver(searchPaths, _scriptBasePath));
     }
 
     internal ImmutableArray<MetadataReference> MetadataReferences { get; }
@@ -140,53 +157,55 @@ internal sealed class ScriptSession
         return (builder.ToString(), position, currentLineStart);
     }
 
+    internal async Task InitializeAsync(
+        string scriptSearchBasePath,
+        CancellationToken cancellationToken = default)
+    {
+        if (_bootstrapCompleted)
+        {
+            return;
+        }
+
+        var loadPaths = _configuration.ResolveLoadPaths(scriptSearchBasePath);
+
+        foreach (var loadPath in loadPaths)
+        {
+            var loadedCode = await File.ReadAllTextAsync(loadPath, cancellationToken);
+            await EvaluateScriptFragmentAsync(loadedCode, cancellationToken);
+            RecordSubmission(ScriptLoadDirectiveResolver.FormatLoadDirective(loadPath));
+        }
+
+        _bootstrapCompleted = true;
+    }
+
     internal async Task<object?> EvaluateAsync(string code, CancellationToken cancellationToken = default)
     {
+        await EnsureBootstrapAsync(cancellationToken);
+
         var trimmed = SnippetNormalizer.ForEvaluation(code, DbContextType, PreserveAsyncQueries);
         if (string.IsNullOrEmpty(trimmed))
         {
             return null;
         }
 
-        try
-        {
-            if (_state is null)
-            {
-                _script = CSharpScript.Create(
-                    trimmed,
-                    _options,
-                    _globalsType,
-                    _assemblyLoader);
+        var (directives, body) = ScriptDirectiveSplitter.SplitLeadingDirectives(trimmed);
 
-                _state = await _script.RunAsync(_globals, cancellationToken);
-            }
-            else
-            {
-                _state = await _state.ContinueWithAsync(trimmed, cancellationToken: cancellationToken);
-            }
-        }
-        catch (CompilationErrorException compilationFailure)
+        if (!string.IsNullOrWhiteSpace(directives))
         {
-            var messages = compilationFailure.Diagnostics
-                .Where(static diagnostic => diagnostic.Severity != DiagnosticSeverity.Hidden)
-                .Select(static diagnostic => diagnostic.ToString())
-                .ToArray();
-
-            throw messages.Length == 0
-                ? new CompilationEvaluationException(compilationFailure.Message)
-                : new CompilationEvaluationException(string.Join(Environment.NewLine, messages));
+            await EvaluateBootstrapAsync(directives, cancellationToken);
         }
 
-        if (_state.Exception is not null)
+        if (string.IsNullOrWhiteSpace(body))
         {
-            throw _state.Exception is Exception concrete
-                ? concrete
-                : new Exception(_state.Exception.ToString());
+            return null;
         }
 
+        trimmed = body;
+
+        await EvaluateScriptFragmentAsync(trimmed, cancellationToken);
         RecordSubmission(trimmed);
 
-        return await UnwrapTaskReturnValueAsync(_state.ReturnValue, cancellationToken);
+        return await UnwrapTaskReturnValueAsync(_state!.ReturnValue, cancellationToken);
     }
 
     /// <summary>
@@ -195,6 +214,8 @@ internal sealed class ScriptSession
     /// </summary>
     internal async Task<object?> EvaluateProbeAsync(string code, CancellationToken cancellationToken = default)
     {
+        await EnsureBootstrapAsync(cancellationToken);
+
         var trimmed = SnippetNormalizer.ForEvaluation(
             ProbeScriptFormatter.ToScriptExpression(code),
             DbContextType,
@@ -273,6 +294,89 @@ internal sealed class ScriptSession
         _state = null;
         _script = null;
         _submissionHistory.Clear();
+        _bootstrapCompleted = false;
+    }
+
+    private async Task EnsureBootstrapAsync(CancellationToken cancellationToken)
+    {
+        if (_bootstrapCompleted)
+        {
+            return;
+        }
+
+        await InitializeAsync(_scriptBasePath, cancellationToken);
+    }
+
+    private async Task EvaluateBootstrapAsync(string code, CancellationToken cancellationToken)
+    {
+        foreach (var line in InputLineUtilities.SplitLines(code))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (ScriptLoadDirectiveResolver.TryParseLoadPath(line) is { } loadPath)
+            {
+                var fullPath = ScriptLoadDirectiveResolver.ResolveLoadPath(
+                    loadPath,
+                    _searchPaths,
+                    _scriptBasePath);
+                var loadedCode = await File.ReadAllTextAsync(fullPath, cancellationToken);
+                await EvaluateScriptFragmentAsync(loadedCode, cancellationToken);
+                RecordSubmission(ScriptLoadDirectiveResolver.FormatLoadDirective(fullPath));
+                continue;
+            }
+
+            await EvaluateScriptFragmentAsync(line, cancellationToken);
+            RecordSubmission(line);
+        }
+    }
+
+    private async Task EvaluateScriptFragmentAsync(string code, CancellationToken cancellationToken)
+    {
+        var trimmed = code.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return;
+        }
+
+        try
+        {
+            if (_state is null)
+            {
+                _script = CSharpScript.Create(
+                    trimmed,
+                    _options,
+                    _globalsType,
+                    _assemblyLoader);
+
+                _state = await _script.RunAsync(_globals, cancellationToken);
+            }
+            else
+            {
+                _state = await _state.ContinueWithAsync(trimmed, cancellationToken: cancellationToken);
+            }
+        }
+        catch (CompilationErrorException compilationFailure)
+        {
+            var messages = compilationFailure.Diagnostics
+                .Where(static diagnostic => diagnostic.Severity != DiagnosticSeverity.Hidden)
+                .Select(static diagnostic => diagnostic.ToString())
+                .ToArray();
+
+            throw messages.Length == 0
+                ? new CompilationEvaluationException(compilationFailure.Message)
+                : new CompilationEvaluationException(string.Join(Environment.NewLine, messages));
+        }
+
+        if (_state.Exception is not null)
+        {
+            throw _state.Exception is Exception concrete
+                ? concrete
+                : new Exception(_state.Exception.ToString());
+        }
     }
 
     private static IEnumerable<string> CollectWorkspaceNamespaces(ImmutableHashSet<string> workspaceAssemblyPaths)

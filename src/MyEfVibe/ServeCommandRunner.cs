@@ -38,6 +38,11 @@ internal static class ServeCommandRunner
             options.DbLogVerbose,
             options.Framework,
             buildPolicy,
+            ScriptSessionConfigurationFactory.FromCliOptions(
+                options.ScriptSearchPath,
+                options.ScriptLoad,
+                options.ScriptUsing,
+                null),
             cancellationToken);
 
         if (runtime is null)

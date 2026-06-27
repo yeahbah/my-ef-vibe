@@ -74,6 +74,15 @@ internal sealed class EfvibeCliOptions
     [Option("force-build", HelpText = "Always run dotnet build, even when isolated output is still fresh.")]
     public bool ForceBuild { get; set; }
 
+    [Option("script-search-path", HelpText = "Directory for resolving #load paths and relative script files.")]
+    public IEnumerable<string>? ScriptSearchPath { get; set; }
+
+    [Option("script-load", HelpText = "Script file(s) to #load when the session starts (repeatable).")]
+    public IEnumerable<string>? ScriptLoad { get; set; }
+
+    [Option("script-using", HelpText = "Additional namespace(s) to import in the script session (repeatable).")]
+    public IEnumerable<string>? ScriptUsing { get; set; }
+
     [Value(0, MetaName = "expression", HelpText = "Optional one-shot expression when -e is omitted.")]
     public IEnumerable<string>? ExpressionParts { get; set; }
 }
