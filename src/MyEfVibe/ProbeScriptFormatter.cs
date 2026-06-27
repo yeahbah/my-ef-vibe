@@ -90,7 +90,66 @@ internal static class ProbeScriptFormatter
             return trimmed;
         }
 
-        return trimmed[(equalsIndex + 1)..].Trim();
+        var declaredName = TryParseVarDeclarationName(trimmed);
+        var rhs = trimmed[(equalsIndex + 1)..].Trim();
+
+        return FixMistakenCountSelfReference(declaredName, rhs);
+    }
+
+    internal static string? TryParseVarDeclarationName(string text)
+    {
+        if (!text.TrimStart().StartsWith("var ", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var equalsIndex = FindVarDeclarationEqualsIndex(text);
+
+        if (equalsIndex < 0)
+        {
+            return null;
+        }
+
+        var declaration = text[..equalsIndex].TrimEnd();
+        var nameStart = 4;
+
+        while (nameStart < declaration.Length && char.IsWhiteSpace(declaration[nameStart]))
+        {
+            nameStart++;
+        }
+
+        var nameEnd = nameStart;
+
+        while (nameEnd < declaration.Length && IsIdentifierPart(declaration[nameEnd]))
+        {
+            nameEnd++;
+        }
+
+        var name = declaration[nameStart..nameEnd].Trim();
+
+        return name.Length == 0 ? null : name;
+    }
+
+    internal static string FixMistakenCountSelfReference(string? declaredName, string expression)
+    {
+        if (string.IsNullOrWhiteSpace(declaredName))
+        {
+            return expression;
+        }
+
+        var fixedExpression = expression;
+
+        foreach (var method in new[] { "Count", "CountAsync" })
+        {
+            var mistaken = $".{method}({declaredName})";
+
+            if (fixedExpression.Contains(mistaken, StringComparison.Ordinal))
+            {
+                fixedExpression = fixedExpression.Replace(mistaken, $".{method}()", StringComparison.Ordinal);
+            }
+        }
+
+        return fixedExpression;
     }
 
     /// <summary>

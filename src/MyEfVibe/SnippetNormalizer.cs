@@ -18,6 +18,16 @@ internal static class SnippetNormalizer
             return trimmed;
         }
 
+        if (TrySplitVariableAssignment(trimmed, out var assignmentPrefix, out var declaredName, out var assignmentRhs))
+        {
+            return RewriteVariableAssignment(
+                assignmentPrefix,
+                declaredName,
+                assignmentRhs,
+                dbContextType,
+                preserveAsyncQueries);
+        }
+
         if (dbContextType is not null && LooksLikeRepositorySnippet(trimmed))
         {
             return RepositorySnippetAdapter.PrepareForEvaluation(trimmed, dbContextType, preserveAsyncQueries);
@@ -120,17 +130,19 @@ internal static class SnippetNormalizer
 
     private static string NormalizeFinalLine(string line)
     {
-        if (!line.EndsWith(';'))
+        var trimmedEnd = line.TrimEnd();
+
+        if (RequiresStatementTerminator(trimmedEnd))
+        {
+            return trimmedEnd.EndsWith(';') ? line : $"{trimmedEnd};";
+        }
+
+        if (!trimmedEnd.EndsWith(';'))
         {
             return line;
         }
 
-        if (RequiresStatementTerminator(line))
-        {
-            return line;
-        }
-
-        return line[..^1].TrimEnd();
+        return trimmedEnd[..^1].TrimEnd();
     }
 
     private static bool RequiresStatementTerminator(string line)
@@ -222,8 +234,59 @@ internal static class SnippetNormalizer
                || snippet.Contains("dbContext", StringComparison.Ordinal)
                || snippet.Contains("Async(", StringComparison.Ordinal)
                || snippet.Contains("cancellationToken", StringComparison.OrdinalIgnoreCase)
-               || SqlTranslationProbe.ContainsEagerLoad(snippet)
-               || InputLineUtilities.SplitLines(snippet).Length > 1;
+               || SqlTranslationProbe.ContainsEagerLoad(snippet);
+    }
+
+    private static bool TrySplitVariableAssignment(
+        string snippet,
+        out string prefix,
+        out string? declaredName,
+        out string rhs)
+    {
+        prefix = string.Empty;
+        declaredName = null;
+        rhs = string.Empty;
+
+        if (!snippet.TrimStart().StartsWith("var ", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var equalsIndex = ProbeScriptFormatter.FindVarDeclarationEqualsIndex(snippet);
+
+        if (equalsIndex < 0)
+        {
+            return false;
+        }
+
+        declaredName = ProbeScriptFormatter.TryParseVarDeclarationName(snippet);
+        prefix = $"{snippet[..equalsIndex].TrimEnd()} = ";
+        rhs = snippet[(equalsIndex + 1)..].TrimStart();
+
+        if (string.IsNullOrWhiteSpace(rhs)
+            || rhs.Contains('\n')
+            || rhs.Contains("await ", StringComparison.Ordinal)
+            || rhs.Contains('{', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string RewriteVariableAssignment(
+        string prefix,
+        string? declaredName,
+        string rhs,
+        Type? dbContextType,
+        bool preserveAsyncQueries)
+    {
+        var fixedRhs = ProbeScriptFormatter.FixMistakenCountSelfReference(declaredName, rhs);
+        var normalizedRhs = NormalizeFinalLine(ReplaceContextAliases(fixedRhs.TrimEnd().TrimEnd(';')));
+        var rewrittenRhs = RewriteBoundedEfQuery(normalizedRhs, dbContextType, preserveAsyncQueries);
+        var combined = $"{prefix}{rewrittenRhs}";
+
+        return combined.TrimEnd().EndsWith(';') ? combined : $"{combined};";
     }
 
     private static bool LooksLikeTypeDeclaration(string text)
