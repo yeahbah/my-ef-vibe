@@ -86,6 +86,63 @@ public sealed class ScriptLoadTests : IDisposable
         Assert.Contains("Missing.csx", failure.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Reset_clears_submission_state_but_reloads_configured_scripts()
+    {
+        var session = await CreateSessionAsync(
+            new ScriptSessionConfiguration
+            {
+                LoadPaths = ["Helpers.csx"],
+                SearchPaths = [_tempDirectory]
+            });
+
+        await session.EvaluateAsync("var sessionValue = LoadedMagic;");
+        Assert.Equal(22, await session.EvaluateAsync("sessionValue + 1"));
+
+        session.Reset();
+
+        await Assert.ThrowsAsync<CompilationEvaluationException>(
+            () => session.EvaluateAsync("sessionValue + 1"));
+
+        Assert.Equal(22, await session.EvaluateAsync("LoadedMagic + 1"));
+    }
+
+    [Fact]
+    public async Task InitializeAsync_loads_multiple_script_files_in_order()
+    {
+        File.WriteAllText(Path.Combine(_tempDirectory, "First.csx"), "int FirstValue = 10;");
+        File.WriteAllText(Path.Combine(_tempDirectory, "Second.csx"), "int SecondValue = FirstValue + 5;");
+
+        var session = await CreateSessionAsync(
+            new ScriptSessionConfiguration
+            {
+                LoadPaths = ["First.csx", "Second.csx"],
+                SearchPaths = [_tempDirectory]
+            });
+
+        var result = await session.EvaluateAsync("SecondValue");
+
+        Assert.Equal(15, result);
+    }
+
+    [Fact]
+    public async Task Loaded_script_records_directive_in_completion_history()
+    {
+        var session = await CreateSessionAsync(
+            new ScriptSessionConfiguration
+            {
+                LoadPaths = ["Helpers.csx"],
+                SearchPaths = [_tempDirectory]
+            });
+
+        await session.EvaluateAsync("LoadedMagic");
+
+        var (source, _, _) = session.CreateCompletionSource("LoadedMagic", 0);
+
+        Assert.Contains("#load", source, StringComparison.Ordinal);
+        Assert.Contains("Helpers.csx", source, StringComparison.Ordinal);
+    }
+
     private async Task<ScriptSession> CreateSessionAsync(ScriptSessionConfiguration configuration)
     {
         var session = await CreateSessionWithoutInitializeAsync(configuration);

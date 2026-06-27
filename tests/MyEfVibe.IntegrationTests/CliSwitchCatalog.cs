@@ -54,6 +54,9 @@ internal static class CliSwitchCatalog
         yield return Case(CliCommandKind.Main, "framework-long", "--framework", Placeholders.Framework);
         yield return Case(CliCommandKind.Main, "framework-short", "-f", Placeholders.Framework);
         yield return Case(CliCommandKind.Main, "positional-expression", "db.Products.Count()");
+        yield return Case(CliCommandKind.Main, "script-search-path", "--script-search-path", Placeholders.Workspace);
+        yield return Case(CliCommandKind.Main, "script-load", "--script-load", "helpers.csx");
+        yield return Case(CliCommandKind.Main, "script-using", "--script-using", "System.Globalization");
     }
 
     internal static IEnumerable<CliSwitchCase> ServeSwitches()
@@ -71,6 +74,9 @@ internal static class CliSwitchCatalog
         yield return Flag(CliCommandKind.Serve, "dblog-verbose", "--dblog-verbose");
         yield return Case(CliCommandKind.Serve, "framework-long", "--framework", Placeholders.Framework);
         yield return Case(CliCommandKind.Serve, "framework-short", "-f", Placeholders.Framework);
+        yield return Case(CliCommandKind.Serve, "script-search-path", "--script-search-path", Placeholders.Workspace);
+        yield return Case(CliCommandKind.Serve, "script-load", "--script-load", "helpers.csx");
+        yield return Case(CliCommandKind.Serve, "script-using", "--script-using", "System.Globalization");
     }
 
     internal static IEnumerable<CliSwitchCase> ScanLiteSwitches()
@@ -146,6 +152,9 @@ internal static class CliSwitchCatalog
         yield return Case(CliCommandKind.LanguageServer, "connection-string", "--connection-string", Placeholders.ConnectionString);
         yield return Case(CliCommandKind.LanguageServer, "framework-long", "--framework", Placeholders.Framework);
         yield return Case(CliCommandKind.LanguageServer, "framework-short", "-f", Placeholders.Framework);
+        yield return Case(CliCommandKind.LanguageServer, "script-search-path", "--script-search-path", Placeholders.Workspace);
+        yield return Case(CliCommandKind.LanguageServer, "script-load", "--script-load", "helpers.csx");
+        yield return Case(CliCommandKind.LanguageServer, "script-using", "--script-using", "System.Globalization");
     }
 
     private static CliSwitchCase Case(CliCommandKind command, string name, params string[] extraArguments) =>

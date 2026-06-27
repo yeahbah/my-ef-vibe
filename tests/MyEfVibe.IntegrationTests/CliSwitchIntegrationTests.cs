@@ -227,6 +227,42 @@ public sealed class CliSwitchIntegrationTests
     }
 
     [SkippableFact]
+    public async Task Main_script_load_makes_helper_available_in_one_shot_expression()
+    {
+        IntegrationTestGuards.RequireEnabled();
+        Skip.IfNot(
+            DatabaseProbe.TryValidateScenario(SqliteScenario, out var validationFailure),
+            validationFailure ?? "sqlite scenario paths are invalid.");
+
+        var scriptDirectory = CreateScriptDirectory("int LoadedMagic = 17;");
+
+        try
+        {
+            var result = await EfvibeCliRunner.RunAsync(
+                BuildSqliteCommand(
+                    "--script-search-path", scriptDirectory,
+                    "--script-load", "Helpers.csx",
+                    "--script-using", "System.Globalization",
+                    "-e", "LoadedMagic + 5",
+                    "--format", "json",
+                    "--no-banner",
+                    "--connection-string", SqliteScenario.ConnectionString!),
+                TimeSpan.FromMinutes(2));
+
+            EfvibeCliRunner.AssertOptionRecognized(result);
+            Assert.Equal(0, result.ExitCode);
+
+            using var document = JsonDocument.Parse(result.StandardOutput.Trim());
+            Assert.True(document.RootElement.GetProperty("success").GetBoolean());
+            Assert.Equal("22", document.RootElement.GetProperty("value").GetString());
+        }
+        finally
+        {
+            Directory.Delete(scriptDirectory, recursive: true);
+        }
+    }
+
+    [SkippableFact]
     public async Task Connection_string_long_form_is_recognized_on_main_command()
     {
         IntegrationTestGuards.RequireEnabled();
@@ -300,6 +336,14 @@ public sealed class CliSwitchIntegrationTests
         var workspace = Path.Combine(Path.GetTempPath(), "efvibe-cli-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
         return workspace;
+    }
+
+    private static string CreateScriptDirectory(string helperContents)
+    {
+        var scriptDirectory = Path.Combine(Path.GetTempPath(), "efvibe-script-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scriptDirectory);
+        File.WriteAllText(Path.Combine(scriptDirectory, "Helpers.csx"), helperContents);
+        return scriptDirectory;
     }
 }
 
