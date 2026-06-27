@@ -120,7 +120,7 @@ internal static class QueryEvaluator
                 else
                 {
                     var probeSql = await session.EvaluateProbeAsync(
-                        $"{probeExpression}.ToQueryString()",
+                        ProbeScriptFormatter.ToQueryStringProbe(probeExpression),
                         cancellationToken);
 
                     if (probeSql is string literal && !string.IsNullOrWhiteSpace(literal))

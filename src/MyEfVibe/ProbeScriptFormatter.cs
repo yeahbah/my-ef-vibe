@@ -26,6 +26,29 @@ internal static class ProbeScriptFormatter
         return EfProbeExpressionSanitizer.RemoveTranslationNeutralOperators(probeExpression);
     }
 
+    /// <summary>
+    ///     Builds a script expression that calls <c>ToQueryString()</c>, parenthesizing query comprehensions so
+    ///     member access binds to the whole query rather than the <c>select</c> identifier.
+    /// </summary>
+    internal static string ToQueryStringProbe(string probeExpression)
+    {
+        if (string.IsNullOrWhiteSpace(probeExpression))
+        {
+            return probeExpression;
+        }
+
+        var probe = ToScriptExpression(probeExpression);
+
+        if (probe.Contains("ToQueryString", StringComparison.Ordinal))
+        {
+            return probe.TrimEnd(';').Trim();
+        }
+
+        probe = QueryComprehensionSyntax.WrapForTrailingMemberAccess(probe);
+
+        return $"{probe}.ToQueryString()";
+    }
+
     private static string CollapseWhitespace(string expression)
     {
         var builder = new StringBuilder(expression.Length);

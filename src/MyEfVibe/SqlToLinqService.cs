@@ -31,7 +31,7 @@ internal static class SqlToLinqService
 
         var expression = probe.Contains("ToQueryString", StringComparison.Ordinal)
             ? probe
-            : $"{probe}.ToQueryString()";
+            : ProbeScriptFormatter.ToQueryStringProbe(probe);
 
         try
         {
