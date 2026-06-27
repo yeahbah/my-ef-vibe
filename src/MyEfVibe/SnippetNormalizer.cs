@@ -154,6 +154,11 @@ internal static class SnippetNormalizer
             return true;
         }
 
+        if (ScriptDirectiveSyntax.IsScriptDirectiveLine(text))
+        {
+            return false;
+        }
+
         if (line.Count(static character => character == ';') > 1)
         {
             return true;
@@ -191,8 +196,7 @@ internal static class SnippetNormalizer
             "enum ",
             "struct ",
             "delegate ",
-            "event ",
-            "#"
+            "event "
         ];
 
         foreach (var prefix in statementPrefixes)
