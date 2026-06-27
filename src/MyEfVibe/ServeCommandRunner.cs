@@ -26,8 +26,15 @@ internal static class ServeCommandRunner
             return 1;
         }
 
+        var workspace = CliPathHelper.ResolveWorkspace(options.Workspace);
+        var workspaceRoot = SessionPaths.EnsureSessionDirectory(workspace.FullName);
+        var searchDirectory = ProjectPathResolver.ResolveSearchDirectory(
+            workspaceRoot,
+            options.Project,
+            options.StartupProject);
+
         var (runtime, exitCode, error) = await WorkspaceRuntimeBootstrap.LoadAsync(
-            CliPathHelper.ResolveWorkspace(options.Workspace),
+            workspace,
             CliPathHelper.ToFileInfo(options.Project),
             CliPathHelper.ToFileInfo(options.StartupProject),
             options.Context,
@@ -42,7 +49,7 @@ internal static class ServeCommandRunner
                 options.ScriptSearchPath,
                 options.ScriptLoad,
                 options.ScriptUsing,
-                null),
+                searchDirectory),
             cancellationToken);
 
         if (runtime is null)
