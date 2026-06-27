@@ -41,4 +41,5 @@ internal sealed record EvaluationMetrics
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public bool Succeeded { get; init; }
     public int? RowCount { get; init; }
+    public string? ConsoleOutput { get; init; }
 }

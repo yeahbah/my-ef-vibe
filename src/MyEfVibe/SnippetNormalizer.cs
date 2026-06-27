@@ -208,6 +208,11 @@ internal static class SnippetNormalizer
             return true;
         }
 
+        if (LooksLikeSideEffectInvocation(text))
+        {
+            return true;
+        }
+
         // `int id = 1`, `string? name = null`, etc.
         if (LooksLikeTypeDeclaration(text))
         {
@@ -265,6 +270,7 @@ internal static class SnippetNormalizer
 
         if (string.IsNullOrWhiteSpace(rhs)
             || rhs.Contains('\n')
+            || ContainsEmbeddedStatementSeparator(rhs)
             || rhs.Contains("await ", StringComparison.Ordinal)
             || rhs.Contains('{', StringComparison.Ordinal))
         {
@@ -272,6 +278,27 @@ internal static class SnippetNormalizer
         }
 
         return true;
+    }
+
+    private static bool ContainsEmbeddedStatementSeparator(string rhs)
+    {
+        var trimmed = rhs.Trim();
+        var semicolonIndex = trimmed.IndexOf(';');
+
+        if (semicolonIndex < 0)
+        {
+            return false;
+        }
+
+        return trimmed[(semicolonIndex + 1)..].Trim().Length > 0;
+    }
+
+    private static bool LooksLikeSideEffectInvocation(string text)
+    {
+        return text.Contains("Console.WriteLine(", StringComparison.Ordinal)
+               || text.Contains("Console.Write(", StringComparison.Ordinal)
+               || text.Contains("Debug.WriteLine(", StringComparison.Ordinal)
+               || text.Contains("Debug.Write(", StringComparison.Ordinal);
     }
 
     private static string RewriteVariableAssignment(

@@ -20,6 +20,7 @@ internal static class QueryEvaluator
         var warnings = new List<string>(SnippetWarningsAnalyzer.Analyze(normalizedSnippet));
 
         using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance, dbLogSettings);
+        using var consoleCapture = new ScriptConsoleCapture();
 
         var stopwatch = Stopwatch.StartNew();
         try
@@ -68,6 +69,7 @@ internal static class QueryEvaluator
                 DatabaseMilliseconds = sqlCapture is { HasEntries: true } ? sqlCapture.TotalDatabaseMilliseconds : null,
                 SqlCommandCount = sqlCapture?.Commands.Count ?? 0,
                 RowCount = rowCount,
+                ConsoleOutput = consoleCapture.CapturedOutput,
             };
 
             return (result, metrics);

@@ -92,7 +92,7 @@ internal static class EvaluationJsonReporter
         return new EvaluationJsonPayload
         {
             Success = true,
-            Value = FormatValue(result, exportRows),
+            Value = FormatValue(result, exportRows, metrics.ConsoleOutput),
             Rows = BuildRows(exportRows),
             Sql = sql,
             TranslatedSql = metrics.TranslatedSql,
@@ -134,7 +134,29 @@ internal static class EvaluationJsonReporter
             : new[] { metrics.TranslatedSql };
     }
 
-    private static string? FormatValue(object? result, IReadOnlyList<object?> exportRows)
+    private static string? FormatValue(
+        object? result,
+        IReadOnlyList<object?> exportRows,
+        string? consoleOutput = null)
+    {
+        var value = FormatValueCore(result, exportRows);
+
+        if (string.IsNullOrWhiteSpace(consoleOutput))
+        {
+            return value;
+        }
+
+        var captured = consoleOutput.TrimEnd();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return captured;
+        }
+
+        return $"{captured}{Environment.NewLine}{value}";
+    }
+
+    private static string? FormatValueCore(object? result, IReadOnlyList<object?> exportRows)
     {
         if (result is null)
         {

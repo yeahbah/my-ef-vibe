@@ -34,6 +34,28 @@ public sealed class EvaluationJsonReporterTests
     }
 
     [Fact]
+    public void BuildSuccess_UsesCapturedConsoleOutputWhenResultIsNull()
+    {
+        var metrics = new EvaluationMetrics
+        {
+            Snippet = "Console.WriteLine(\"hello\");",
+            TotalMilliseconds = 1,
+            SqlCommandCount = 0,
+            ExecutedSql = [],
+            ResultKind = ResultKind.Null,
+            ResultTypeName = "null",
+            IsMaterialized = true,
+            Warnings = [],
+            Succeeded = true,
+            ConsoleOutput = "hello",
+        };
+
+        var payload = EvaluationJsonReporter.BuildSuccess(null, metrics);
+
+        Assert.Equal("hello", payload.Value);
+    }
+
+    [Fact]
     public void BuildFailure_IncludesErrorAndWarnings()
     {
         var metrics = EvaluationMetrics.Failed("db.Bad", 3, "Compilation error");
