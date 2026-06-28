@@ -4,16 +4,89 @@ namespace MyEfVibe;
 
 internal static partial class RawSqlClassifier
 {
+    private static readonly HashSet<string> QueryKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SELECT",
+        "WITH",
+        "SHOW",
+        "EXPLAIN",
+        "DESCRIBE",
+        "DESC",
+        "PRAGMA",
+        "TABLE"
+    };
+
+    private static readonly HashSet<string> PreambleKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "DECLARE",
+        "SET"
+    };
+
     internal static bool LooksLikeQuery(string sql)
     {
-        return FirstKeyword(sql) switch
+        foreach (var statement in EnumerateStatements(sql))
         {
-            "SELECT" or "WITH" or "SHOW" or "EXPLAIN" or "DESCRIBE" or "DESC" or "PRAGMA" or "TABLE" => true,
-            _ => false
-        };
+            var keyword = FirstStatementKeyword(statement);
+
+            if (string.IsNullOrEmpty(keyword))
+            {
+                continue;
+            }
+
+            if (PreambleKeywords.Contains(keyword))
+            {
+                continue;
+            }
+
+            return QueryKeywords.Contains(keyword);
+        }
+
+        return false;
     }
 
-    private static string FirstKeyword(string sql)
+    internal static bool ContainsQueryStatement(string sql)
+    {
+        foreach (var statement in EnumerateStatements(sql))
+        {
+            var keyword = FirstStatementKeyword(statement);
+
+            if (QueryKeywords.Contains(keyword))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> EnumerateStatements(string sql)
+    {
+        foreach (var part in sql.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!string.IsNullOrWhiteSpace(part))
+            {
+                yield return part;
+            }
+        }
+    }
+
+    private static string FirstStatementKeyword(string statement)
+    {
+        var remaining = SkipLeadingComments(statement.TrimStart());
+
+        if (remaining.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var match = FirstKeywordRegex().Match(remaining);
+
+        return match.Success
+            ? match.Groups["keyword"].Value.ToUpperInvariant()
+            : string.Empty;
+    }
+
+    private static string SkipLeadingComments(string sql)
     {
         var remaining = sql.TrimStart();
 
@@ -46,16 +119,7 @@ internal static partial class RawSqlClassifier
             break;
         }
 
-        if (remaining.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        var match = FirstKeywordRegex().Match(remaining);
-
-        return match.Success
-            ? match.Groups["keyword"].Value.ToUpperInvariant()
-            : string.Empty;
+        return remaining;
     }
 
     [GeneratedRegex(@"^(?<keyword>[A-Za-z_]+)", RegexOptions.CultureInvariant)]

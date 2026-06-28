@@ -35,37 +35,14 @@ internal static class RawSqlExecutor
         {
             if (RawSqlClassifier.LooksLikeQuery(trimmed))
             {
-                var (rows, totalCount) = await ReadQueryRowsAsync(
+                return await ExecuteQueryAsync(
                     dbContext,
                     trimmed,
                     inspectionAssemblies,
-                    cancellationToken);
-
-                stopwatch.Stop();
-
-                if (totalCount > MaxRows)
-                {
-                    warnings.Add($"Showing first {MaxRows} of {totalCount} row(s).");
-                }
-
-                var metrics = BuildMetrics(
-                    trimmed,
-                    stopwatch.ElapsedMilliseconds,
                     sqlCapture,
-                    ResultKind.Enumerable,
-                    "raw-sql",
-                    totalCount,
-                    true,
-                    warnings);
-
-                var value = totalCount switch
-                {
-                    0 => "(empty)",
-                    1 when rows.Count == 1 => FormatSingleRowSummary(rows[0]),
-                    _ => $"{totalCount} row(s)"
-                };
-
-                return (value, metrics, rows);
+                    stopwatch,
+                    warnings,
+                    cancellationToken);
             }
 
             var rowsAffected = await ExecuteNonQueryAsync(
@@ -73,6 +50,18 @@ internal static class RawSqlExecutor
                 trimmed,
                 inspectionAssemblies,
                 cancellationToken);
+
+            if (rowsAffected < 0 && RawSqlClassifier.ContainsQueryStatement(trimmed))
+            {
+                return await ExecuteQueryAsync(
+                    dbContext,
+                    trimmed,
+                    inspectionAssemblies,
+                    sqlCapture,
+                    stopwatch,
+                    warnings,
+                    cancellationToken);
+            }
 
             stopwatch.Stop();
 
@@ -96,6 +85,49 @@ internal static class RawSqlExecutor
                 EvaluationMetrics.Failed(trimmed, stopwatch.ElapsedMilliseconds, failure.Message),
                 failure);
         }
+    }
+
+    private static async Task<(object? Result, EvaluationMetrics Metrics, IReadOnlyList<Dictionary<string, string>>? Rows)>
+        ExecuteQueryAsync(
+            object dbContext,
+            string trimmed,
+            IEnumerable<Assembly> inspectionAssemblies,
+            EfSqlCapture? sqlCapture,
+            Stopwatch stopwatch,
+            List<string> warnings,
+            CancellationToken cancellationToken)
+    {
+        var (rows, totalCount) = await ReadQueryRowsAsync(
+            dbContext,
+            trimmed,
+            inspectionAssemblies,
+            cancellationToken);
+
+        stopwatch.Stop();
+
+        if (totalCount > MaxRows)
+        {
+            warnings.Add($"Showing first {MaxRows} of {totalCount} row(s).");
+        }
+
+        var metrics = BuildMetrics(
+            trimmed,
+            stopwatch.ElapsedMilliseconds,
+            sqlCapture,
+            ResultKind.Enumerable,
+            "raw-sql",
+            totalCount,
+            true,
+            warnings);
+
+        var value = totalCount switch
+        {
+            0 => "(empty)",
+            1 when rows.Count == 1 => FormatSingleRowSummary(rows[0]),
+            _ => $"{totalCount} row(s)"
+        };
+
+        return (value, metrics, rows);
     }
 
     private static EvaluationMetrics BuildMetrics(
