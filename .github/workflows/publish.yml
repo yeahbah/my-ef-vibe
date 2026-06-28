@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve version
         id: version
@@ -51,10 +51,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
@@ -89,7 +89,7 @@ jobs:
           Copy-Item $vsix.FullName "artifacts/visualstudio-efvibe-$env:VERSION.vsix"
 
       - name: Upload Visual Studio extension package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: visualstudio-extension
           path: artifacts/visualstudio-efvibe-${{ needs.resolve-version.outputs.version }}.vsix
@@ -100,16 +100,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '9.0.0'
 
@@ -131,7 +131,7 @@ jobs:
           cp "$zip_path" "../artifacts/rider-efvibe-${VERSION}.zip"
 
       - name: Upload Rider extension package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: rider-extension
           path: artifacts/rider-efvibe-${{ needs.resolve-version.outputs.version }}.zip
@@ -145,12 +145,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -177,7 +177,7 @@ jobs:
           --skip-duplicate
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -202,19 +202,19 @@ jobs:
           cp "vscode-efvibe-${VERSION}.vsix" "../artifacts/vscode-efvibe-${VERSION}.vsix"
 
       - name: Download Visual Studio extension package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: visualstudio-extension
           path: ./artifacts
 
       - name: Download Rider extension package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: rider-extension
           path: ./artifacts
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ needs.resolve-version.outputs.version }}
           name: v${{ needs.resolve-version.outputs.version }}
@@ -255,13 +255,13 @@ jobs:
             --baseImagesUrl "https://github.com/yeahbah/my-ef-vibe/raw/HEAD/vscode-extension/images"
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '9.0.0'
 
