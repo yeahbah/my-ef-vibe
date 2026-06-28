@@ -31,6 +31,102 @@ internal static class EvaluationJsonReporter
         Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
     }
 
+    internal static void WriteCompareSuccess(
+        object? result,
+        EvaluationMetrics metrics,
+        IReadOnlyList<EvaluationJsonCompareEntry> compareResults,
+        QueryPlanResult? plan = null)
+    {
+        var payload = BuildSuccess(result, metrics, plan, compareResults);
+        Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
+    }
+
+    internal static void WriteCompareFailure(
+        EvaluationMetrics metrics,
+        IReadOnlyList<EvaluationJsonCompareEntry> compareResults,
+        string? error = null)
+    {
+        var payload = BuildFailure(metrics, error, compareResults);
+        Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
+    }
+
+    internal static void WriteBenchmarkSuccess(
+        object? result,
+        EvaluationMetrics metrics,
+        EvaluationJsonBenchmarkResult benchmarkResult,
+        QueryPlanResult? plan = null)
+    {
+        var payload = BuildSuccess(result, metrics, plan, compareResults: null, benchmarkResult);
+        Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
+    }
+
+    internal static void WriteBenchmarkFailure(
+        EvaluationMetrics metrics,
+        string snippet,
+        int iterations,
+        IReadOnlyList<EvaluationJsonBenchmarkSample> samples,
+        string? error = null)
+    {
+        var payload = BuildFailure(
+            metrics,
+            error,
+            compareResults: null,
+            BuildBenchmarkResult(snippet, iterations, samples));
+        Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
+    }
+
+    internal static EvaluationJsonBenchmarkResult BuildBenchmarkResult(
+        string snippet,
+        int iterations,
+        IReadOnlyList<EvaluationJsonBenchmarkSample> samples)
+    {
+        var successfulTimings = samples
+            .Where(static sample => sample.Success)
+            .Select(static sample => sample.TotalMs)
+            .ToArray();
+
+        return new EvaluationJsonBenchmarkResult
+        {
+            Iterations = iterations,
+            Samples = samples,
+            Snippet = snippet,
+            MinMs = successfulTimings.Length > 0 ? successfulTimings.Min() : 0,
+            AverageMs = successfulTimings.Length > 0
+                ? (long)Math.Round(successfulTimings.Average())
+                : 0,
+            MaxMs = successfulTimings.Length > 0 ? successfulTimings.Max() : 0,
+            P95Ms = successfulTimings.Length > 0
+                ? Math.Round(Percentile(successfulTimings, 0.95), 1)
+                : 0,
+        };
+    }
+
+    private static double Percentile(IReadOnlyList<long> values, double percentile)
+    {
+        var ordered = values.OrderBy(static value => value).ToArray();
+        var index = (int)Math.Ceiling(percentile * ordered.Length) - 1;
+
+        return ordered[Math.Clamp(index, 0, ordered.Length - 1)];
+    }
+
+    internal static EvaluationJsonCompareEntry BuildCompareEntry(
+        int index,
+        string label,
+        string snippet,
+        EvaluationMetrics metrics,
+        string? error = null)
+    {
+        return new EvaluationJsonCompareEntry
+        {
+            Index = index,
+            Label = label,
+            Snippet = snippet,
+            Success = metrics.Succeeded,
+            Error = error,
+            Metrics = EvaluationJsonMetrics.From(metrics),
+        };
+    }
+
     internal static void WriteSqlSuccess(
         object? result,
         IReadOnlyList<Dictionary<string, string>>? rows,
@@ -84,7 +180,9 @@ internal static class EvaluationJsonReporter
     internal static EvaluationJsonPayload BuildSuccess(
         object? result,
         EvaluationMetrics metrics,
-        QueryPlanResult? plan = null)
+        QueryPlanResult? plan = null,
+        IReadOnlyList<EvaluationJsonCompareEntry>? compareResults = null,
+        EvaluationJsonBenchmarkResult? benchmarkResult = null)
     {
         var (_, _, _, _, _, exportRows) = ResultAnalyzer.Analyze(result);
         var sql = BuildSql(metrics);
@@ -92,19 +190,27 @@ internal static class EvaluationJsonReporter
         return new EvaluationJsonPayload
         {
             Success = true,
-            Value = FormatValue(result, exportRows, metrics.ConsoleOutput),
-            Rows = BuildRows(exportRows),
+            Value = benchmarkResult is not null
+                ? $"Benchmark: {benchmarkResult.Iterations} iteration(s) · avg {benchmarkResult.AverageMs} ms"
+                : FormatValue(result, exportRows, metrics.ConsoleOutput),
+            Rows = benchmarkResult is not null ? null : BuildRows(exportRows),
             Sql = sql,
             TranslatedSql = metrics.TranslatedSql,
             QueryPlan = string.IsNullOrWhiteSpace(plan?.PlanText) ? null : plan.PlanText,
             QueryPlanNote = string.IsNullOrWhiteSpace(plan?.PlanText) ? plan?.Note : null,
             Metrics = EvaluationJsonMetrics.From(metrics),
             Warnings = metrics.Warnings,
-            Snippet = metrics.Snippet
+            Snippet = metrics.Snippet,
+            CompareResults = compareResults,
+            BenchmarkResult = benchmarkResult,
         };
     }
 
-    internal static EvaluationJsonPayload BuildFailure(EvaluationMetrics metrics, string? error)
+    internal static EvaluationJsonPayload BuildFailure(
+        EvaluationMetrics metrics,
+        string? error,
+        IReadOnlyList<EvaluationJsonCompareEntry>? compareResults = null,
+        EvaluationJsonBenchmarkResult? benchmarkResult = null)
     {
         var message = error
                       ?? metrics.Warnings.FirstOrDefault()
@@ -118,7 +224,9 @@ internal static class EvaluationJsonReporter
             TranslatedSql = metrics.TranslatedSql,
             Metrics = EvaluationJsonMetrics.From(metrics),
             Warnings = metrics.Warnings,
-            Snippet = metrics.Snippet
+            Snippet = metrics.Snippet,
+            CompareResults = compareResults,
+            BenchmarkResult = benchmarkResult,
         };
     }
 
@@ -226,6 +334,59 @@ internal static class EvaluationJsonReporter
         public string? Error { get; init; }
 
         public string? Snippet { get; init; }
+
+        public IReadOnlyList<EvaluationJsonCompareEntry>? CompareResults { get; init; }
+
+        public EvaluationJsonBenchmarkResult? BenchmarkResult { get; init; }
+    }
+
+    internal sealed class EvaluationJsonBenchmarkResult
+    {
+        public int Iterations { get; init; }
+
+        public IReadOnlyList<EvaluationJsonBenchmarkSample> Samples { get; init; } = [];
+
+        public long MinMs { get; init; }
+
+        public long AverageMs { get; init; }
+
+        public long MaxMs { get; init; }
+
+        public double P95Ms { get; init; }
+
+        public string? Snippet { get; init; }
+    }
+
+    internal sealed class EvaluationJsonBenchmarkSample
+    {
+        public int Iteration { get; init; }
+
+        public long TotalMs { get; init; }
+
+        public long? DatabaseMs { get; init; }
+
+        public int? RowCount { get; init; }
+
+        public int SqlCommandCount { get; init; }
+
+        public bool Success { get; init; }
+
+        public string? Error { get; init; }
+    }
+
+    internal sealed class EvaluationJsonCompareEntry
+    {
+        public int Index { get; init; }
+
+        public string Label { get; init; } = string.Empty;
+
+        public string? Snippet { get; init; }
+
+        public bool Success { get; init; }
+
+        public string? Error { get; init; }
+
+        public EvaluationJsonMetrics Metrics { get; init; } = new();
     }
 
     internal sealed class EvaluationJsonMetrics

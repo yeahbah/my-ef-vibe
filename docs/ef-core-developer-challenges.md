@@ -202,7 +202,7 @@ Most mature teams are neither pure code-first nor pure database-first:
 
 ---
 
-## How this connects to efvibe Studio positioning
+## How this connects to MyEFvibe Studio positioning
 
 The challenges above explain why “DBeaver + LINQPad, but EF-only” is a coherent product idea:
 
@@ -235,6 +235,6 @@ Studio does not replace **migrations**, **scaffolding**, or **DBA tools**. It ta
 
 ## See also
 
-- [efvibe-studio-plan.md](efvibe-studio-plan.md) — Problem statement, product DNA, and phased delivery for efvibe Studio
+- [efvibe-studio-plan.md](efvibe-studio-plan.md) — Problem statement, product DNA, and phased delivery for MyEFvibe Studio
 - [features.md](../features.md) — What the efvibe CLI and editor plugins ship today
 - [linq-scan-rules.md](linq-scan-rules.md) — Scan rules reference (N+1, client eval, cartesian, etc.)

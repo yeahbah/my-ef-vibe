@@ -22,6 +22,43 @@ internal static class QueryResultWriter
 
         host.EnsureEntityFrameworkRelationalLoaded();
         host.EnsureAspNetCoreSharedFrameworkLoaded();
+
+        if (ScriptAttributeParser.TryGetCompareBlocks(snippet, out var compareBlocks))
+        {
+            await ScriptCompareRunner.RunCompareAsync(
+                dbContextInstance,
+                session,
+                dbLogSettings,
+                host,
+                analytics,
+                compareBlocks,
+                outputFormat,
+                withPlan,
+                cancellationToken);
+
+            return;
+        }
+
+        if (ScriptAttributeParser.TryGetBenchmarkBlock(snippet, out var benchmarkBlock)
+            && benchmarkBlock is not null)
+        {
+            var iterations = ScriptAttributeParser.GetBenchmarkIterations(benchmarkBlock);
+
+            await ScriptBenchmarkRunner.RunBenchmarkAsync(
+                dbContextInstance,
+                session,
+                dbLogSettings,
+                host,
+                analytics,
+                benchmarkBlock,
+                iterations,
+                outputFormat,
+                withPlan,
+                cancellationToken);
+
+            return;
+        }
+
         try
         {
             var (result, metrics) = await QueryEvaluator.EvaluateAsync(

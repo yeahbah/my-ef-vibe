@@ -14,6 +14,58 @@ internal static class ServeEvaluator
         runtime.Host.EnsureEntityFrameworkRelationalLoaded();
         runtime.Host.EnsureAspNetCoreSharedFrameworkLoaded();
 
+        if (ScriptAttributeParser.TryGetCompareBlocks(expression, out var compareBlocks))
+        {
+            try
+            {
+                await ScriptCompareRunner.RunCompareAsync(
+                    runtime.DbContext,
+                    runtime.Session,
+                    runtime.DbLogSettings,
+                    runtime.Host,
+                    runtime.Analytics,
+                    compareBlocks,
+                    CliOutputFormat.Json,
+                    withPlan,
+                    cancellationToken);
+            }
+            catch (EvaluationFailedException evaluationFailure)
+            {
+                runtime.Analytics.Record(evaluationFailure.Metrics, null, []);
+                EvaluationJsonReporter.WriteFailure(evaluationFailure.Metrics, evaluationFailure.Message);
+            }
+
+            return;
+        }
+
+        if (ScriptAttributeParser.TryGetBenchmarkBlock(expression, out var benchmarkBlock)
+            && benchmarkBlock is not null)
+        {
+            try
+            {
+                var iterations = ScriptAttributeParser.GetBenchmarkIterations(benchmarkBlock);
+
+                await ScriptBenchmarkRunner.RunBenchmarkAsync(
+                    runtime.DbContext,
+                    runtime.Session,
+                    runtime.DbLogSettings,
+                    runtime.Host,
+                    runtime.Analytics,
+                    benchmarkBlock,
+                    iterations,
+                    CliOutputFormat.Json,
+                    withPlan,
+                    cancellationToken);
+            }
+            catch (EvaluationFailedException evaluationFailure)
+            {
+                runtime.Analytics.Record(evaluationFailure.Metrics, null, []);
+                EvaluationJsonReporter.WriteFailure(evaluationFailure.Metrics, evaluationFailure.Message);
+            }
+
+            return;
+        }
+
         try
         {
             var (result, metrics) = await QueryEvaluator.EvaluateAsync(

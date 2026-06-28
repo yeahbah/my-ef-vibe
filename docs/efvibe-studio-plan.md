@@ -1,8 +1,8 @@
-# Plan: efvibe Studio — EF Core database client
+# Plan: MyEFvibe Studio — EF Core database client
 
 A dedicated desktop app for **exploring and querying databases through Entity Framework Core** — the EF-native alternative to [DBeaver](https://dbeaver.io/).
 
-DBeaver is a universal database client: JDBC connections, SQL editor, data grid, metadata browser, DDL tools, and DBA workflows across dozens of providers. **efvibe Studio** occupies the same *job* for EF Core developers — connect, browse schema, run queries, inspect results, export data — but the connection is always **your real `DbContext`**, your build, your LINQ, and the SQL EF actually generates.
+DBeaver is a universal database client: JDBC connections, SQL editor, data grid, metadata browser, DDL tools, and DBA workflows across dozens of providers. **MyEFvibe Studio** occupies the same *job* for EF Core developers — connect, browse schema, run queries, inspect results, export data — but the connection is always **your real `DbContext`**, your build, your LINQ, and the SQL EF actually generates.
 
 The **interaction model** comes from **LINQPad**: fast scratchpad queries, many tabs, Ctrl+Enter run, rich result exploration, snippets, and notebooks — but scoped to EF Core (`db` completions, scan, translated SQL) instead of general C# or ad-hoc SQL.
 
@@ -88,9 +88,9 @@ flowchart LR
 
 ---
 
-## Positioning: DBeaver vs efvibe Studio
+## Positioning: DBeaver vs MyEFvibe Studio
 
-| | **DBeaver** | **efvibe Studio** |
+| | **DBeaver** | **MyEFvibe Studio** |
 |---|---|---|
 | **Audience** | DBAs, backend devs, data analysts — any SQL database | EF Core developers — one team’s app model |
 | **Connection** | JDBC URL, driver, credentials | EF project + startup project + `DbContext` (+ optional connection override) |
@@ -115,7 +115,7 @@ flowchart LR
 
 ### What we *do* build (the “DBeaver for EF” checklist)
 
-| DBeaver-like capability | efvibe Studio interpretation |
+| DBeaver-like capability | MyEFvibe Studio interpretation |
 |---|---|
 | **Connection manager** | Named connections: `-p`, `-s`, `-c`, framework, secrets, env tags (Dev/Staging) |
 | **Database navigator** | Schema sidebar: DbSets → entities → columns, keys, navigations |
@@ -130,13 +130,13 @@ flowchart LR
 
 ### One-line pitch
 
-> **DBeaver shows you the database. LINQPad lets you try code in seconds. efvibe Studio does both — through your EF Core model, with the SQL your LINQ becomes.**
+> **DBeaver shows you the database. LINQPad lets you try code in seconds. MyEFvibe Studio does both — through your EF Core model, with the SQL your LINQ becomes.**
 
 ---
 
-## Positioning: LINQPad vs efvibe Studio
+## Positioning: LINQPad vs MyEFvibe Studio
 
-| | **LINQPad** | **efvibe Studio** |
+| | **LINQPad** | **MyEFvibe Studio** |
 |---|---|---|
 | **Scope** | General C# scratchpad + optional DB drivers | **EF Core only** — your project’s `DbContext` |
 | **Connection** | Built-in driver or custom `DbContext` template | Real `.csproj` + startup project + context discovery |
@@ -155,7 +155,7 @@ flowchart LR
 |---|---|---|
 | Query tabs + `.efvibe-query` files | Yes | **1** |
 | Connection dropdown per tab | Yes | **1** |
-| Ctrl+Enter / F5 run, run selection | Yes | **0–1** |
+| Ctrl+Enter run current line; F5 Run all | Yes | **0–1** |
 | Schema browser (DbSets tree) | Yes | **1** |
 | SQL pane (generated SQL) | Yes | **1–2** (live debounce in **2**) |
 | Result grid | Yes (plugins today) | **0–1** |
@@ -188,7 +188,7 @@ flowchart LR
 
 ## Vision
 
-**efvibe Studio** (working name): a database exploration and query environment **for EF Core** — **DBeaver’s client workflows** (connect, browse, export) with **LINQPad’s scratchpad speed** (tabs, instant run, rich results) — centered on live `DbContext`, translated SQL, query plans, scan review, and session analytics, with first-class support for **multiple solutions/projects** in one window.
+**MyEFvibe Studio**: a database exploration and query environment **for EF Core** — **DBeaver’s client workflows** (connect, browse, export) with **LINQPad’s scratchpad speed** (tabs, instant run, rich results) — centered on live `DbContext`, translated SQL, query plans, scan review, and session analytics, with first-class support for **multiple solutions/projects** in one window.
 
 | Reference product | What Studio inherits |
 |---|---|
@@ -196,7 +196,7 @@ flowchart LR
 | **LINQPad** | Query tabs, Ctrl+Enter run, Dump-style exploration, snippets, notebooks, script library |
 | **efvibe today** | Scan, `:plan`, REPL, daemon protocol, Rider/VS Code parity |
 
-| DBeaver / generic SQL client | efvibe Studio |
+| DBeaver / generic SQL client | MyEFvibe Studio |
 |---|---|
 | Connect with JDBC URL | Connect with EF project + `DbContext` |
 | Write SQL in SQL editor | Write **LINQ**; SQL is an output you inspect |
@@ -220,7 +220,7 @@ Keep the split you already have: **UI shell ↔ `efvibe serve` daemons ↔ Rosly
 
 ```mermaid
 flowchart TB
-    subgraph studio [efvibe Studio UI]
+    subgraph studio [MyEFvibe Studio UI]
         WS[Workspace Manager]
         QE[Query Editor]
         RP[Results / SQL / Plan]
@@ -287,7 +287,7 @@ Studio is a **focused EF client**, not a general C# IDE. Build the shell greenfi
 
 | Responsibility | Where it lives |
 |---|---|
-| LINQ scratchpad, results, SQL/plan, scan, notebooks | **efvibe Studio** |
+| LINQ scratchpad, results, SQL/plan, scan, notebooks | **MyEFvibe Studio** |
 | Edit `.cs` project source, refactor, debug app | **Rider / VS Code / Visual Studio** (user’s choice) |
 | Ad-hoc SQL, DBA tasks | **DBeaver** or provider tools |
 
@@ -434,7 +434,7 @@ Pick features that fit EF workflows — not a full LINQPad clone (no general C# 
 
 ### Tier 1 — LINQPad essentials (Phase 0–1)
 
-| LINQPad idea | efvibe Studio interpretation |
+| LINQPad idea | MyEFvibe Studio interpretation |
 |---|---|
 | **Query tabs** | Many `.efvibe-query` files; each tab binds to a connection |
 | **Connection dropdown** | LINQPad-style toolbar picker across workspace connections |
@@ -448,7 +448,7 @@ Pick features that fit EF workflows — not a full LINQPad clone (no general C# 
 
 ### Tier 2 — LINQPad depth (Phase 2 — high priority)
 
-| LINQPad idea | efvibe Studio interpretation |
+| LINQPad idea | MyEFvibe Studio interpretation |
 |---|---|
 | **Dump() / result explorer** | Tree/grid hybrid for nested objects — **#1 LINQPad parity gap** |
 | **Live SQL preview** | Debounced `ToQueryString()` while typing (bidirectional with SQL → LINQ) |
@@ -457,8 +457,8 @@ Pick features that fit EF workflows — not a full LINQPad clone (no general C# 
 | **Lambda scratchpad** | Expression-only buffer (no `;` required) for quick `db.Products.Count()` |
 | **#load / additional usings** | Extend scripting globals per connection (Roslyn submissions) |
 | **Recent & pinned queries** | SQLite index of runs + snippets |
-| **Benchmark panel** | Visual wrapper around `:benchmark N` + charts (`:chart`) |
-| **Compare runs** | UI for `:compare set` / `:compare` side-by-side |
+| **Benchmark panel** | Visual wrapper around `:benchmark N`, `#[Benchmark(N)]`, and charts (`:chart`) |
+| **Compare runs** | Result tab for `#[Compare]` multi-variant; Charts + `:compare set` / `:compare` baseline |
 | **Diff two connections** | Same LINQ against Dev vs Staging (two daemons, diff grid) |
 | **Export / share** | Query + SQL + plan as markdown bundle or gist |
 | **SQL → LINQ** | EF-model-aware converter — see below |
@@ -477,7 +477,7 @@ Pick features that fit EF workflows — not a full LINQPad clone (no general C# 
 
 ## SQL → LINQ conversion
 
-efvibe already does **LINQ → SQL** reliably via EF Core `ToQueryString()` and executed SQL capture. **SQL → LINQ** is the inverse problem — EF Core does not provide it, and there is no standard .NET API. A **bounded, EF-model-aware converter** is feasible and fits efvibe Studio well.
+efvibe already does **LINQ → SQL** reliably via EF Core `ToQueryString()` and executed SQL capture. **SQL → LINQ** is the inverse problem — EF Core does not provide it, and there is no standard .NET API. A **bounded, EF-model-aware converter** is feasible and fits MyEFvibe Studio well.
 
 ### Positioning
 
@@ -603,7 +603,7 @@ JSON response shape (sketch):
 │ ├ API    │  db.Products.Where(...).Take(10).ToList()   │ ├ Orders      │
 │ └ Persist│                                              │ └ ...         │
 │          │──────────────────────────────────────────────│ Model actions │
-│ Connections│ [Run] [Run Plan] [Scan] [Export] [Benchmark]│ Count Sample  │
+│ Connections│ Per-tab: Run all · Run line · Run plan · Stop     │ Count Sample  │
 │ Queries  │                                              │ Describe      │
 │ Notebooks├──────────────────────────────────────────────┤               │
 │ Scan     │ Result | SQL | Plan | Messages | Explorer    │               │
@@ -738,7 +738,7 @@ Features neither DBeaver nor stock LINQPad offer for EF:
 
 Working backlog: **[my-ef-vibe-studio/docs/PHASE6_CHECKLIST.md](https://github.com/yeahbah/my-ef-vibe-studio/blob/main/docs/PHASE6_CHECKLIST.md)**
 
-- **Compare baseline UI** — run-bar + Charts (`:compare` parity)
+- **Compare & benchmark** — `#[Compare]` / `#[Benchmark(N)]` in Result tab; Charts + `:compare` baseline
 - **Expression mode toggle**, **query library folders/search**
 - **Aligned engine + Studio releases**, website screenshots
 - **SQL→LINQ polish**, **two-connection diff**, **`workspace validate --json`**

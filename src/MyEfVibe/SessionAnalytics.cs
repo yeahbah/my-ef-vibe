@@ -13,6 +13,10 @@ internal sealed class SessionAnalytics
 
     internal EvaluationMetrics? CompareBaseline { get; private set; }
 
+    internal IReadOnlyList<EvaluationMetrics> CompareGroup { get; private set; } = [];
+
+    internal IReadOnlyList<string> CompareGroupLabels { get; private set; } = [];
+
     internal IReadOnlyList<EvaluationMetrics> Evaluations => _evaluations;
 
     internal IReadOnlyList<object?> ExportRows => _exportRows;
@@ -39,5 +43,17 @@ internal sealed class SessionAnalytics
     internal void ClearCompareBaseline()
     {
         CompareBaseline = null;
+    }
+
+    internal void SetCompareGroup(IReadOnlyList<EvaluationMetrics> metrics, IReadOnlyList<string>? labels = null)
+    {
+        CompareGroup = metrics;
+        CompareGroupLabels = labels ?? [];
+    }
+
+    internal void ClearCompareGroup()
+    {
+        CompareGroup = [];
+        CompareGroupLabels = [];
     }
 }

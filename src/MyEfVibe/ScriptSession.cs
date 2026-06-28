@@ -200,7 +200,18 @@ internal sealed class ScriptSession
             return null;
         }
 
-        trimmed = body;
+        trimmed = ScriptAttributeParser.StripScriptAttributeLines(body);
+
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            if (ScriptAttributeParser.ContainsScriptAttributeLines(body))
+            {
+                throw new CompilationEvaluationException(
+                    "Script attribute lines such as #[Benchmark(N)] must run with the full script. Use Run All.");
+            }
+
+            return null;
+        }
 
         await EvaluateScriptFragmentAsync(trimmed, cancellationToken);
         RecordSubmission(trimmed);
@@ -217,7 +228,8 @@ internal sealed class ScriptSession
         await EnsureBootstrapAsync(cancellationToken);
 
         var trimmed = SnippetNormalizer.ForEvaluation(
-            ProbeScriptFormatter.ToScriptExpression(code),
+            ScriptAttributeParser.StripScriptAttributeLines(
+                ProbeScriptFormatter.ToScriptExpression(code)),
             DbContextType,
             PreserveAsyncQueries);
 

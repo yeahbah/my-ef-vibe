@@ -364,7 +364,14 @@ internal sealed class ReplCommandHandler
         if (parts.Length > 1 && parts[1].Equals("clear", StringComparison.OrdinalIgnoreCase))
         {
             _analytics.ClearCompareBaseline();
-            CliUi.WriteSuccess("Comparison baseline cleared.");
+            _analytics.ClearCompareGroup();
+            CliUi.WriteSuccess("Comparison baseline and compare group cleared.");
+            return;
+        }
+
+        if (_analytics.CompareGroup.Count >= 2)
+        {
+            VisualizationPresenter.WriteCompareGroup(_analytics.CompareGroup, _analytics.CompareGroupLabels);
             return;
         }
 
@@ -417,7 +424,15 @@ internal sealed class ReplCommandHandler
                 break;
 
             case "compare":
-                VisualizationPresenter.WriteCompare(_analytics.CompareBaseline, _analytics.LastMetrics);
+                if (_analytics.CompareGroup.Count >= 2)
+                {
+                    VisualizationPresenter.WriteCompareGroup(_analytics.CompareGroup, _analytics.CompareGroupLabels);
+                }
+                else
+                {
+                    VisualizationPresenter.WriteCompare(_analytics.CompareBaseline, _analytics.LastMetrics);
+                }
+
                 break;
 
             case "tables":

@@ -125,6 +125,54 @@ Statements such as `var id = 1;` keep their terminator for Roslyn. Trailing `;` 
 
 `:commands` (e.g. `:help`, `:quit`) run on a single line and do not require `;`.
 
+### Script attributes (`#[...]`)
+
+Attribute lines tell efvibe to run structured experiments instead of a single evaluation. They work in the REPL, `efvibe -e`, and `efvibe serve` `eval` requests (including Studio **Run all**).
+
+Lines matching `#[Name]` or `#[Name(...)]` are **not** compiled as C# preprocessor directives — they are stripped and interpreted before Roslyn runs the script.
+
+**Shared preamble:** any code before the first attribute line (constants, `#load`, helper methods) is prepended to every attributed block.
+
+#### `#[Compare("description")]`
+
+Compare two or more LINQ variants in one run. An optional quoted string is the variant label in results; omit the label to use `#1`, `#2`, …
+
+```csharp
+const int DefaultTake = 10;
+
+#[Compare("With tracking")]
+ActiveProducts()
+  .OrderBy(p => p.Name)
+  .Take(DefaultTake)
+  .ToList();
+
+#[Compare("No tracking")]
+ActiveProducts()
+  .AsNoTracking()
+  .OrderBy(p => p.Name)
+  .Take(DefaultTake)
+  .ToList();
+```
+
+In the REPL, `:compare` still compares baseline vs last run. After a compare script, `:compare` and `:chart compare` show the multi-variant group from the last attributed run.
+
+#### `#[Benchmark(N)]`
+
+Run one block **N** times (default **5** when the count is omitted). Reports per-iteration timings plus min, avg, max, and p95.
+
+```csharp
+#[Benchmark(10)]
+ActiveProducts()
+  .AsNoTracking()
+  .OrderBy(p => p.Name)
+  .Take(10)
+  .ToList();
+```
+
+Equivalent to `:benchmark N` on the same snippet in the REPL.
+
+**Tips:** use **Run all** in Studio (not run-current-line) so the full script is evaluated. Live SQL preview skips attributed scripts.
+
 ### Scripting global: `db`
 
 The active `DbContext` instance is exposed as **`db`** in every snippet:
@@ -232,8 +280,8 @@ Re-show with `:warnings`.
 | `:repeat`, `:end` | Restart scan review · exit scan review |
 | `:plan` | Execution plan for last translated SQL when supported — `EXPLAIN` (PostgreSQL), `EXPLAIN QUERY PLAN` (SQLite), `SET SHOWPLAN_ALL` (SQL Server, separate batches). Unavailable for newly discovered providers until capabilities are registered; shows a friendly note instead of failing. |
 | `:compare set` | Set baseline for comparison |
-| `:compare` | Diff baseline vs last run (timings, rows, SQL) |
-| `:compare clear` | Clear comparison baseline |
+| `:compare` | Diff baseline vs last run, or show multi-variant group after a `#[Compare]` script |
+| `:compare clear` | Clear comparison baseline and compare group |
 | `:history stats` | Input history with per-snippet timings |
 | `:benchmark N` | Run last snippet `N` times (default 5) |
 | `:export csv\|json [path]` | Export last tabular result to `<ProjectName>/<DbContextName>/`; optional path is relative to that folder |
@@ -247,7 +295,7 @@ Re-show with `:warnings`.
 |------------|--------|
 | `:chart stats` | Bar chart of recent evaluation times (ms) |
 | `:chart timing` | Breakdown of last run (database vs app/Roslyn) |
-| `:chart compare` | Baseline vs current timings |
+| `:chart compare` | Baseline vs current, or multi-variant timings after `#[Compare]` |
 | `:chart tables` | DbSet row counts |
 | `:chart result` | Numeric column from last result (≤25 rows) |
 

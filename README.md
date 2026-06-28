@@ -12,7 +12,7 @@ and other packages discovered from your EF project's `PackageReference` entries.
 
 Point `efvibe` at your solution, get a REPL with **`db`** (your `DbContext`) in scope, see translated SQL,
 execution metrics, and helpers like `:tables`, `:describe`, `:dbinfo`, `:plan`, `:stats`, `:scan lite`, and
-`:scan deep`.
+`:scan deep`. Use **`#[Compare]`** and **`#[Benchmark(N)]`** script attributes for multi-variant or timed runs (see [features.md](features.md)).
 
 Requires [.NET 8 SDK](https://dotnet.microsoft.com/download) or newer (tool ships `net8.0`, `net9.0`, and `net10.0`
 assets).

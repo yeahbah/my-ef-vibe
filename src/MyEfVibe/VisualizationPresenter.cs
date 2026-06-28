@@ -137,6 +137,74 @@ internal static class VisualizationPresenter
         AnsiConsole.WriteLine();
     }
 
+    internal static void WriteCompareGroup(
+        IReadOnlyList<EvaluationMetrics> variants,
+        IReadOnlyList<string>? labels = null)
+    {
+        if (!EnsureInteractive() || variants.Count == 0)
+        {
+            return;
+        }
+
+        var chart = new BarChart()
+            .Width(Console.WindowWidth > 0 ? Math.Min(Console.WindowWidth - 4, 60) : 50)
+            .Label("[bold]Compare variants — total time (ms)[/]");
+
+        for (var index = 0; index < variants.Count; index++)
+        {
+            chart.AddItem(
+                ResolveCompareLabel(labels, index),
+                variants[index].TotalMilliseconds,
+                ColorForCompareIndex(index));
+        }
+
+        AnsiConsole.Write(chart);
+
+        if (variants.Any(static metrics => metrics.DatabaseMilliseconds is not null))
+        {
+            var dbChart = new BarChart()
+                .Width(Console.WindowWidth > 0 ? Math.Min(Console.WindowWidth - 4, 60) : 50)
+                .Label("[bold]Compare variants — database time (ms)[/]");
+
+            for (var index = 0; index < variants.Count; index++)
+            {
+                dbChart.AddItem(
+                    ResolveCompareLabel(labels, index),
+                    variants[index].DatabaseMilliseconds ?? 0,
+                    ColorForCompareIndex(index));
+            }
+
+            AnsiConsole.Write(dbChart);
+        }
+
+        AnsiConsole.WriteLine();
+    }
+
+    private static string ResolveCompareLabel(IReadOnlyList<string>? labels, int index)
+    {
+        if (labels is not null
+            && index < labels.Count
+            && !string.IsNullOrWhiteSpace(labels[index]))
+        {
+            return labels[index];
+        }
+
+        return $"#{index + 1}";
+    }
+
+    private static Color ColorForCompareIndex(int index)
+    {
+        return index switch
+        {
+            0 => Color.Grey,
+            1 => Color.Cyan1,
+            2 => Color.Yellow,
+            3 => Color.Green,
+            4 => Color.Magenta1,
+            _ => Color.Blue,
+        };
+    }
+
     internal static void WriteBenchmarkTimings(IReadOnlyList<long> timingsMs)
     {
         if (!EnsureInteractive() || timingsMs.Count == 0)
