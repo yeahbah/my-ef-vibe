@@ -22,6 +22,10 @@ internal static class ReflectionToolkit
         {
             return [];
         }
+        catch (BadImageFormatException)
+        {
+            return [];
+        }
         catch (TypeLoadException)
         {
             return [];
@@ -43,6 +47,10 @@ internal static class ReflectionToolkit
             return [];
         }
         catch (FileLoadException)
+        {
+            return [];
+        }
+        catch (BadImageFormatException)
         {
             return [];
         }
