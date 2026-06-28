@@ -12,7 +12,8 @@ internal static class QueryEvaluator
         DbLogSettings dbLogSettings,
         IEnumerable<Assembly> inspectionAssemblies,
         CancellationToken cancellationToken = default,
-        QueryPagingOptions? paging = null)
+        QueryPagingOptions? paging = null,
+        bool captureConsoleOutput = true)
     {
         var pagingSupported = QueryPagingRewriter.SupportsPaging(snippet);
         var executionSnippet = snippet;
@@ -39,7 +40,9 @@ internal static class QueryEvaluator
         }
 
         using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance, dbLogSettings);
-        using var consoleCapture = new ScriptConsoleCapture();
+        using var consoleCapture = captureConsoleOutput
+            ? new ScriptConsoleCapture()
+            : null;
 
         var stopwatch = Stopwatch.StartNew();
         try
@@ -111,7 +114,7 @@ internal static class QueryEvaluator
                 DatabaseMilliseconds = sqlCapture is { HasEntries: true } ? sqlCapture.TotalDatabaseMilliseconds : null,
                 SqlCommandCount = sqlCapture?.Commands.Count ?? 0,
                 RowCount = rowCount,
-                ConsoleOutput = consoleCapture.CapturedOutput,
+                ConsoleOutput = consoleCapture?.CapturedOutput,
                 PageIndex = pageIndex,
                 PageSize = pageSize,
                 HasMore = hasMore,
