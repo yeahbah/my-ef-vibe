@@ -49,7 +49,8 @@ internal static class ServeCommandRunner
                 options.ScriptSearchPath,
                 options.ScriptLoad,
                 options.ScriptUsing,
-                searchDirectory),
+                searchDirectory,
+                options.ScriptBasePath),
             cancellationToken);
 
         if (runtime is null)

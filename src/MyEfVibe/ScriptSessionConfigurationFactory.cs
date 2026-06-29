@@ -6,7 +6,8 @@ internal static class ScriptSessionConfigurationFactory
         IEnumerable<string>? scriptSearchPath,
         IEnumerable<string>? scriptLoad,
         IEnumerable<string>? scriptUsing,
-        string? resolvedSearchDirectory = null)
+        string? resolvedSearchDirectory = null,
+        string? scriptBasePath = null)
     {
         var searchPaths = new List<string>();
 
@@ -24,6 +25,6 @@ internal static class ScriptSessionConfigurationFactory
             searchPaths,
             scriptLoad,
             scriptUsing,
-            resolvedSearchDirectory);
+            scriptBasePath ?? resolvedSearchDirectory);
     }
 }

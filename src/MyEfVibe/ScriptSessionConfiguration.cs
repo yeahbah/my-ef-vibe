@@ -33,6 +33,7 @@ internal sealed class ScriptSessionConfiguration
     {
         var resolved = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var scriptResolutionBase = ResolveScriptResolutionBase(fallbackBasePath);
 
         void Add(string? path)
         {
@@ -51,13 +52,23 @@ internal sealed class ScriptSessionConfiguration
 
         foreach (var path in SearchPaths)
         {
-            Add(ScriptPathResolver.ResolvePath(path, fallbackBasePath));
+            Add(ScriptPathResolver.ResolvePath(path, scriptResolutionBase));
         }
 
         Add(BasePath);
         Add(fallbackBasePath);
 
         return [..resolved];
+    }
+
+    internal string ResolveScriptResolutionBase(string fallbackBasePath)
+    {
+        if (!string.IsNullOrWhiteSpace(BasePath))
+        {
+            return Path.GetFullPath(BasePath.Trim());
+        }
+
+        return Path.GetFullPath(fallbackBasePath);
     }
 
     internal ImmutableArray<string> ResolveLoadPaths(string fallbackBasePath)

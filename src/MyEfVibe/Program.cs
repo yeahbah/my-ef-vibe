@@ -255,7 +255,10 @@ internal static class Program
             options.ScriptSearchPath,
             options.ScriptLoad,
             options.ScriptUsing,
-            searchDirectory);
+            searchDirectory,
+            options.ScriptBasePath);
+
+        var scriptBootstrapBase = scriptConfiguration.ResolveBasePath(searchDirectory);
 
         var session = new ScriptSession(
             dbContextInstance.GetType(),
@@ -264,11 +267,11 @@ internal static class Program
             host.AssemblyLoader,
             ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor),
             scriptConfiguration,
-            searchDirectory);
+            scriptBootstrapBase);
 
         try
         {
-            await session.InitializeAsync(searchDirectory);
+            await session.InitializeAsync(scriptBootstrapBase);
         }
         catch (Exception bootstrapFailure)
         {

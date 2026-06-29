@@ -170,7 +170,10 @@ internal sealed class ScriptSession
 
         foreach (var loadPath in loadPaths)
         {
-            var loadedCode = await File.ReadAllTextAsync(loadPath, cancellationToken);
+            var loadedCode = ScriptLoadNormalizer.Normalize(
+                await File.ReadAllTextAsync(loadPath, cancellationToken),
+                DbContextType,
+                PreserveAsyncQueries);
             await EvaluateScriptFragmentAsync(loadedCode, cancellationToken);
             RecordSubmission(ScriptLoadDirectiveResolver.FormatLoadDirective(loadPath));
         }
@@ -334,7 +337,10 @@ internal sealed class ScriptSession
                     loadPath,
                     _searchPaths,
                     _scriptBasePath);
-                var loadedCode = await File.ReadAllTextAsync(fullPath, cancellationToken);
+                var loadedCode = ScriptLoadNormalizer.Normalize(
+                    await File.ReadAllTextAsync(fullPath, cancellationToken),
+                    DbContextType,
+                    PreserveAsyncQueries);
                 await EvaluateScriptFragmentAsync(loadedCode, cancellationToken);
                 RecordSubmission(ScriptLoadDirectiveResolver.FormatLoadDirective(fullPath));
                 continue;

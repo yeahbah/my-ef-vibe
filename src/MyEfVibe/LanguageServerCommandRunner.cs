@@ -26,6 +26,10 @@ internal sealed class LanguageServerCliOptions
     [Option("script-search-path", Separator = ';', HelpText = "Directory for resolving #load paths and relative script files.")]
     public IEnumerable<string>? ScriptSearchPath { get; set; }
 
+    [Option("script-base-path",
+        HelpText = "Base directory for resolving relative --script-search-path values (e.g. the folder containing the .efvibe-workspace file). Defaults to the EF project search directory.")]
+    public string? ScriptBasePath { get; set; }
+
     [Option("script-load", Separator = ';', HelpText = "Script file(s) to #load when the session starts (semicolon-separated).")]
     public IEnumerable<string>? ScriptLoad { get; set; }
 
@@ -54,7 +58,8 @@ internal static class LanguageServerCommandRunner
                 options.ScriptSearchPath,
                 options.ScriptLoad,
                 options.ScriptUsing,
-                null),
+                null,
+                options.ScriptBasePath),
             cancellationToken: cancellationToken);
 
         if (runtime is null)

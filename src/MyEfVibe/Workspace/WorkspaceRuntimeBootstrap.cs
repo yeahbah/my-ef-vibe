@@ -114,18 +114,21 @@ internal static class WorkspaceRuntimeBootstrap
             return (null, 14, resolutionFailure.Message);
         }
 
+        var effectiveScriptConfiguration = scriptConfiguration ?? ScriptSessionConfiguration.Empty;
+        var scriptBootstrapBase = effectiveScriptConfiguration.ResolveBasePath(searchDirectory);
+
         var session = new ScriptSession(
             dbContextInstance.GetType(),
             dbContextInstance,
             workspaceBuild.ReferenceAssemblyPaths,
             host.AssemblyLoader,
             ProviderCapabilityResolver.RequiresAsyncQueries(host.ActiveProviderDescriptor),
-            scriptConfiguration ?? ScriptSessionConfiguration.Empty,
-            searchDirectory);
+            effectiveScriptConfiguration,
+            scriptBootstrapBase);
 
         try
         {
-            await session.InitializeAsync(searchDirectory, cancellationToken);
+            await session.InitializeAsync(scriptBootstrapBase, cancellationToken);
         }
         catch (Exception bootstrapFailure)
         {
