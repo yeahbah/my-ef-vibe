@@ -52,7 +52,32 @@ public sealed class EvaluationJsonReporterTests
 
         var payload = EvaluationJsonReporter.BuildSuccess(null, metrics);
 
-        Assert.Equal("hello", payload.Value);
+        Assert.Equal("hello", payload.ConsoleOutput);
+        Assert.Null(payload.Value);
+    }
+
+    [Fact]
+    public void BuildSuccess_SeparatesConsoleOutputFromReturnValue()
+    {
+        var metrics = new EvaluationMetrics
+        {
+            Snippet = "Console.WriteLine(\"hello\"); new[] { 1, 2 };",
+            TotalMilliseconds = 2,
+            SqlCommandCount = 0,
+            ExecutedSql = [],
+            ResultKind = ResultKind.Enumerable,
+            ResultTypeName = "Int32[]",
+            RowCount = 2,
+            IsMaterialized = true,
+            Warnings = [],
+            Succeeded = true,
+            ConsoleOutput = "hello",
+        };
+
+        var payload = EvaluationJsonReporter.BuildSuccess(new[] { 1, 2 }, metrics);
+
+        Assert.Equal("hello", payload.ConsoleOutput);
+        Assert.Equal("2 rows", payload.Value);
     }
 
     [Fact]

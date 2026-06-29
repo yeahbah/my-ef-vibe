@@ -205,6 +205,8 @@ efvibe -p ... -c MyDbContext -e "db.Products.Count()" --format json --no-banner
 efvibe -p ... -c MyDbContext -e "db.Products.Take(5).ToList()" --format json --no-banner --with-plan
 ```
 
+JSON eval responses include **`value`** (return value summary), optional **`consoleOutput`** (captured `Console.WriteLine` / `Console.Write` text from multi-statement scripts), **`rows`** when tabular, plus SQL, timings, and warnings. MyEFvibe Studio uses **Run all** for C# programs and displays Output separately from the return value.
+
 See [docs/efvibe-daemon-and-vscode.md](docs/efvibe-daemon-and-vscode.md) and [vscode-extension/README.md](vscode-extension/README.md).
 
 ### Rider extension

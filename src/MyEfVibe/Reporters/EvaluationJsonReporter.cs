@@ -192,7 +192,8 @@ internal static class EvaluationJsonReporter
             Success = true,
             Value = benchmarkResult is not null
                 ? $"Benchmark: {benchmarkResult.Iterations} iteration(s) · avg {benchmarkResult.AverageMs} ms"
-                : FormatValue(result, exportRows, metrics.ConsoleOutput),
+                : FormatValueCore(result, exportRows),
+            ConsoleOutput = NormalizeConsoleOutput(metrics.ConsoleOutput),
             Rows = benchmarkResult is not null ? null : BuildRows(exportRows),
             Sql = sql,
             TranslatedSql = metrics.TranslatedSql,
@@ -242,26 +243,14 @@ internal static class EvaluationJsonReporter
             : new[] { metrics.TranslatedSql };
     }
 
-    private static string? FormatValue(
-        object? result,
-        IReadOnlyList<object?> exportRows,
-        string? consoleOutput = null)
+    private static string? NormalizeConsoleOutput(string? consoleOutput)
     {
-        var value = FormatValueCore(result, exportRows);
-
         if (string.IsNullOrWhiteSpace(consoleOutput))
         {
-            return value;
+            return null;
         }
 
-        var captured = consoleOutput.TrimEnd();
-
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return captured;
-        }
-
-        return $"{captured}{Environment.NewLine}{value}";
+        return consoleOutput.TrimEnd();
     }
 
     private static string? FormatValueCore(object? result, IReadOnlyList<object?> exportRows)
@@ -316,6 +305,8 @@ internal static class EvaluationJsonReporter
         public bool Success { get; init; }
 
         public string? Value { get; init; }
+
+        public string? ConsoleOutput { get; init; }
 
         public IReadOnlyList<Dictionary<string, string>>? Rows { get; init; }
 

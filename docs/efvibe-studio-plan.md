@@ -469,7 +469,7 @@ Pick features that fit EF workflows — not a full LINQPad clone (no general C# 
 | LINQPad idea | Notes |
 |---|---|
 | **NuGet references in script** | `#r` via Roslyn; needs isolation per connection |
-| **C# Program mode** | Full `Main()` scripts — lower priority than EF scratchpad |
+| **C# Program mode** | Multi-statement scripts with `Console.WriteLine` in query tabs — **Run all**; console output in Result tab (**shipped** in Studio sample workspace) |
 | **Attach to running app** | Hard; defer unless strong demand |
 | **ORM-agnostic ADO** | Out of scope; stay EF Core focused (use DBeaver) |
 
