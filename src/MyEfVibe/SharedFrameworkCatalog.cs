@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 
 namespace MyEfVibe;
 
@@ -8,18 +7,21 @@ internal sealed class SharedFrameworkCatalog
     private readonly Dictionary<string, string> _assemblyNameToPath =
         new(StringComparer.OrdinalIgnoreCase);
 
-    internal static SharedFrameworkCatalog Create(
-        string targetFrameworkMoniker,
+    internal static SharedFrameworkCatalog Create(string targetFrameworkMoniker)
+    {
+        var catalog = new SharedFrameworkCatalog();
+        catalog.IndexMicrosoftNetCoreAppFromMoniker(targetFrameworkMoniker);
+
+        return catalog;
+    }
+
+    internal void IndexProjectRuntimeConfigs(
         string outputDirectory,
         string primaryAssemblyDll,
         string? startupOutputDirectory,
         string? startupAssemblyDll)
     {
-        var catalog = new SharedFrameworkCatalog();
-
-        catalog.IndexMicrosoftNetCoreAppFromMoniker(targetFrameworkMoniker);
-
-        catalog.TryIndexFromRuntimeConfig(
+        TryIndexFromRuntimeConfig(
             Path.Combine(
                 outputDirectory,
                 $"{Path.GetFileNameWithoutExtension(primaryAssemblyDll)}.runtimeconfig.json"));
@@ -28,13 +30,11 @@ internal sealed class SharedFrameworkCatalog
             && !string.IsNullOrEmpty(startupAssemblyDll)
             && !string.Equals(startupOutputDirectory, outputDirectory, StringComparison.OrdinalIgnoreCase))
         {
-            catalog.TryIndexFromRuntimeConfig(
+            TryIndexFromRuntimeConfig(
                 Path.Combine(
                     startupOutputDirectory,
                     $"{Path.GetFileNameWithoutExtension(startupAssemblyDll)}.runtimeconfig.json"));
         }
-
-        return catalog;
     }
 
     private void IndexMicrosoftNetCoreAppFromMoniker(string targetFrameworkMoniker)
@@ -87,43 +87,13 @@ internal sealed class SharedFrameworkCatalog
 
     private void TryIndexFromRuntimeConfig(string runtimeConfigPath)
     {
-        if (!File.Exists(runtimeConfigPath))
+        foreach (var framework in RuntimeFrameworkConfigParser.ReadFrameworks(runtimeConfigPath))
         {
-            return;
-        }
-
-        using var document = JsonDocument.Parse(File.ReadAllText(runtimeConfigPath));
-
-        if (!document.RootElement.TryGetProperty("runtimeOptions", out var runtimeOptions))
-        {
-            return;
-        }
-
-        if (!runtimeOptions.TryGetProperty("frameworks", out var frameworks))
-        {
-            return;
-        }
-
-        var dotnetRoot = DotNetInstallRoot.Resolve();
-
-        foreach (var framework in frameworks.EnumerateArray())
-        {
-            if (!framework.TryGetProperty("name", out var nameProperty)
-                || !framework.TryGetProperty("version", out var versionProperty))
-            {
-                continue;
-            }
-
-            var frameworkName = nameProperty.GetString();
-
-            var frameworkVersion = versionProperty.GetString();
-
-            if (string.IsNullOrWhiteSpace(frameworkName) || string.IsNullOrWhiteSpace(frameworkVersion))
-            {
-                continue;
-            }
-
-            var frameworkDirectory = Path.Combine(dotnetRoot, "shared", frameworkName, frameworkVersion);
+            var frameworkDirectory = Path.Combine(
+                DotNetInstallRoot.Resolve(),
+                "shared",
+                framework.Name,
+                framework.Version);
 
             IndexFrameworkDirectory(frameworkDirectory);
         }

@@ -3,12 +3,17 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MyEfVibe;
 
 internal static class TabularExportBuilder
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        ReferenceHandler = ReferenceHandler.IgnoreCycles,
+    };
 
     internal static string ToCsv(IReadOnlyList<object?> rows)
     {
@@ -125,7 +130,75 @@ internal static class TabularExportBuilder
         return type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(static property => property.CanRead && property.GetIndexParameters().Length == 0)
+            .Where(static property => IsExportableProperty(property))
             .Select(static property => (property.Name, property));
+    }
+
+    private static bool IsExportableProperty(PropertyInfo property)
+    {
+        return IsExportablePropertyType(property.PropertyType);
+    }
+
+    private static bool IsExportablePropertyType(Type propertyType)
+    {
+        propertyType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
+
+        if (IsScalarType(propertyType) || propertyType.IsEnum || propertyType.IsValueType)
+        {
+            return true;
+        }
+
+        if (TryGetEnumerableElementType(propertyType, out var elementType))
+        {
+            elementType = Nullable.GetUnderlyingType(elementType) ?? elementType;
+
+            return IsScalarType(elementType) || elementType.IsEnum;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetEnumerableElementType(Type type, out Type elementType)
+    {
+        elementType = typeof(object);
+
+        if (type == typeof(string))
+        {
+            return false;
+        }
+
+        if (type.IsArray)
+        {
+            elementType = type.GetElementType()!;
+            return true;
+        }
+
+        if (type.IsGenericType)
+        {
+            var definition = type.GetGenericTypeDefinition();
+
+            if (definition == typeof(IEnumerable<>)
+                || definition == typeof(IList<>)
+                || definition == typeof(ICollection<>)
+                || definition == typeof(List<>)
+                || definition == typeof(IReadOnlyList<>)
+                || definition == typeof(IReadOnlyCollection<>))
+            {
+                elementType = type.GetGenericArguments()[0];
+                return true;
+            }
+        }
+
+        foreach (var iface in type.GetInterfaces())
+        {
+            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            {
+                elementType = iface.GetGenericArguments()[0];
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static object? ReadProperty(object? row, PropertyInfo property)
@@ -174,9 +247,34 @@ internal static class TabularExportBuilder
             DateTimeOffset dateTimeOffset => dateTimeOffset.ToString("O", CultureInfo.InvariantCulture),
             byte[] bytes => Convert.ToBase64String(bytes),
             IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
-            IEnumerable enumerable and not string => JsonSerializer.Serialize(enumerable, JsonOptions),
+            IEnumerable enumerable and not string => FormatEnumerable(enumerable),
             _ => value.ToString() ?? string.Empty
         };
+    }
+
+    private static string FormatEnumerable(IEnumerable enumerable)
+    {
+        var values = new List<string>();
+
+        foreach (var item in enumerable)
+        {
+            values.Add(item switch
+            {
+                null => string.Empty,
+                string text => text,
+                _ when IsScalarType(item.GetType()) || item.GetType().IsEnum =>
+                    FormatScalar(item),
+                _ => item.ToString() ?? string.Empty,
+            });
+
+            if (values.Count >= 32)
+            {
+                values.Add("…");
+                break;
+            }
+        }
+
+        return values.Count == 0 ? "(empty)" : $"[{string.Join(", ", values)}]";
     }
 
     private static string EscapeCsv(string value)

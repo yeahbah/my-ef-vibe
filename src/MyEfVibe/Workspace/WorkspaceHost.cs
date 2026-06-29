@@ -79,14 +79,15 @@ internal sealed class WorkspaceHost : IDisposable
     {
         var startupAssemblyDll = ResolveStartupAssemblyDll(workspaceBuild);
 
-        var sharedFrameworkCatalog = SharedFrameworkCatalog.Create(
-            workspaceBuild.TargetFrameworkMoniker,
+        var sharedFrameworkCatalog = SharedFrameworkCatalog.Create(workspaceBuild.TargetFrameworkMoniker);
+
+        WorkspaceSystemTextJsonBootstrap.PrimeSharedFramework(sharedFrameworkCatalog);
+
+        sharedFrameworkCatalog.IndexProjectRuntimeConfigs(
             workspaceBuild.OutputDirectory,
             workspaceBuild.PrimaryAssemblyDll,
             workspaceBuild.StartupOutputDirectory,
             startupAssemblyDll);
-
-        WorkspaceSystemTextJsonBootstrap.PrimeSharedFramework(sharedFrameworkCatalog);
 
         var depsManifest = WorkspaceDepsManifest.TryLoad(workspaceBuild.PrimaryAssemblyDll);
         depsManifest = MergeStartupDepsManifest(workspaceBuild, depsManifest);

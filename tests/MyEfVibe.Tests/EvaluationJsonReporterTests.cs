@@ -93,4 +93,62 @@ public sealed class EvaluationJsonReporterTests
         Assert.Single(payload.Sql);
         Assert.Contains("Products", payload.Sql[0], StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void BuildSuccess_serializes_entity_rows_with_navigation_properties()
+    {
+        var product = new EntityWithNavigation
+        {
+            ProductId = 7,
+            Name = "Sprocket",
+            ProductInventory = new InventoryWithBackReference
+            {
+                ProductId = 7,
+                Quantity = 12,
+                Product = null!,
+            },
+        };
+        product.ProductInventory.Product = product;
+
+        var metrics = new EvaluationMetrics
+        {
+            Snippet = "db.Products.Take(1).ToList()",
+            TotalMilliseconds = 4,
+            SqlCommandCount = 1,
+            ExecutedSql = ["SELECT ..."],
+            ResultKind = ResultKind.Enumerable,
+            ResultTypeName = "List<Product>",
+            RowCount = 1,
+            IsMaterialized = true,
+            Warnings = [],
+            Succeeded = true,
+        };
+
+        var payload = EvaluationJsonReporter.BuildSuccess(new[] { product }, metrics);
+
+        Assert.True(payload.Success);
+        Assert.NotNull(payload.Rows);
+        Assert.Single(payload.Rows!);
+        Assert.Equal("7", payload.Rows![0]["ProductId"]);
+        Assert.Equal("Sprocket", payload.Rows![0]["Name"]);
+        Assert.False(payload.Rows![0].ContainsKey("ProductInventory"));
+    }
+
+    private sealed class EntityWithNavigation
+    {
+        public int ProductId { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public InventoryWithBackReference ProductInventory { get; set; } = null!;
+    }
+
+    private sealed class InventoryWithBackReference
+    {
+        public int ProductId { get; set; }
+
+        public short Quantity { get; set; }
+
+        public EntityWithNavigation Product { get; set; } = null!;
+    }
 }
