@@ -38,7 +38,10 @@ internal static partial class RawSqlClassifier
                 continue;
             }
 
-            return QueryKeywords.Contains(keyword);
+            if (QueryKeywords.Contains(keyword))
+            {
+                return true;
+            }
         }
 
         return false;

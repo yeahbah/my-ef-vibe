@@ -51,19 +51,6 @@ internal static class RawSqlExecutor
                 inspectionAssemblies,
                 cancellationToken);
 
-            if (rowsAffected < 0 && RawSqlClassifier.ContainsQueryStatement(trimmed))
-            {
-                return await ExecuteQueryAsync(
-                    dbContext,
-                    trimmed,
-                    inspectionAssemblies,
-                    sqlCapture,
-                    stopwatch,
-                    warnings,
-                    paging,
-                    cancellationToken);
-            }
-
             stopwatch.Stop();
 
             var commandMetrics = BuildMetrics(
@@ -187,6 +174,10 @@ internal static class RawSqlExecutor
         command.CommandText = sql;
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (reader.FieldCount == 0 && await reader.NextResultAsync(cancellationToken))
+        {
+        }
+
         var columnNames = Enumerable.Range(0, reader.FieldCount)
             .Select(reader.GetName)
             .ToArray();
