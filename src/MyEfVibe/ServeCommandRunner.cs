@@ -98,10 +98,15 @@ internal static class ServeCommandRunner
                             break;
                         }
 
+                        QueryPagingOptions? paging = request.PageSize is > 0
+                            ? new QueryPagingOptions(request.Skip ?? 0, request.PageSize.Value)
+                            : null;
+
                         await ServeEvaluator.EvaluateAndWriteJsonAsync(
                             runtime,
                             request.Expression,
                             request.WithPlan,
+                            paging,
                             cancellationToken);
 
                         break;
@@ -194,10 +199,15 @@ internal static class ServeCommandRunner
                             break;
                         }
 
+                        QueryPagingOptions? sqlPaging = request.PageSize is > 0
+                            ? new QueryPagingOptions(request.Skip ?? 0, request.PageSize.Value)
+                            : null;
+
                         await ServeSqlEvaluator.ExecuteAndWriteJsonAsync(
                             runtime,
                             request.Sql,
                             request.WithPlan,
+                            sqlPaging,
                             cancellationToken);
 
                         break;

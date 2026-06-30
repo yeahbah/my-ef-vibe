@@ -144,7 +144,11 @@ internal static class EvaluationJsonReporter
             QueryPlanNote = string.IsNullOrWhiteSpace(plan?.PlanText) ? plan?.Note : null,
             Metrics = EvaluationJsonMetrics.From(metrics),
             Warnings = metrics.Warnings,
-            Snippet = metrics.Snippet
+            Snippet = metrics.Snippet,
+            PageIndex = metrics.PageIndex,
+            PageSize = metrics.PageSize,
+            HasMore = metrics.HasMore,
+            PagingSupported = metrics.PagingSupported ? true : null,
         };
 
         Console.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
@@ -204,6 +208,10 @@ internal static class EvaluationJsonReporter
             Snippet = metrics.Snippet,
             CompareResults = compareResults,
             BenchmarkResult = benchmarkResult,
+            PageIndex = metrics.PageIndex,
+            PageSize = metrics.PageSize,
+            HasMore = metrics.HasMore,
+            PagingSupported = metrics.PagingSupported ? true : null,
         };
     }
 
@@ -329,6 +337,14 @@ internal static class EvaluationJsonReporter
         public IReadOnlyList<EvaluationJsonCompareEntry>? CompareResults { get; init; }
 
         public EvaluationJsonBenchmarkResult? BenchmarkResult { get; init; }
+
+        public int? PageIndex { get; init; }
+
+        public int? PageSize { get; init; }
+
+        public bool? HasMore { get; init; }
+
+        public bool? PagingSupported { get; init; }
     }
 
     internal sealed class EvaluationJsonBenchmarkResult

@@ -7,15 +7,14 @@ namespace MyEfVibe;
 
 internal static class RawSqlExecutor
 {
-    private const int MaxRows = 250;
-
     internal static async Task<(object? Result, EvaluationMetrics Metrics, IReadOnlyList<Dictionary<string, string>>? Rows)>
         ExecuteAsync(
             object dbContext,
             string sql,
             IEnumerable<Assembly> inspectionAssemblies,
             DbLogSettings dbLogSettings,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            QueryPagingOptions? paging = null)
     {
         var trimmed = sql.Trim().TrimEnd(';');
 
@@ -42,6 +41,7 @@ internal static class RawSqlExecutor
                     sqlCapture,
                     stopwatch,
                     warnings,
+                    paging,
                     cancellationToken);
             }
 
@@ -60,6 +60,7 @@ internal static class RawSqlExecutor
                     sqlCapture,
                     stopwatch,
                     warnings,
+                    paging,
                     cancellationToken);
             }
 
@@ -95,20 +96,17 @@ internal static class RawSqlExecutor
             EfSqlCapture? sqlCapture,
             Stopwatch stopwatch,
             List<string> warnings,
+            QueryPagingOptions? paging,
             CancellationToken cancellationToken)
     {
-        var (rows, totalCount) = await ReadQueryRowsAsync(
+        var (rows, totalCount, hasMore) = await ReadQueryRowsAsync(
             dbContext,
             trimmed,
             inspectionAssemblies,
+            paging,
             cancellationToken);
 
         stopwatch.Stop();
-
-        if (totalCount > MaxRows)
-        {
-            warnings.Add($"Showing first {MaxRows} of {totalCount} row(s).");
-        }
 
         var metrics = BuildMetrics(
             trimmed,
@@ -118,7 +116,9 @@ internal static class RawSqlExecutor
             "raw-sql",
             totalCount,
             true,
-            warnings);
+            warnings,
+            paging,
+            hasMore);
 
         var value = totalCount switch
         {
@@ -138,7 +138,9 @@ internal static class RawSqlExecutor
         string resultTypeName,
         int? rowCount,
         bool succeeded,
-        IReadOnlyList<string> warnings)
+        IReadOnlyList<string> warnings,
+        QueryPagingOptions? paging = null,
+        bool? hasMore = null)
     {
         var executedSql = sqlCapture?.Commands.Select(EfSqlCapture.FormatEntry).ToArray() ?? [];
 
@@ -159,16 +161,26 @@ internal static class RawSqlExecutor
             RowCount = rowCount,
             IsMaterialized = true,
             Warnings = warnings,
-            Succeeded = succeeded
+            Succeeded = succeeded,
+            PageIndex = paging?.PageIndex,
+            PageSize = paging?.PageSize,
+            HasMore = hasMore,
+            PagingSupported = RawSqlClassifier.LooksLikeQuery(snippet),
         };
     }
 
-    private static async Task<(IReadOnlyList<Dictionary<string, string>> Rows, int TotalCount)> ReadQueryRowsAsync(
-        object dbContext,
-        string sql,
-        IEnumerable<Assembly> inspectionAssemblies,
-        CancellationToken cancellationToken)
+    private static async Task<(IReadOnlyList<Dictionary<string, string>> Rows, int TotalCount, bool HasMore)>
+        ReadQueryRowsAsync(
+            object dbContext,
+            string sql,
+            IEnumerable<Assembly> inspectionAssemblies,
+            QueryPagingOptions? paging,
+            CancellationToken cancellationToken)
     {
+        var skip = paging?.Skip ?? 0;
+        var pageSize = paging?.PageSize ?? QueryPagingRewriter.DefaultPageSize;
+        var maxRowsToRead = skip + pageSize + 1;
+
         await using var scope = await OpenConnectionScopeAsync(dbContext, inspectionAssemblies, cancellationToken);
 
         await using var command = scope.Connection.CreateCommand();
@@ -179,30 +191,41 @@ internal static class RawSqlExecutor
             .Select(reader.GetName)
             .ToArray();
         var rows = new List<Dictionary<string, string>>();
-        var totalCount = 0;
+        var seenIndex = 0;
+        var hasMore = false;
 
         while (await reader.ReadAsync(cancellationToken))
         {
-            totalCount++;
-
-            if (rows.Count >= MaxRows)
+            if (seenIndex >= skip + pageSize)
             {
-                continue;
+                hasMore = true;
+                break;
             }
 
-            var row = new Dictionary<string, string>(columnNames.Length, StringComparer.Ordinal);
-
-            for (var column = 0; column < reader.FieldCount; column++)
+            if (seenIndex >= skip)
             {
-                row[columnNames[column]] = reader.IsDBNull(column)
-                    ? string.Empty
-                    : TabularExportBuilder.FormatScalar(reader.GetValue(column));
+                var row = new Dictionary<string, string>(columnNames.Length, StringComparer.Ordinal);
+
+                for (var column = 0; column < reader.FieldCount; column++)
+                {
+                    row[columnNames[column]] = reader.IsDBNull(column)
+                        ? string.Empty
+                        : TabularExportBuilder.FormatScalar(reader.GetValue(column));
+                }
+
+                rows.Add(row);
             }
 
-            rows.Add(row);
+            seenIndex++;
+
+            if (seenIndex >= maxRowsToRead)
+            {
+                hasMore = true;
+                break;
+            }
         }
 
-        return (rows, totalCount);
+        return (rows, rows.Count, hasMore);
     }
 
     private static async Task<int> ExecuteNonQueryAsync(

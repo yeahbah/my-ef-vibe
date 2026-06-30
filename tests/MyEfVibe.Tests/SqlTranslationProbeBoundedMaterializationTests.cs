@@ -56,10 +56,10 @@ public sealed class SqlTranslationProbeBoundedMaterializationTests
     }
 
     [Fact]
-    public void DescribeAutoMaterializationLimit_reports_when_take_was_added()
+    public void DescribeAutoMaterializationLimit_reports_after_snippet_normalization()
     {
         const string original = "db.Products.ToList()";
-        var normalized = SqlTranslationProbe.TryRewriteBoundedTerminalQuery(original)!;
+        var normalized = SnippetNormalizer.ForEvaluation(original, typeof(FakeRewriterDbContext));
 
         var warning = SqlTranslationProbe.DescribeAutoMaterializationLimit(normalized, original);
 

@@ -42,4 +42,8 @@ internal sealed record EvaluationMetrics
     public bool Succeeded { get; init; }
     public int? RowCount { get; init; }
     public string? ConsoleOutput { get; init; }
+    public int? PageIndex { get; init; }
+    public int? PageSize { get; init; }
+    public bool? HasMore { get; init; }
+    public bool PagingSupported { get; init; }
 }

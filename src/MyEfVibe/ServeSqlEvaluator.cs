@@ -9,6 +9,7 @@ internal static class ServeSqlEvaluator
         WorkspaceRuntime runtime,
         string sql,
         bool withPlan,
+        QueryPagingOptions? paging = null,
         CancellationToken cancellationToken = default)
     {
         runtime.Host.EnsureEntityFrameworkRelationalLoaded();
@@ -21,7 +22,8 @@ internal static class ServeSqlEvaluator
                 sql,
                 runtime.Host.EnumerateLoadedAssemblies(),
                 runtime.DbLogSettings,
-                cancellationToken);
+                cancellationToken,
+                paging);
 
             runtime.Analytics.Record(metrics, result, []);
 

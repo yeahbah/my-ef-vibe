@@ -40,11 +40,6 @@ internal static class ResultAnalyzer
                 {
                     rows.Add(item);
                     bytes += EstimateSize(item);
-
-                    if (rows.Count >= 250)
-                    {
-                        break;
-                    }
                 }
             }
             else
@@ -54,11 +49,6 @@ internal static class ResultAnalyzer
                     rows.Add(item);
                     count++;
                     bytes += EstimateSize(item);
-
-                    if (count >= 250)
-                    {
-                        break;
-                    }
                 }
             }
 

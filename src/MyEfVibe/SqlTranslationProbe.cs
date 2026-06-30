@@ -157,14 +157,43 @@ internal static class SqlTranslationProbe
             return null;
         }
 
-        if (!normalized.Contains($".Take({DefaultMaterializationTake})", StringComparison.Ordinal))
+        if (!ContainsAutoMaterializationTake(normalized))
         {
             return null;
         }
 
-        return EndsWithListMaterialization(normalized)
+        return LooksLikeListMaterialization(normalized)
             ? $"Results limited to {DefaultMaterializationTake} rows (Take added automatically). Add .Take(n) for a different limit, or #[Unbounded] to run without a cap."
             : null;
+    }
+
+    private static bool ContainsAutoMaterializationTake(string snippet)
+    {
+        if (snippet.Contains($".Take({DefaultMaterializationTake})", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        foreach (var limitText in new[] { $", {DefaultMaterializationTake})", $",{DefaultMaterializationTake})" })
+        {
+            if (!snippet.Contains(limitText, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (snippet.Contains("ReplQueryableRuntime.Take(", StringComparison.Ordinal)
+                || snippet.Contains(".Take(", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool LooksLikeListMaterialization(string expression)
+    {
+        return EndsWithListMaterialization(expression);
     }
 
     private static bool AllowsUnboundedMaterialization(string snippet)

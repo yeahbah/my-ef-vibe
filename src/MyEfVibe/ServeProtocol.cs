@@ -81,6 +81,10 @@ internal static class ServeProtocol
         public JsonElement? Updates { get; init; }
 
         public JsonElement? Deletes { get; init; }
+
+        public int? Skip { get; init; }
+
+        public int? PageSize { get; init; }
     }
 
     private sealed class ServeReadyResponse

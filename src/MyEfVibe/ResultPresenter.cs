@@ -52,12 +52,6 @@ internal static class ResultPresenter
             {
                 builder.AppendLine($"[cyan]•[/] {Markup.Escape(element?.ToString() ?? "<null>")}");
                 printedRowCount++;
-
-                if (printedRowCount >= 250)
-                {
-                    builder.AppendLine("[grey]… (truncated)[/]");
-                    break;
-                }
             }
 
             if (printedRowCount == 0)
@@ -123,12 +117,7 @@ internal static class ResultPresenter
             foreach (var element in sequence)
             {
                 writer.WriteLine(element);
-
-                if (++printedRowCount >= 250)
-                {
-                    writer.WriteLine("...(truncated)");
-                    break;
-                }
+                printedRowCount++;
             }
 
             if (printedRowCount == 0)

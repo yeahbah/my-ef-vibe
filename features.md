@@ -266,7 +266,7 @@ Before a LINQ query **materializes** rows (`ToList`, `ToListAsync`, `ToArray`, `
 |------|----------|
 | Already has `.Take(n)` | Unchanged |
 | `Include` / `ThenInclude` graph loads | Not auto-capped — add `.Take(n)` yourself |
-| Raw SQL `SELECT` | Capped at **250 rows** in the raw SQL executor |
+| Raw SQL `SELECT` | First page reads up to **100 rows** from the server; use `skip` / `pageSize` on serve `eval` or `executeSql` for later pages |
 | Opt out | Put `#[Unbounded]` above the query (script attribute) |
 | Different limit | Use `.Take(n)` explicitly |
 

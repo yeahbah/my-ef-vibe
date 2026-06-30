@@ -11,15 +11,29 @@ internal static class QueryEvaluator
         string snippet,
         DbLogSettings dbLogSettings,
         IEnumerable<Assembly> inspectionAssemblies,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        QueryPagingOptions? paging = null)
     {
+        var pagingSupported = QueryPagingRewriter.SupportsPaging(snippet);
+        var executionSnippet = snippet;
+
+        if (paging is { IsRequested: true })
+        {
+            executionSnippet = QueryPagingRewriter.TryApplyPaging(
+                                   snippet,
+                                   paging.Value.Skip,
+                                   paging.Value.PageSize)
+                               ?? snippet;
+        }
+
         var normalizedSnippet = SnippetNormalizer.ForEvaluation(
-            snippet,
+            executionSnippet,
             session.DbContextType,
             session.PreserveAsyncQueries);
         var warnings = new List<string>(SnippetWarningsAnalyzer.Analyze(normalizedSnippet));
 
-        if (SqlTranslationProbe.DescribeAutoMaterializationLimit(normalizedSnippet, snippet) is { } autoTakeWarning)
+        if (paging is not { IsRequested: true }
+            && SqlTranslationProbe.DescribeAutoMaterializationLimit(normalizedSnippet, snippet) is { } autoTakeWarning)
         {
             warnings.Add(autoTakeWarning);
         }
@@ -30,7 +44,7 @@ internal static class QueryEvaluator
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            var result = await session.EvaluateAsync(snippet, cancellationToken);
+            var result = await session.EvaluateAsync(executionSnippet, cancellationToken);
             stopwatch.Stop();
 
             var (kind, typeName, rowCount, isMaterialized, estimatedBytes, exportRows) =
@@ -47,7 +61,7 @@ internal static class QueryEvaluator
             {
                 translatedSql = await TryResolveTranslatedSqlFallbackAsync(
                     session,
-                    snippet,
+                    executionSnippet,
                     result,
                     inspectionAssemblies,
                     dbLogSettings,
@@ -57,6 +71,29 @@ internal static class QueryEvaluator
                 {
                     warnings.Add(BuildTranslatedSqlWarning(result));
                 }
+            }
+
+            bool? hasMore;
+            int? pageIndex;
+            int? pageSize;
+
+            if (paging is { IsRequested: true })
+            {
+                pageIndex = paging.Value.PageIndex;
+                pageSize = paging.Value.PageSize;
+                hasMore = rowCount >= paging.Value.PageSize;
+            }
+            else if (pagingSupported && rowCount >= SqlTranslationProbe.DefaultMaterializationTake)
+            {
+                pageIndex = 0;
+                pageSize = SqlTranslationProbe.DefaultMaterializationTake;
+                hasMore = true;
+            }
+            else
+            {
+                pageIndex = null;
+                pageSize = null;
+                hasMore = null;
             }
 
             var metrics = new EvaluationMetrics
@@ -75,6 +112,10 @@ internal static class QueryEvaluator
                 SqlCommandCount = sqlCapture?.Commands.Count ?? 0,
                 RowCount = rowCount,
                 ConsoleOutput = consoleCapture.CapturedOutput,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                HasMore = hasMore,
+                PagingSupported = pagingSupported,
             };
 
             return (result, metrics);

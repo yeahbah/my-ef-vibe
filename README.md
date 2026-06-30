@@ -105,7 +105,7 @@ omitted, `efvibe` infers a project that references the EF project and has user s
 In the REPL, query with `db` (for example `db.Products.Take(5).ToList();`). **Couchbase** sessions require async terminals (`await db.Products.Take(5).ToListAsync();`). End input with `;` to run. Use `:help` for
 all commands, `:about` for version and session info.
 
-**Safety defaults:** unbounded LINQ materializers (`ToList`, `ToListAsync`, `ToArray`, `ToArrayAsync`) automatically get `.Take(100)` at runtime unless you already specified `Take`, use `#[Unbounded]`, or the query includes `Include`/`ThenInclude`. Raw SQL `SELECT` queries are capped at 250 rows.
+**Safety defaults:** unbounded LINQ materializers (`ToList`, `ToListAsync`, `ToArray`, `ToArrayAsync`) automatically get `.Take(100)` at runtime unless you already specified `Take`, use `#[Unbounded]`, or the query includes `Include`/`ThenInclude`. Studio and serve clients can request later pages with `skip` / `pageSize` on eval. Raw SQL `SELECT` reads up to 100 rows per page by default.
 
 **Explore the model**
 
