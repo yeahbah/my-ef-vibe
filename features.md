@@ -171,6 +171,15 @@ ActiveProducts()
 
 Equivalent to `:benchmark N` on the same snippet in the REPL.
 
+#### `#[Unbounded]`
+
+Disable the runtime **`.Take(100)`** cap on unbounded LINQ materializers for that script. Use sparingly — prefer explicit `.Take(n)` when you only need a sample.
+
+```csharp
+#[Unbounded]
+db.Products.OrderBy(p => p.Name).ToList();
+```
+
 **Tips:** use **Run all** in Studio (not run-current-line) so the full script is evaluated. Live SQL preview skips attributed scripts.
 
 ### Scripting global: `db`
@@ -249,12 +258,26 @@ After each evaluation:
 - Footer: total time, DB time, SQL command count, row count, materialized vs deferred, rough size estimate.
 - **Warnings** when the snippet looks risky (see below).
 
+### Automatic result paging (runtime)
+
+Before a LINQ query **materializes** rows (`ToList`, `ToListAsync`, `ToArray`, `ToArrayAsync`), efvibe injects **`.Take(100)`** when the snippet has no `.Take` / `.TakeAsync` already. That pushes `LIMIT` / `TOP` into the database instead of pulling an unbounded `SELECT *`.
+
+| Case | Behavior |
+|------|----------|
+| Already has `.Take(n)` | Unchanged |
+| `Include` / `ThenInclude` graph loads | Not auto-capped — add `.Take(n)` yourself |
+| Raw SQL `SELECT` | Capped at **250 rows** in the raw SQL executor |
+| Opt out | Put `#[Unbounded]` above the query (script attribute) |
+| Different limit | Use `.Take(n)` explicitly |
+
+When auto-`Take` applies, the evaluation **warnings** list includes a note that results were limited to 100 rows.
+
 ## Snippet warnings
 
 Heuristic warnings (non-blocking), for example:
 
 - `AsEnumerable()` — possible client-side evaluation
-- `ToList()` without `Take()` — large materialization
+- `ToList()` without `Take()` — large materialization (runtime auto-`Take(100)` still applies at execution unless `#[Unbounded]`)
 - Multiple `Include()` — cartesian explosion risk
 - `Take()` without `OrderBy` — undefined ordering
 - `TagWith()` — reminder to check tagged SQL

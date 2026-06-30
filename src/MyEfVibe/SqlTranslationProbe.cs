@@ -4,6 +4,16 @@ namespace MyEfVibe;
 
 internal static class SqlTranslationProbe
 {
+    internal const int DefaultMaterializationTake = 100;
+
+    private static readonly string[] ListMaterializationMethodNames =
+    [
+        "ToList",
+        "ToListAsync",
+        "ToArray",
+        "ToArrayAsync"
+    ];
+
     private static readonly string[] AggregateTerminalMethods =
     [
         "Count",
@@ -88,8 +98,8 @@ internal static class SqlTranslationProbe
     ];
 
     /// <summary>
-    ///     Rewrites terminal <c>First</c>/<c>Single</c> operators on EF queries to include <c>Take(n)</c> before execution
-    ///     so providers emit <c>LIMIT</c>/<c>TOP</c> instead of materializing the full result set client-side.
+    ///     Rewrites terminal EF queries to include <c>Take(n)</c> before execution so providers emit
+    ///     <c>LIMIT</c>/<c>TOP</c> instead of materializing huge result sets client-side.
     /// </summary>
     internal static string? TryRewriteBoundedTerminalQuery(string snippet)
     {
@@ -97,6 +107,7 @@ internal static class SqlTranslationProbe
 
         if (string.IsNullOrWhiteSpace(trimmed)
             || !LinqEfQueryHeuristics.LooksLikeEfQuery(trimmed)
+            || AllowsUnboundedMaterialization(trimmed)
             || trimmed.Contains(".Take(", StringComparison.Ordinal)
             || trimmed.Contains(".TakeAsync(", StringComparison.Ordinal))
         {
@@ -124,9 +135,160 @@ internal static class SqlTranslationProbe
             return bounded is null ? null : bounded + remappedSuffix;
         }
 
-        var terminalRewrite = TryRewriteBoundedTrailingTerminalCall(trimmed);
+        var listRewrite = TryRewriteBoundedListMaterialization(trimmed);
 
-        return terminalRewrite;
+        if (listRewrite is not null)
+        {
+            return listRewrite;
+        }
+
+        return TryRewriteBoundedTrailingTerminalCall(trimmed);
+    }
+
+    internal static string? DescribeAutoMaterializationLimit(string normalizedSnippet, string originalSnippet)
+    {
+        var normalized = normalizedSnippet.Trim().TrimEnd(';').Trim();
+        var original = originalSnippet.Trim().TrimEnd(';').Trim();
+
+        if (original.Contains(".Take(", StringComparison.Ordinal)
+            || original.Contains(".TakeAsync(", StringComparison.Ordinal)
+            || AllowsUnboundedMaterialization(original))
+        {
+            return null;
+        }
+
+        if (!normalized.Contains($".Take({DefaultMaterializationTake})", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return EndsWithListMaterialization(normalized)
+            ? $"Results limited to {DefaultMaterializationTake} rows (Take added automatically). Add .Take(n) for a different limit, or #[Unbounded] to run without a cap."
+            : null;
+    }
+
+    private static bool AllowsUnboundedMaterialization(string snippet)
+    {
+        if (snippet.Contains("#[Unbounded", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return ScriptAttributeParser.Parse(snippet)
+            .Any(static block => block.Attribute.Equals("Unbounded", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool EndsWithListMaterialization(string expression)
+    {
+        foreach (var methodName in ListMaterializationMethodNames)
+        {
+            if (expression.EndsWith($".{methodName}()", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            var needle = $".{methodName}(";
+
+            if (!expression.EndsWith(")", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var index = expression.LastIndexOf(needle, StringComparison.Ordinal);
+
+            if (index < 0)
+            {
+                continue;
+            }
+
+            var openParenIndex = index + needle.Length - 1;
+
+            if (TryFindClosingParenthesis(expression, openParenIndex, out var closeParenIndex)
+                && IsEndOfExpression(expression, closeParenIndex + 1))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string? TryRewriteBoundedListMaterialization(string trimmed)
+    {
+        foreach (var methodName in ListMaterializationMethodNames)
+        {
+            var suffix = $".{methodName}()";
+
+            if (!trimmed.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var queryable = trimmed[..^suffix.Length].TrimEnd();
+
+            if (string.IsNullOrWhiteSpace(queryable) || ContainsEagerLoad(queryable))
+            {
+                return null;
+            }
+
+            var bounded = TryFinalizeProbe(queryable, DefaultMaterializationTake);
+
+            if (bounded is null || string.Equals(bounded, queryable, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return bounded + suffix;
+        }
+
+        return TryRewriteBoundedTrailingListMaterialization(trimmed);
+    }
+
+    private static string? TryRewriteBoundedTrailingListMaterialization(string expression)
+    {
+        foreach (var methodName in ListMaterializationMethodNames)
+        {
+            var needle = $".{methodName}(";
+            var index = expression.LastIndexOf(needle, StringComparison.Ordinal);
+
+            if (index < 0)
+            {
+                continue;
+            }
+
+            var openParenIndex = index + needle.Length - 1;
+
+            if (!TryFindClosingParenthesis(expression, openParenIndex, out var closeParenIndex))
+            {
+                continue;
+            }
+
+            if (!IsEndOfExpression(expression, closeParenIndex + 1))
+            {
+                continue;
+            }
+
+            var queryable = expression[..index].TrimEnd();
+            var suffix = expression[index..];
+
+            if (string.IsNullOrWhiteSpace(queryable)
+                || !LinqEfQueryHeuristics.LooksLikeEfQuery(expression)
+                || ContainsEagerLoad(queryable))
+            {
+                continue;
+            }
+
+            var bounded = TryFinalizeProbe(queryable, DefaultMaterializationTake);
+
+            if (bounded is null || string.Equals(bounded, queryable, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return bounded + suffix;
+        }
+
+        return null;
     }
 
     private static string? TryRewriteBoundedTrailingTerminalCall(string expression)

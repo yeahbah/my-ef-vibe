@@ -56,6 +56,8 @@ Unknown rule ids default to **warning** severity.
 
 ## `unbounded-materialize`
 
+> **Runtime note:** When you **run** a query through efvibe (REPL, `serve`, or `-e`), unbounded materializers automatically receive `.Take(100)` unless the snippet already has `Take`, includes `#[Unbounded]`, or uses an `Include`/`ThenInclude` chain. This scan rule still flags the pattern in **source files** so you fix projects before production.
+
 | | |
 |--|--|
 | **Severity** | `critical` |

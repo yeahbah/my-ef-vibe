@@ -110,9 +110,11 @@ internal static class SnippetNormalizer
         rewritten = EfReplQueryableRewriter.TryCastDbSetRoots(rewritten, dbContextType, options)
                     ?? rewritten;
 
-        return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten, dbContextType, options)
-               ?? EfReplQueryableRewriter.TryRewriteBareWhere(rewritten, dbContextType)
-               ?? rewritten;
+        rewritten = EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten, dbContextType, options)
+                    ?? EfReplQueryableRewriter.TryRewriteBareWhere(rewritten, dbContextType)
+                    ?? rewritten;
+
+        return SqlTranslationProbe.TryRewriteBoundedTerminalQuery(rewritten) ?? rewritten;
     }
 
     private static int IndexOfLastNonEmptyLine(string[] lines)

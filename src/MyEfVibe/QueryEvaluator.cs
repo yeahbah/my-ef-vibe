@@ -19,6 +19,11 @@ internal static class QueryEvaluator
             session.PreserveAsyncQueries);
         var warnings = new List<string>(SnippetWarningsAnalyzer.Analyze(normalizedSnippet));
 
+        if (SqlTranslationProbe.DescribeAutoMaterializationLimit(normalizedSnippet, snippet) is { } autoTakeWarning)
+        {
+            warnings.Add(autoTakeWarning);
+        }
+
         using var sqlCapture = EfSqlCapture.TryAttach(dbContextInstance, dbLogSettings);
         using var consoleCapture = new ScriptConsoleCapture();
 
