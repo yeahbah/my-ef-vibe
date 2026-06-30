@@ -245,7 +245,11 @@ internal sealed class WorkspaceDepsManifest
             var normalizedRelativePath = runtimeAsset.Name.Replace('/', Path.DirectorySeparatorChar);
             var fileName = Path.GetFileName(normalizedRelativePath);
 
-            if (fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            if (NativeLibraryFileNames.IsNativeBinaryFileName(fileName))
+            {
+                TryAddNativeAsset(normalizedRelativePath, fileName, packageFolder, outputDirectory, rank);
+            }
+            else if (fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
             {
                 TryAddAsset(
                     normalizedRelativePath,
@@ -255,10 +259,6 @@ internal sealed class WorkspaceDepsManifest
                     libraryVersion,
                     rank,
                     isProjectLibrary);
-            }
-            else if (IsNativeLibraryFileName(fileName))
-            {
-                TryAddNativeAsset(normalizedRelativePath, fileName, packageFolder, outputDirectory, rank);
             }
         }
     }
@@ -289,18 +289,6 @@ internal sealed class WorkspaceDepsManifest
         }
 
         return false;
-    }
-
-    private static bool IsNativeLibraryFileName(string fileName)
-    {
-        if (fileName.EndsWith(".dylib", StringComparison.OrdinalIgnoreCase)
-            || fileName.EndsWith(".so", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return fileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
-               && fileName.Contains("e_sqlite3", StringComparison.OrdinalIgnoreCase);
     }
 
     private void TryAddNativeAsset(
@@ -350,6 +338,12 @@ internal sealed class WorkspaceDepsManifest
         int rank,
         bool isProjectLibrary)
     {
+        if (NativeLibraryFileNames.IsNativeBinaryFileName(fileName))
+        {
+            TryAddNativeAsset(normalizedRelativePath, fileName, packageFolder, outputDirectory, rank);
+            return;
+        }
+
         var absolutePath = packageFolder is null
             ? Path.Combine(outputDirectory, fileName)
             : Path.Combine(packageFolder, normalizedRelativePath);

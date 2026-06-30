@@ -54,6 +54,13 @@ internal static class WorkspaceAssemblyFilter
     /// </summary>
     internal static bool ShouldIncludeRoslynMetadata(string dllPath)
     {
+        var fileName = Path.GetFileName(dllPath);
+
+        if (NativeLibraryFileNames.IsNativeBinaryFileName(fileName))
+        {
+            return false;
+        }
+
         var simpleName = Path.GetFileNameWithoutExtension(dllPath);
 
         if (string.IsNullOrEmpty(simpleName))

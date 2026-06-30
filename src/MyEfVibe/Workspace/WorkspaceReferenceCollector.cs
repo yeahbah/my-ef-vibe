@@ -10,6 +10,11 @@ internal static class WorkspaceReferenceCollector
 
         foreach (var path in ArtifactResolver.CollectReferencePaths(outputDirectory))
         {
+            if (NativeLibraryFileNames.IsNativeBinaryFileName(Path.GetFileName(path)))
+            {
+                continue;
+            }
+
             paths.Add(path);
         }
 

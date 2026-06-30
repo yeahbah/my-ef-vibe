@@ -36,6 +36,9 @@ public sealed class WorkspaceDepsManifestNativeTests
         Assert.NotNull(manifest);
         Assert.True(manifest!.TryResolveNativeLibrary(out var nativePath, nativeFileName));
         Assert.Equal(packageRoot, nativePath);
+        Assert.DoesNotContain(
+            manifest.RuntimeAssemblyPaths,
+            path => path.Contains("e_sqlite3", StringComparison.OrdinalIgnoreCase));
     }
 
     private static (string NativeFileName, string RelativeNativePath) GetNativeAssetForRid(string rid)
