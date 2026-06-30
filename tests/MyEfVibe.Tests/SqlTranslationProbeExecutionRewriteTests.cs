@@ -271,7 +271,8 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     {
         var normalized = SnippetNormalizer.ForEvaluation("db.Users.First();", typeof(FakeRewriterDbContext));
 
-        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.First(db.Users)", normalized);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.FirstOrDefault(", normalized, StringComparison.Ordinal);
+        Assert.Contains("global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 1)", normalized, StringComparison.Ordinal);
         Assert.DoesNotContain("Queryable.Take", normalized);
     }
 
