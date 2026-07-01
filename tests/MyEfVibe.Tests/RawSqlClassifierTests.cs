@@ -15,6 +15,7 @@ public sealed class RawSqlClassifierTests
     [InlineData("DECLARE @p int = 25; SELECT TOP(@p) 1", true)]
     [InlineData("SET NOCOUNT ON;\nSELECT 1", true)]
     [InlineData("SET @p = 25;\nSELECT @p", true)]
+    [InlineData("INSERT INTO Products (Name) VALUES ('x'); SELECT * FROM Products", true)]
     public void LooksLikeQuery_classifies_statements(string sql, bool expected)
     {
         Assert.Equal(expected, RawSqlClassifier.LooksLikeQuery(sql));
