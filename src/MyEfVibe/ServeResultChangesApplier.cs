@@ -46,6 +46,7 @@ internal static class ServeResultChangesApplier
         catch (Exception failure)
         {
             stopwatch.Stop();
+            ClearChangeTracker(dbContext: runtime.DbContext);
 
             EvaluationJsonReporter.WriteFailure(
                 new EvaluationMetrics
@@ -136,6 +137,61 @@ internal static class ServeResultChangesApplier
         await InvokeSaveChangesAsync(dbContext, cancellationToken);
 
         return $"{updatedCount} row(s) updated, {deletedCount} row(s) deleted.";
+    }
+
+    private static void ClearChangeTracker(object dbContext)
+    {
+        try
+        {
+            var changeTracker = dbContext.GetType()
+                .GetProperty("ChangeTracker", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetValue(dbContext);
+
+            if (changeTracker is null)
+            {
+                return;
+            }
+
+            var clearMethod = changeTracker.GetType()
+                .GetMethod("Clear", BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
+
+            if (clearMethod is not null)
+            {
+                clearMethod.Invoke(changeTracker, null);
+                return;
+            }
+
+            var entriesMethod = changeTracker.GetType()
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(static method =>
+                    string.Equals(method.Name, "Entries", StringComparison.Ordinal)
+                    && !method.IsGenericMethodDefinition
+                    && method.GetParameters().Length == 0);
+
+            if (entriesMethod?.Invoke(changeTracker, null) is not IEnumerable entries)
+            {
+                return;
+            }
+
+            foreach (var entry in entries.Cast<object>().ToArray())
+            {
+                var stateProperty = entry.GetType()
+                    .GetProperty("State", BindingFlags.Public | BindingFlags.Instance);
+
+                if (stateProperty?.PropertyType.IsEnum is not true)
+                {
+                    continue;
+                }
+
+                stateProperty.SetValue(
+                    entry,
+                    Enum.Parse(stateProperty.PropertyType, "Detached"));
+            }
+        }
+        catch
+        {
+            // Best effort cleanup: preserve the original apply failure reported to the client.
+        }
     }
 
     private static List<string> GetPrimaryKeyNames(Type entityType, object? modelEntity)
