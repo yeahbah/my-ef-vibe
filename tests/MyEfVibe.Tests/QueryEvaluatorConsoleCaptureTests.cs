@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MyEfVibe.Tests;
 
+[Collection(ConsoleTestCollection.Name)]
 public sealed class QueryEvaluatorConsoleCaptureTests
 {
     [Fact]

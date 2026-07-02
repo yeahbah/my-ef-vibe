@@ -3,6 +3,7 @@ using MyEfVibe.Linq;
 
 namespace MyEfVibe.Tests;
 
+[Collection(ConsoleTestCollection.Name)]
 public sealed class LinqScanCiReporterTests
 {
     [Fact]
