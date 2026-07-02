@@ -16,4 +16,16 @@ public sealed class ScriptLoadNormalizationTests
         Assert.Equal("Helpers.csx", ScriptLoadDirectiveResolver.TryParseLoadPath(directives));
         Assert.Equal("LoadedMagic + 1", body);
     }
+
+    [Fact]
+    public void ForEvaluation_preserves_load_only_directive_for_parsing()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "#load \"Helpers.csx\"",
+            typeof(ProbeHistoryDbContext),
+            preserveAsyncQueries: false);
+
+        Assert.Equal("#load \"Helpers.csx\"", normalized);
+        Assert.Equal("Helpers.csx", ScriptLoadDirectiveResolver.TryParseLoadPath(normalized));
+    }
 }

@@ -9,6 +9,7 @@ const BLOCKED_EF_PATTERNS: RegExp[] = [
 ];
 
 const BLOCKED_SQL_IN_STRING = /\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\b/i;
+const LOAD_DIRECTIVE_PATTERN = /^\s*#load\b/im;
 
 function stripCSharpComments(expression: string): string {
   let result = expression.replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -42,6 +43,13 @@ export function validateReadOnlyExpression(expression: string): ExpressionGuardR
   }
 
   const stripped = stripCSharpComments(trimmed);
+
+  if (LOAD_DIRECTIVE_PATTERN.test(stripped)) {
+    return {
+      ok: false,
+      reason: 'Read-only mode: #load directives are not allowed from guarded UI execution paths.',
+    };
+  }
 
   for (const pattern of BLOCKED_EF_PATTERNS) {
     if (pattern.test(stripped)) {
