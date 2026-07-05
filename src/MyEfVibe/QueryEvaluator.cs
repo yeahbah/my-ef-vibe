@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -52,6 +53,7 @@ internal static class QueryEvaluator
 
             var (kind, typeName, rowCount, isMaterialized, estimatedBytes, exportRows) =
                 ResultAnalyzer.Analyze(result);
+            var returnedResult = FreezeDeferredEnumerable(result, exportRows);
 
             var executedSql = sqlCapture?.Commands.Select(EfSqlCapture.FormatEntry).ToArray()
                               ?? [];
@@ -121,7 +123,7 @@ internal static class QueryEvaluator
                 PagingSupported = pagingSupported,
             };
 
-            return (result, metrics);
+            return (returnedResult, metrics);
         }
         catch (Exception failure)
         {
@@ -200,6 +202,13 @@ internal static class QueryEvaluator
         return result is IQueryable
             ? "Query not executed; showing translated SQL from ToQueryString()."
             : "Executed SQL was not captured from the database log; showing translated SQL from ToQueryString() (provider LIMIT/TOP may differ at runtime).";
+    }
+
+    private static object? FreezeDeferredEnumerable(object? result, IReadOnlyList<object?> exportRows)
+    {
+        return result is IEnumerable and not string and not IQueryable and not ICollection
+            ? exportRows.ToArray()
+            : result;
     }
 
     private static Exception UnwrapEvaluationException(Exception failure)
