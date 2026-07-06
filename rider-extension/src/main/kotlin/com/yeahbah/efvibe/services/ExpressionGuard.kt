@@ -12,12 +12,20 @@ object ExpressionGuard {
     )
 
     private val blockedSql = Regex("""\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\b""", RegexOption.IGNORE_CASE)
+    private val scriptDirective = Regex(
+        """^\s*#(?:load\b|r(?=\s|"))""",
+        setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE),
+    )
 
     fun validate(expression: String): String? {
         val trimmed = expression.trim()
         if (trimmed.isEmpty()) return "Expression is empty."
 
         val stripped = stripComments(trimmed)
+        if (scriptDirective.containsMatchIn(stripped)) {
+            return "Read-only mode: #load and #r directives are not allowed."
+        }
+
         if (blockedEfPatterns.any { it.containsMatchIn(stripped) }) {
             return "Read-only mode: SaveChanges, Add/Update/Remove, ExecuteSql, ExecuteDelete/Update, and schema changes are not allowed."
         }
