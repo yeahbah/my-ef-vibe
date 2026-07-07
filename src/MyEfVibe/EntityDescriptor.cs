@@ -358,9 +358,9 @@ internal static class EntityDescriptor
             return null;
         }
 
-        foreach (var method in model.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var method in model.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
         {
-            if (!string.Equals(method.Name, "FindEntityType", StringComparison.Ordinal))
+            if (!IsMemberNameMatch(method.Name, "FindEntityType"))
             {
                 continue;
             }
@@ -382,7 +382,35 @@ internal static class EntityDescriptor
             }
         }
 
+        foreach (var interfaceType in model.GetType().GetInterfaces())
+        {
+            var method = interfaceType.GetMethod("FindEntityType", BindingFlags.Public | BindingFlags.Instance);
+            var parameters = method?.GetParameters();
+
+            if (method is null
+                || parameters?.Length != 1
+                || parameters[0].ParameterType != typeof(Type))
+            {
+                continue;
+            }
+
+            try
+            {
+                return method.Invoke(model, [entityType]);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         return null;
+    }
+
+    private static bool IsMemberNameMatch(string actualName, string expectedName)
+    {
+        return string.Equals(actualName, expectedName, StringComparison.Ordinal)
+               || actualName.EndsWith($".{expectedName}", StringComparison.Ordinal);
     }
 
     private static IEnumerable<ModelPropertyInfo> EnumerateModelProperties(object modelEntity)
