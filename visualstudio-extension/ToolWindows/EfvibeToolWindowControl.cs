@@ -547,6 +547,12 @@ internal sealed class EfvibeToolWindowControl : UserControl
             }
             else
             {
+                if (!ExpressionGuard.IsReadOnly(cell, out var reason))
+                {
+                    output.AppendLine($"Blocked: {reason}");
+                    break;
+                }
+
                 var run = await workspace.Runner.RunExpressionPayloadAsync(
                     workspace,
                     cell,

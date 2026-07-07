@@ -198,10 +198,17 @@ internal static class ServeResultChangesApplier
     {
         if (modelEntity is not null)
         {
-            var keys = EnumerateModelProperties(modelEntity)
+            var keys = EnumerateModelPrimaryKeyNames(modelEntity)
+                .ToList();
+
+            if (keys.Count > 0)
+            {
+                return keys;
+            }
+
+            keys = EnumerateModelProperties(modelEntity)
                 .Where(static property => property.IsPrimaryKey)
                 .Select(static property => property.Name)
-                .OrderBy(static name => name, StringComparer.Ordinal)
                 .ToList();
 
             if (keys.Count > 0)
@@ -215,6 +222,33 @@ internal static class ServeResultChangesApplier
             .Where(static property => string.Equals(property.Name, "Id", StringComparison.OrdinalIgnoreCase))
             .Select(static property => property.Name)
             .ToList();
+    }
+
+    private static IEnumerable<string> EnumerateModelPrimaryKeyNames(object modelEntity)
+    {
+        var findPrimaryKeyMethod = modelEntity.GetType()
+            .GetMethod("FindPrimaryKey", BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
+        var primaryKey = findPrimaryKeyMethod?.Invoke(modelEntity, null);
+        var properties = primaryKey?.GetType()
+            .GetProperty("Properties", BindingFlags.Public | BindingFlags.Instance)
+            ?.GetValue(primaryKey) as IEnumerable;
+
+        if (properties is null)
+        {
+            yield break;
+        }
+
+        foreach (var property in properties)
+        {
+            var name = property?.GetType()
+                .GetProperty("Name", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetValue(property) as string;
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                yield return name;
+            }
+        }
     }
 
     private static IEnumerable<ModelPropertySnapshot> EnumerateModelProperties(object modelEntity)
@@ -277,9 +311,18 @@ internal static class ServeResultChangesApplier
         IReadOnlyDictionary<string, string> keys)
     {
         var keyValues = primaryKeys
-            .Select(name => ConvertStringToPropertyValue(
-                keys.TryGetValue(name, out var value) ? value : string.Empty,
-                entityType.GetProperty(name)?.PropertyType ?? typeof(string)))
+            .Select(name =>
+            {
+                if (!keys.TryGetValue(name, out var value) || string.IsNullOrWhiteSpace(value))
+                {
+                    throw new InvalidOperationException(
+                        $"Missing primary key `{name}` for result persistence.");
+                }
+
+                return ConvertStringToPropertyValue(
+                    value,
+                    entityType.GetProperty(name)?.PropertyType ?? typeof(string));
+            })
             .ToArray();
 
         var findMethod = dbSet.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
