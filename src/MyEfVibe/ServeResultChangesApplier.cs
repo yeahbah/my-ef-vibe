@@ -59,8 +59,15 @@ internal static class ServeResultChangesApplier
                     Succeeded = false,
                     Warnings = []
                 },
-                failure.Message);
+                GetFailureMessage(failure));
         }
+    }
+
+    private static string GetFailureMessage(Exception failure)
+    {
+        return failure is TargetInvocationException { InnerException: { } inner }
+            ? inner.Message
+            : failure.Message;
     }
 
     private static async Task<string> ApplyAsync(
