@@ -226,12 +226,10 @@ internal static class ServeResultChangesApplier
 
     private static IEnumerable<string> EnumerateModelPrimaryKeyNames(object modelEntity)
     {
-        var findPrimaryKeyMethod = modelEntity.GetType()
-            .GetMethod("FindPrimaryKey", BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
-        var primaryKey = findPrimaryKeyMethod?.Invoke(modelEntity, null);
-        var properties = primaryKey?.GetType()
-            .GetProperty("Properties", BindingFlags.Public | BindingFlags.Instance)
-            ?.GetValue(primaryKey) as IEnumerable;
+        var primaryKey = InvokeParameterlessMethod(modelEntity, "FindPrimaryKey");
+        var properties = primaryKey is null
+            ? null
+            : ReadPropertyValue(primaryKey, "Properties") as IEnumerable;
 
         if (properties is null)
         {
@@ -240,15 +238,67 @@ internal static class ServeResultChangesApplier
 
         foreach (var property in properties)
         {
-            var name = property?.GetType()
-                .GetProperty("Name", BindingFlags.Public | BindingFlags.Instance)
-                ?.GetValue(property) as string;
+            var name = property is null ? null : ReadPropertyValue(property, "Name") as string;
 
             if (!string.IsNullOrEmpty(name))
             {
                 yield return name;
             }
         }
+    }
+
+    private static object? InvokeParameterlessMethod(object target, string methodName)
+    {
+        var method = target.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .FirstOrDefault(method =>
+                IsMemberNameMatch(method.Name, methodName)
+                && method.GetParameters().Length == 0);
+
+        if (method is not null)
+        {
+            return method.Invoke(target, null);
+        }
+
+        foreach (var interfaceType in target.GetType().GetInterfaces())
+        {
+            method = interfaceType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+            if (method is not null && method.GetParameters().Length == 0)
+            {
+                return method.Invoke(target, null);
+            }
+        }
+
+        return null;
+    }
+
+    private static object? ReadPropertyValue(object target, string propertyName)
+    {
+        var property = target.GetType()
+            .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .FirstOrDefault(property => IsMemberNameMatch(property.Name, propertyName));
+
+        if (property is not null)
+        {
+            return property.GetValue(target);
+        }
+
+        foreach (var interfaceType in target.GetType().GetInterfaces())
+        {
+            property = interfaceType.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+            if (property is not null)
+            {
+                return property.GetValue(target);
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsMemberNameMatch(string actualName, string expectedName)
+    {
+        return string.Equals(actualName, expectedName, StringComparison.Ordinal)
+               || actualName.EndsWith($".{expectedName}", StringComparison.Ordinal);
     }
 
     private static IEnumerable<ModelPropertySnapshot> EnumerateModelProperties(object modelEntity)
