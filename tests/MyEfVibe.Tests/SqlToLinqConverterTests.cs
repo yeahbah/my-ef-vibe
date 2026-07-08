@@ -81,6 +81,29 @@ public sealed class SqlToLinqConverterTests
     }
 
     [Fact]
+    public void Convert_maps_sqlite_quoted_dotted_table_name()
+    {
+        var options = new DbContextOptionsBuilder<SchemaDbContext>()
+            .UseSqlite($"Data Source=sqltolinq-quoted-{Guid.NewGuid():N};Mode=Memory;Cache=Shared")
+            .Options;
+
+        using var dbContext = new SchemaDbContext(options);
+
+        var draft = SqlToLinqConverter.Convert(
+            dbContext,
+            """
+            SELECT "ProductID", "Name"
+            FROM "Production.Product"
+            LIMIT 10
+            """);
+
+        Assert.Contains("db.Products", draft.Linq, StringComparison.Ordinal);
+        Assert.Contains(".Take(10)", draft.Linq, StringComparison.Ordinal);
+        Assert.Equal("high", draft.Confidence);
+        Assert.Contains(draft.Mappings, mapping => mapping.Table == "Production.Product");
+    }
+
+    [Fact]
     public void Convert_reports_missing_from_clause()
     {
         var draft = SqlToLinqConverter.Convert(new FakeDbContext(), "SELECT 1");

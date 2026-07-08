@@ -381,10 +381,55 @@ internal static partial class SqlToLinqConverter
 
     private static IReadOnlyList<string> SplitQualifiedSqlName(string token)
     {
-        return token.Split('.')
+        var trimmed = token.Trim();
+
+        if (!ContainsQuotedQualificationSeparator(trimmed)
+            && TryStripSingleQuotedIdentifier(trimmed, out var singleIdentifier))
+        {
+            return [singleIdentifier];
+        }
+
+        return trimmed.Split('.')
             .Select(StripSqlIdentifier)
             .Where(static part => part.Length > 0)
             .ToArray();
+    }
+
+    private static bool ContainsQuotedQualificationSeparator(string value)
+    {
+        return value.Contains("\".\"", StringComparison.Ordinal)
+               || value.Contains("'.\'", StringComparison.Ordinal)
+               || value.Contains("].[", StringComparison.Ordinal);
+    }
+
+    private static bool TryStripSingleQuotedIdentifier(string value, out string identifier)
+    {
+        identifier = string.Empty;
+
+        if (value.Length < 2)
+        {
+            return false;
+        }
+
+        if (value.StartsWith('"') && value.EndsWith('"'))
+        {
+            identifier = value[1..^1];
+            return true;
+        }
+
+        if (value.StartsWith('\'') && value.EndsWith('\''))
+        {
+            identifier = value[1..^1];
+            return true;
+        }
+
+        if (value.StartsWith('[') && value.EndsWith(']') && !value.Contains("].[", StringComparison.Ordinal))
+        {
+            identifier = value[1..^1];
+            return true;
+        }
+
+        return false;
     }
 
     private static string StripSqlIdentifier(string value)
