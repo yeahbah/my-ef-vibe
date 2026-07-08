@@ -837,6 +837,11 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
                             appendLine(response.payload?.let { formatTablesText(it) } ?: "No tables payload.")
                         }
                         else -> {
+                            ExpressionGuard.validate(cell)?.let {
+                                appendLine("Blocked: $it")
+                                return@buildString
+                            }
+
                             val result = CliRunner(project).runExpressionPayload(cell, withPlan = false)
                             appendLine(result.payload?.let { formatEvaluationSummary(it) } ?: result.result.stderr.ifBlank { result.result.stdout })
                         }
