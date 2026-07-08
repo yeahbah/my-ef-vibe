@@ -233,8 +233,9 @@ internal static class DbContextActivator
                         ", but the EF project (`-p`) does not reference `Couchbase.EntityFrameworkCore`.";
                 }
                 else if (EntityFrameworkProviderDiscovery.TryDescribeAmbiguousProviders(
-                        host.ProjectPath,
-                        out var ambiguousProvidersMessage))
+                             host.ProjectPath,
+                             out var ambiguousProvidersMessage)
+                         && ambiguousProvidersMessage is not null)
                 {
                     failureMessage +=
                         $", but {ambiguousProvidersMessage.TrimEnd('.')}.";

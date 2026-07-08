@@ -260,7 +260,14 @@ public static class ReplQueryableRuntime
 
         _ = cancellationToken;
 
-        return UnwrapScalarProjection(await materializedTask.ConfigureAwait(false), memberName);
+        var materialized = await materializedTask.ConfigureAwait(false);
+
+        if (materialized is null)
+        {
+            return null;
+        }
+
+        return UnwrapScalarProjection(materialized, memberName);
     }
 
     private static object InvokeQueryableSelect(object source, Expression selector)

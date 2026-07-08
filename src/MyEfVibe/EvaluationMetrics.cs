@@ -28,14 +28,14 @@ internal sealed record EvaluationMetrics
         };
     }
 
-    public string Snippet { get; init; }
+    public required string Snippet { get; init; }
     public long TotalMilliseconds { get; init; }
     public long? DatabaseMilliseconds { get; init; }
     public int SqlCommandCount { get; init; }
     public string? TranslatedSql { get; init; }
     public IReadOnlyList<string> ExecutedSql { get; init; } = [];
     public ResultKind ResultKind { get; init; }
-    public string ResultTypeName { get; init; }
+    public required string ResultTypeName { get; init; }
     public bool IsMaterialized { get; init; }
     public long? EstimatedBytes { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
