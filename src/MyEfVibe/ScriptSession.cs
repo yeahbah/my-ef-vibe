@@ -241,13 +241,50 @@ internal sealed class ScriptSession
             return null;
         }
 
-        var script = CSharpScript.Create(trimmed, _options, _globalsType, _assemblyLoader);
-
-        ScriptState state;
-
         try
         {
-            state = await script.RunAsync(_globals, cancellationToken);
+            if (_state is not null)
+            {
+                var probeState = await _state.ContinueWithAsync(trimmed, cancellationToken: cancellationToken);
+
+                if (probeState.Exception is not null)
+                {
+                    throw probeState.Exception is Exception concrete
+                        ? concrete
+                        : new Exception(probeState.Exception.ToString());
+                }
+
+                return await UnwrapTaskReturnValueAsync(probeState.ReturnValue, cancellationToken);
+            }
+
+            var script = CSharpScript.Create(trimmed, _options, _globalsType, _assemblyLoader);
+
+            ScriptState state;
+
+            try
+            {
+                state = await script.RunAsync(_globals, cancellationToken);
+            }
+            catch (CompilationErrorException compilationFailure)
+            {
+                var messages = compilationFailure.Diagnostics
+                    .Where(static diagnostic => diagnostic.Severity != DiagnosticSeverity.Hidden)
+                    .Select(static diagnostic => diagnostic.ToString())
+                    .ToArray();
+
+                throw messages.Length == 0
+                    ? new CompilationEvaluationException(compilationFailure.Message)
+                    : new CompilationEvaluationException(string.Join(Environment.NewLine, messages));
+            }
+
+            if (state.Exception is not null)
+            {
+                throw state.Exception is Exception concrete
+                    ? concrete
+                    : new Exception(state.Exception.ToString());
+            }
+
+            return await UnwrapTaskReturnValueAsync(state.ReturnValue, cancellationToken);
         }
         catch (CompilationErrorException compilationFailure)
         {
@@ -260,15 +297,6 @@ internal sealed class ScriptSession
                 ? new CompilationEvaluationException(compilationFailure.Message)
                 : new CompilationEvaluationException(string.Join(Environment.NewLine, messages));
         }
-
-        if (state.Exception is not null)
-        {
-            throw state.Exception is Exception concrete
-                ? concrete
-                : new Exception(state.Exception.ToString());
-        }
-
-        return await UnwrapTaskReturnValueAsync(state.ReturnValue, cancellationToken);
     }
 
     private static async Task<object?> UnwrapTaskReturnValueAsync(

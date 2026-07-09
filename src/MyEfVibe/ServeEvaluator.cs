@@ -76,7 +76,8 @@ internal static class ServeEvaluator
                 runtime.DbLogSettings,
                 runtime.Host.EnumerateLoadedAssemblies(),
                 cancellationToken,
-                paging);
+                paging,
+                host: runtime.Host);
 
             var (_, _, _, _, _, exportRows) = ResultAnalyzer.Analyze(result);
             runtime.Analytics.Record(metrics, result, exportRows);

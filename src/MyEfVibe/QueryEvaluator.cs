@@ -1,3 +1,5 @@
+using MyEfVibe.Linq;
+using MyEfVibe.Workspace;
 using System.Collections;
 using System.Diagnostics;
 using System.Reflection;
@@ -14,10 +16,21 @@ internal static class QueryEvaluator
         IEnumerable<Assembly> inspectionAssemblies,
         CancellationToken cancellationToken = default,
         QueryPagingOptions? paging = null,
-        bool captureConsoleOutput = true)
+        bool captureConsoleOutput = true,
+        WorkspaceHost? host = null)
     {
         var pagingSupported = QueryPagingRewriter.SupportsPaging(snippet);
         var executionSnippet = snippet;
+
+        if (host is not null
+            && ProbeScriptFormatter.TryStripToQueryStringTerminal(executionSnippet, out var translateExpression))
+        {
+            return await EvaluateToQueryStringAsync(
+                session,
+                host,
+                translateExpression,
+                cancellationToken);
+        }
 
         if (paging is { IsRequested: true })
         {
@@ -172,13 +185,17 @@ internal static class QueryEvaluator
                 }
                 else
                 {
-                    var probeSql = await session.EvaluateProbeAsync(
-                        ProbeScriptFormatter.ToQueryStringProbe(probeExpression),
+                    var queryable = await session.EvaluateProbeAsync(
+                        ProbeScriptFormatter.ToScriptExpression(probeExpression),
                         cancellationToken);
 
-                    if (probeSql is string literal && !string.IsNullOrWhiteSpace(literal))
+                    if (RelationalQueryableSqlFormatter.TryGetSql(
+                            queryable,
+                            inspectionAssemblies,
+                            out var sqlLiteral)
+                        && !string.IsNullOrWhiteSpace(sqlLiteral))
                     {
-                        return literal;
+                        return sqlLiteral;
                     }
                 }
             }
@@ -202,6 +219,69 @@ internal static class QueryEvaluator
         return result is IQueryable
             ? "Query not executed; showing translated SQL from ToQueryString()."
             : "Executed SQL was not captured from the database log; showing translated SQL from ToQueryString() (provider LIMIT/TOP may differ at runtime).";
+    }
+
+    private static async Task<(object? Result, EvaluationMetrics Metrics)> EvaluateToQueryStringAsync(
+        ScriptSession session,
+        WorkspaceHost host,
+        string translateExpression,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            host.EnsureEntityFrameworkRelationalLoaded();
+
+            var translation = await LinqDeepSqlTranslator.TranslateAsync(
+                session,
+                host,
+                translateExpression,
+                cancellationToken: cancellationToken);
+
+            stopwatch.Stop();
+
+            if (string.IsNullOrWhiteSpace(translation.Sql))
+            {
+                throw new EvaluationFailedException(
+                    EvaluationMetrics.Failed(
+                        translateExpression,
+                        stopwatch.ElapsedMilliseconds,
+                        translation.Note ?? "Could not translate this expression to SQL."),
+                    new InvalidOperationException(translation.Note ?? "Could not translate this expression to SQL."));
+            }
+
+            var metrics = new EvaluationMetrics
+            {
+                ExecutedSql = [],
+                TranslatedSql = translation.Sql,
+                ResultKind = ResultKind.Scalar,
+                ResultTypeName = typeof(string).FullName ?? "System.String",
+                IsMaterialized = true,
+                EstimatedBytes = translation.Sql.Length * sizeof(char),
+                Warnings = [],
+                Succeeded = true,
+                Snippet = translateExpression,
+                TotalMilliseconds = stopwatch.ElapsedMilliseconds,
+                RowCount = 1,
+            };
+
+            return (translation.Sql, metrics);
+        }
+        catch (EvaluationFailedException)
+        {
+            throw;
+        }
+        catch (Exception failure)
+        {
+            stopwatch.Stop();
+            throw new EvaluationFailedException(
+                EvaluationMetrics.Failed(
+                    translateExpression,
+                    stopwatch.ElapsedMilliseconds,
+                    failure.Message),
+                failure);
+        }
     }
 
     private static object? FreezeDeferredEnumerable(object? result, IReadOnlyList<object?> exportRows)

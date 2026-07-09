@@ -15,6 +15,13 @@ public sealed class LinqEfQueryHeuristicsTests
     }
 
     [Theory]
+    [InlineData("ActiveProducts().OrderBy(p => p.Name).Take(10).ToList();")]
+    public void LooksLikeEfQuery_IncludesHelperRootedLinqChains(string statement)
+    {
+        Assert.True(LinqEfQueryHeuristics.LooksLikeEfQuery(statement));
+    }
+
+    [Theory]
     [InlineData("context.Features.Get<IExceptionHandlerFeature>();")]
     [InlineData("Request.Headers.Accept")]
     [InlineData("filters.Values.ToList();")]

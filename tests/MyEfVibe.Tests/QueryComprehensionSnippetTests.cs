@@ -34,6 +34,24 @@ public sealed class QueryComprehensionSnippetTests
     }
 
     [Fact]
+    public void ForEvaluation_query_comprehension_with_external_parameter_stubs_parameter()
+    {
+        const string snippet = """
+                               from product in db.Products
+                               where product.ListPrice > MinListPrice
+                               orderby product.Name
+                               select product
+                               """;
+
+        var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeAdventureWorksDbContext));
+
+        Assert.Contains("product.ListPrice", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("MinListPrice", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("0.ListPrice", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
     public void ForEvaluation_query_comprehension_with_where_parses()
     {
         const string snippet = """
@@ -286,6 +304,8 @@ public sealed class QueryCompProduct
     public int ProductId { get; set; }
 
     public string Name { get; set; } = string.Empty;
+
+    public decimal ListPrice { get; set; }
 }
 
 public sealed class QueryCompProductDbContext(DbContextOptions<QueryCompProductDbContext> options)

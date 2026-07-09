@@ -49,6 +49,28 @@ internal static class ProbeScriptFormatter
         return $"{probe}.ToQueryString()";
     }
 
+    internal static bool TryStripToQueryStringTerminal(string expression, out string queryExpression)
+    {
+        queryExpression = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(expression))
+        {
+            return false;
+        }
+
+        var probe = ToScriptExpression(expression).TrimEnd(';').Trim();
+
+        if (!probe.EndsWith(".ToQueryString()", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        queryExpression = probe[..^".ToQueryString()".Length].TrimEnd();
+        queryExpression = QueryComprehensionSyntax.WrapForTrailingMemberAccess(queryExpression);
+
+        return !string.IsNullOrWhiteSpace(queryExpression);
+    }
+
     private static string CollapseWhitespace(string expression)
     {
         var builder = new StringBuilder(expression.Length);

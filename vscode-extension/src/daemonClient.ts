@@ -133,6 +133,34 @@ function drainStdoutBuffer(): void {
   appendStdout('');
 }
 
+function parseServeHandshake(line: string): { type?: string; message?: string } | undefined {
+  if (!line.startsWith('{')) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(line) as { type?: string; message?: string };
+  } catch {
+    return undefined;
+  }
+}
+
+async function waitForServeHandshake(timeoutMs: number): Promise<{ type?: string; message?: string }> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const remaining = Math.max(1, deadline - Date.now());
+    const line = await waitForLine(remaining);
+    const payload = parseServeHandshake(line);
+
+    if (payload) {
+      return payload;
+    }
+  }
+
+  throw new Error('efvibe serve timed out during workspace load.');
+}
+
 function parseServeError(line: string): string | undefined {
   try {
     const payload = JSON.parse(line) as { type?: string; message?: string };
@@ -226,29 +254,23 @@ async function ensureDaemonReady(
     disposeDaemon();
   }, READY_TIMEOUT_MS);
 
-  waitForLine(READY_TIMEOUT_MS)
-    .then((line) => {
+  waitForServeHandshake(READY_TIMEOUT_MS)
+    .then((payload) => {
       clearTimeout(readyTimer);
 
-      try {
-        const payload = JSON.parse(line) as { type?: string; message?: string };
-        if (payload.type === 'ready') {
-          readyResolve();
-          return;
-        }
-
-        if (payload.type === 'error') {
-          readyReject(new Error(payload.message ?? 'efvibe serve failed to start.'));
-          disposeDaemon();
-          return;
-        }
-
-        readyReject(new Error(`Unexpected serve handshake: ${line}`));
-        disposeDaemon();
-      } catch (error) {
-        readyReject(error instanceof Error ? error : new Error(String(error)));
-        disposeDaemon();
+      if (payload.type === 'ready') {
+        readyResolve();
+        return;
       }
+
+      if (payload.type === 'error') {
+        readyReject(new Error(payload.message ?? 'efvibe serve failed to start.'));
+        disposeDaemon();
+        return;
+      }
+
+      readyReject(new Error(`Unexpected serve handshake: ${JSON.stringify(payload)}`));
+      disposeDaemon();
     })
     .catch((error) => {
       clearTimeout(readyTimer);

@@ -1,3 +1,4 @@
+using MyEfVibe.Linq;
 using MyEfVibe.Reporters;
 using MyEfVibe.Workspace;
 
@@ -33,24 +34,11 @@ internal static class ServeCommandRunner
             options.Project,
             options.StartupProject);
 
-        var (runtime, exitCode, error) = await WorkspaceRuntimeBootstrap.LoadAsync(
+        var (runtime, exitCode, error) = await LoadRuntimeAsync(
             workspace,
-            CliPathHelper.ToFileInfo(options.Project),
-            CliPathHelper.ToFileInfo(options.StartupProject),
-            options.Context,
-            options.ConnectionString,
-            options.DbLog,
-            options.NoDbLog,
-            options.DbLogLevel,
-            options.DbLogVerbose,
-            options.Framework,
+            options,
             buildPolicy,
-            ScriptSessionConfigurationFactory.FromCliOptions(
-                options.ScriptSearchPath,
-                options.ScriptLoad,
-                options.ScriptUsing,
-                searchDirectory,
-                options.ScriptBasePath),
+            searchDirectory,
             cancellationToken);
 
         if (runtime is null)
@@ -76,8 +64,8 @@ internal static class ServeCommandRunner
 
                 if (request is null || string.IsNullOrWhiteSpace(request.Type))
                 {
-                    ServeProtocol.WriteError(
-                        "Invalid request JSON. Expected {\"type\":\"eval|dbinfo|tables|describe|diagram|scan|completions|sqlToLinq|executeSql|applyResultChanges|ping|shutdown\",...}.");
+                        ServeProtocol.WriteError(
+                        "Invalid request JSON. Expected {\"type\":\"eval|translate|dbinfo|tables|describe|diagram|scan|completions|sqlToLinq|executeSql|applyResultChanges|ping|shutdown\",...}.");
                     continue;
                 }
 
@@ -178,7 +166,7 @@ internal static class ServeCommandRunner
                             var draft = await SqlToLinqService.ConvertAndValidateAsync(
                                 runtime.DbContext,
                                 runtime.Session,
-                                runtime.Host.EnumerateLoadedAssemblies(),
+                                runtime.Host,
                                 runtime.DbLogSettings,
                                 request.Sql,
                                 cancellationToken);
@@ -228,6 +216,30 @@ internal static class ServeCommandRunner
 
                         break;
 
+                    case "translate":
+                        if (string.IsNullOrWhiteSpace(request.Expression))
+                        {
+                            ServeProtocol.WriteError("translate requires \"expression\".");
+                            break;
+                        }
+
+                        try
+                        {
+                            var translation = await LinqDeepSqlTranslator.TranslateAsync(
+                                runtime.Session,
+                                runtime.Host,
+                                request.Expression,
+                                cancellationToken: cancellationToken);
+
+                            TranslateJsonReporter.Write(translation);
+                        }
+                        catch (Exception failure)
+                        {
+                            ServeProtocol.WriteError(failure.Message);
+                        }
+
+                        break;
+
                     default:
                         ServeProtocol.WriteError($"Unknown request type '{request.Type}'.");
                         break;
@@ -236,5 +248,35 @@ internal static class ServeCommandRunner
         }
 
         return 0;
+    }
+
+    private static async Task<(WorkspaceRuntime? Runtime, int ExitCode, string? Error)> LoadRuntimeAsync(
+        DirectoryInfo workspace,
+        ServeCliOptions options,
+        WorkspaceBuildPolicy buildPolicy,
+        string searchDirectory,
+        CancellationToken cancellationToken)
+    {
+        using var consoleGuard = ServeConsoleGuard.Enter();
+
+        return await WorkspaceRuntimeBootstrap.LoadAsync(
+            workspace,
+            CliPathHelper.ToFileInfo(options.Project),
+            CliPathHelper.ToFileInfo(options.StartupProject),
+            options.Context,
+            options.ConnectionString,
+            options.DbLog,
+            options.NoDbLog,
+            options.DbLogLevel,
+            options.DbLogVerbose,
+            options.Framework,
+            buildPolicy,
+            ScriptSessionConfigurationFactory.FromCliOptions(
+                options.ScriptSearchPath,
+                options.ScriptLoad,
+                options.ScriptUsing,
+                searchDirectory,
+                options.ScriptBasePath),
+            cancellationToken);
     }
 }

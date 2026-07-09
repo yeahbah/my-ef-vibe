@@ -78,6 +78,43 @@ internal static class LinqEfQueryHeuristics
             }
         }
 
+        if (ContainsDeferredLinqOperator(normalized))
+        {
+            return true;
+        }
+
         return false;
     }
+
+    private static bool ContainsDeferredLinqOperator(string normalized)
+    {
+        foreach (var operatorName in DeferredLinqOperatorNames)
+        {
+            if (normalized.Contains($".{operatorName}(", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static readonly string[] DeferredLinqOperatorNames =
+    [
+        "Where",
+        "Select",
+        "SelectMany",
+        "OrderBy",
+        "OrderByDescending",
+        "ThenBy",
+        "ThenByDescending",
+        "GroupBy",
+        "Join",
+        "Skip",
+        "Take",
+        "Include",
+        "ThenInclude",
+        "FromSql",
+        "FromSqlRaw"
+    ];
 }

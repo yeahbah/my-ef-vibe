@@ -76,7 +76,7 @@ internal static class SqlToLinqCommandRunner
             var draft = await SqlToLinqService.ConvertAndValidateAsync(
                 runtime.DbContext,
                 runtime.Session,
-                runtime.Host.EnumerateLoadedAssemblies(),
+                runtime.Host,
                 runtime.DbLogSettings,
                 sql,
                 cancellationToken);

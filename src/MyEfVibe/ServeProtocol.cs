@@ -55,7 +55,7 @@ internal static class ServeProtocol
 
     private static void WriteLine<T>(T payload)
     {
-        Console.Out.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
+        ServeConsoleGuard.ProtocolOut.WriteLine(JsonSerializer.Serialize(payload, SerializerOptions));
     }
 
     internal sealed class ServeRequest

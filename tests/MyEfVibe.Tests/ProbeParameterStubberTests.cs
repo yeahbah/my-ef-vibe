@@ -136,17 +136,36 @@ public sealed class ProbeParameterStubberTests
     }
 
     [Fact]
-    public void Stub_OuterNoteUserIdComparedToUserId_UsesGuidEmpty()
+    public void Stub_MethodCallRoot_IsNotReplaced()
     {
-        const string probe = "db.Users.Where(u => u.Id == note.UserId)";
+        const string probe = "ActiveProducts().OrderBy(p => p.Name).Take(DefaultTake)";
+
+        var stubbed = ProbeParameterStubber.Stub(probe);
+
+        Assert.StartsWith("ActiveProducts()", stubbed, StringComparison.Ordinal);
+        Assert.Contains(".Take(0)", stubbed, StringComparison.Ordinal);
+        Assert.DoesNotContain("0()", stubbed, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(stubbed);
+    }
+
+    [Fact]
+    public void Stub_QueryComprehensionRangeVariable_NotReplaced()
+    {
+        const string probe = """
+                               from product in db.Products
+                               where product.ListPrice > MinListPrice
+                               orderby product.Name
+                               select product
+                               """;
 
         var stubbed = ProbeParameterStubber.Stub(
             probe,
-            new ProbeStubContext(typeof(FakeGuidNoteDbContext), typeof(FakeGuidUser).FullName!));
+            new ProbeStubContext(typeof(FakeAdventureWorksDbContext), "Product"));
 
-        Assert.Contains("u.Id == Guid.Empty", stubbed, StringComparison.Ordinal);
-        Assert.DoesNotContain("note.UserId", stubbed, StringComparison.Ordinal);
-        Assert.DoesNotContain("0.UserId", stubbed, StringComparison.Ordinal);
+        Assert.Contains("product.ListPrice", stubbed, StringComparison.Ordinal);
+        Assert.Contains("product.Name", stubbed, StringComparison.Ordinal);
+        Assert.DoesNotContain("0.ListPrice", stubbed, StringComparison.Ordinal);
+        Assert.DoesNotContain("MinListPrice", stubbed, StringComparison.Ordinal);
         ProbeTestHelper.AssertParsesAsScript(stubbed);
     }
 }

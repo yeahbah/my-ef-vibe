@@ -28,7 +28,13 @@ internal static class ProbeParameterStubber
                 wrapped,
                 CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
 
-            var rewritten = new ParameterStubRewriter(context).Visit(tree.GetRoot());
+            var queryRangeVariables = tree.GetRoot()
+                .DescendantNodes()
+                .OfType<QueryExpressionSyntax>()
+                .SelectMany(CollectQueryRangeVariables)
+                .ToHashSet(StringComparer.Ordinal);
+
+            var rewritten = new ParameterStubRewriter(context, queryRangeVariables).Visit(tree.GetRoot());
 
             if (rewritten is null)
             {
@@ -67,14 +73,48 @@ internal static class ProbeParameterStubber
         return rewritten[start..end].Trim();
     }
 
+    private static IEnumerable<string> CollectQueryRangeVariables(QueryExpressionSyntax node)
+    {
+        var rangeVariables = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var fromClause in node.DescendantNodes().OfType<FromClauseSyntax>())
+        {
+            rangeVariables.Add(fromClause.Identifier.Text);
+        }
+
+        foreach (var joinClause in node.DescendantNodes().OfType<JoinClauseSyntax>())
+        {
+            rangeVariables.Add(joinClause.Identifier.Text);
+
+            if (joinClause.Into is not null)
+            {
+                rangeVariables.Add(joinClause.Into.Identifier.Text);
+            }
+        }
+
+        foreach (var letClause in node.DescendantNodes().OfType<LetClauseSyntax>())
+        {
+            rangeVariables.Add(letClause.Identifier.Text);
+        }
+
+        foreach (var continuation in node.DescendantNodes().OfType<QueryContinuationSyntax>())
+        {
+            rangeVariables.Add(continuation.Identifier.Text);
+        }
+
+        return rangeVariables;
+    }
+
     private sealed class ParameterStubRewriter : CSharpSyntaxRewriter
     {
         private readonly ProbeStubContext? _context;
+        private readonly HashSet<string> _queryRangeVariables;
         private readonly Stack<HashSet<string>> _lambdaParameters = new();
 
-        internal ParameterStubRewriter(ProbeStubContext? context)
+        internal ParameterStubRewriter(ProbeStubContext? context, HashSet<string>? queryRangeVariables = null)
         {
             _context = context;
+            _queryRangeVariables = queryRangeVariables ?? new HashSet<string>(StringComparer.Ordinal);
         }
 
         public override SyntaxNode? VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node)
@@ -150,6 +190,8 @@ internal static class ProbeParameterStubber
             if (string.Equals(name, "db", StringComparison.Ordinal)
                 || string.Equals(name, "cancellationToken", StringComparison.OrdinalIgnoreCase)
                 || IsLambdaParameter(name)
+                || _queryRangeVariables.Contains(name)
+                || IsInvocationCallee(node)
                 || IsDeclaredInProbe(node)
                 || IsInTypeContext(node)
                 || IsMemberAccessPart(node)
@@ -424,6 +466,12 @@ internal static class ProbeParameterStubber
         private static ExpressionSyntax GuidStubLiteral()
         {
             return SyntaxFactory.ParseExpression("Guid.Empty");
+        }
+
+        private static bool IsInvocationCallee(IdentifierNameSyntax node)
+        {
+            return node.Parent is InvocationExpressionSyntax invocation
+                   && invocation.Expression == node;
         }
 
         private static bool IsInTypeContext(IdentifierNameSyntax node)

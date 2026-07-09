@@ -68,7 +68,8 @@ internal static class QueryResultWriter
                 dbLogSettings,
                 host.EnumerateLoadedAssemblies(),
                 cancellationToken,
-                captureConsoleOutput: outputFormat == CliOutputFormat.Json);
+                captureConsoleOutput: outputFormat == CliOutputFormat.Json,
+                host: host);
 
             var (_, _, _, _, _, exportRows) = ResultAnalyzer.Analyze(result);
 

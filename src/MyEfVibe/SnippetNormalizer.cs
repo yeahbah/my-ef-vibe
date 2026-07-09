@@ -35,7 +35,21 @@ internal static class SnippetNormalizer
 
         if (QueryComprehensionSyntax.IsQueryComprehensionOnlySnippet(trimmed))
         {
-            return ProbeScriptFormatter.ToScriptExpression(trimmed);
+            var script = ProbeScriptFormatter.ToScriptExpression(trimmed);
+
+            if (dbContextType is not null)
+            {
+                QueryableEntityTypeResolver.TryExtractConcreteEntityTypeName(
+                    trimmed,
+                    dbContextType,
+                    out var entityTypeName);
+
+                script = ProbeParameterStubber.Stub(
+                    script,
+                    new ProbeStubContext(dbContextType, entityTypeName));
+            }
+
+            return script;
         }
 
         var lines = InputLineUtilities.SplitLines(trimmed);

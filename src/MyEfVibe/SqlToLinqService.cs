@@ -1,7 +1,7 @@
-using System.Reflection;
+using MyEfVibe.Linq;
+using MyEfVibe.Workspace;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using MyEfVibe.Workspace;
 
 namespace MyEfVibe;
 
@@ -10,7 +10,7 @@ internal static class SqlToLinqService
     internal static async Task<SqlToLinqConverter.SqlToLinqDraft> ConvertAndValidateAsync(
         object dbContext,
         ScriptSession session,
-        IEnumerable<Assembly> inspectionAssemblies,
+        WorkspaceHost host,
         DbLogSettings dbLogSettings,
         string sql,
         CancellationToken cancellationToken = default)
@@ -22,28 +22,15 @@ internal static class SqlToLinqService
             return draft;
         }
 
-        var probe = SqlTranslationProbe.TryCreateProbeExpression(draft.Linq);
-
-        if (string.IsNullOrWhiteSpace(probe))
-        {
-            return draft;
-        }
-
-        var expression = probe.Contains("ToQueryString", StringComparison.Ordinal)
-            ? probe
-            : ProbeScriptFormatter.ToQueryStringProbe(probe);
-
         try
         {
-            var (_, metrics) = await QueryEvaluator.EvaluateAsync(
-                dbContext,
+            var translation = await LinqDeepSqlTranslator.TranslateAsync(
                 session,
-                expression,
-                dbLogSettings,
-                inspectionAssemblies,
-                cancellationToken);
+                host,
+                draft.Linq,
+                cancellationToken: cancellationToken);
 
-            draft.TranslatedSql = metrics.TranslatedSql ?? metrics.ExecutedSql.FirstOrDefault();
+            draft.TranslatedSql = translation.Sql;
             draft.Similarity = SqlSimilarity.Compare(sql, draft.TranslatedSql);
         }
         catch
