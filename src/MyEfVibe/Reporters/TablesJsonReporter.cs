@@ -20,12 +20,30 @@ internal static class TablesJsonReporter
 
     internal static TablesJsonPayload Build(object dbContext)
     {
-        var tables = SchemaBrowser.GetDbSets(dbContext)
-            .Select(entry => new TablesJsonEntry
+        var dbSets = EntityDescriptor.EnumerateDbSetEntities(dbContext).ToArray();
+        var entityTypeNames = dbSets.Select(static entry => entry.EntityType).ToHashSet();
+
+        var tables = dbSets
+            .Select(entry =>
             {
-                DbSet = entry.DbSet,
-                EntityType = entry.EntityType,
-                EntityTypeFullName = entry.EntityTypeFullName
+                var modelEntity = EntityDescriptor.TryFindModelEntity(dbContext, entry.EntityType);
+                var members = EntityDescriptor.DescribeMembers(entry.EntityType, modelEntity, entityTypeNames)
+                    .Select(static member => new TablesJsonMember
+                    {
+                        Name = member.Name,
+                        Type = member.TypeDisplay,
+                        Nullable = member.Nullable,
+                        Notes = string.IsNullOrWhiteSpace(member.Notes) ? null : member.Notes
+                    })
+                    .ToArray();
+
+                return new TablesJsonEntry
+                {
+                    DbSet = entry.DbSetName,
+                    EntityType = entry.EntityType.Name,
+                    EntityTypeFullName = entry.EntityType.FullName,
+                    Members = members
+                };
             })
             .ToArray();
 
@@ -50,5 +68,18 @@ internal static class TablesJsonReporter
         public string EntityType { get; init; } = string.Empty;
 
         public string? EntityTypeFullName { get; init; }
+
+        public TablesJsonMember[] Members { get; init; } = [];
+    }
+
+    internal sealed class TablesJsonMember
+    {
+        public string Name { get; init; } = string.Empty;
+
+        public string Type { get; init; } = string.Empty;
+
+        public string Nullable { get; init; } = string.Empty;
+
+        public string? Notes { get; init; }
     }
 }

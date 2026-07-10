@@ -13,6 +13,15 @@ internal sealed class TablesJsonEntry
     public string? DbSet { get; set; }
     public string? EntityType { get; set; }
     public string? EntityTypeFullName { get; set; }
+    public List<TablesJsonMember>? Members { get; set; }
+}
+
+internal sealed class TablesJsonMember
+{
+    public string? Name { get; set; }
+    public string? Type { get; set; }
+    public string? Nullable { get; set; }
+    public string? Notes { get; set; }
 }
 
 internal sealed class DescribeJsonPayload

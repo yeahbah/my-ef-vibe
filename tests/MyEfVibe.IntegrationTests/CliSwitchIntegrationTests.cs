@@ -75,6 +75,35 @@ public sealed class CliSwitchIntegrationTests
     }
 
     [SkippableFact]
+    public async Task Main_tables_json_emits_entity_members()
+    {
+        IntegrationTestGuards.RequireEnabled();
+
+        var result = await EfvibeCliRunner.RunAsync(
+            BuildSqliteCommand(
+                "--tables-json",
+                "--no-banner",
+                "--connection-string",
+                SqliteScenario.ConnectionString!),
+            TimeSpan.FromMinutes(2));
+
+        EfvibeCliRunner.AssertOptionRecognized(result);
+        Assert.Equal(0, result.ExitCode);
+
+        using var document = JsonDocument.Parse(result.StandardOutput.Trim());
+        var tables = document.RootElement.GetProperty("tables");
+        Assert.Equal(JsonValueKind.Array, tables.ValueKind);
+        Assert.True(tables.GetArrayLength() > 0);
+
+        var firstTable = tables[0];
+        Assert.True(firstTable.TryGetProperty("members", out var members));
+        Assert.Equal(JsonValueKind.Array, members.ValueKind);
+        Assert.True(members.GetArrayLength() > 0);
+        Assert.True(members[0].TryGetProperty("name", out _));
+        Assert.True(members[0].TryGetProperty("type", out _));
+    }
+
+    [SkippableFact]
     public async Task Main_dbinfo_json_emits_connection_metadata()
     {
         IntegrationTestGuards.RequireEnabled();
