@@ -77,10 +77,13 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
             statement,
             nameof(QueryCompProduct),
             typeof(QueryCompProductDbContext),
-            nameof(QueryCompProduct));
+            nameof(QueryCompProduct),
+            preserveIdentifiers: session.GetDefinedIdentifiers());
 
         Assert.NotNull(probe);
         Assert.StartsWith("ActiveProducts()", probe, StringComparison.Ordinal);
+        Assert.Contains(".Take(DefaultTake)", probe, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(0)", probe, StringComparison.Ordinal);
         Assert.DoesNotContain("0()", probe, StringComparison.Ordinal);
         ProbeTestHelper.AssertParsesAsScript(probe);
 
@@ -92,6 +95,29 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
         Assert.Contains("Product", sqlText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ListPrice", sqlText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("SELECT 0", sqlText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("LIMIT 0", sqlText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("25", sqlText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ActiveProducts_repository_style_evaluation_preserves_DefaultTake()
+    {
+        var session = await CreateSessionAsync(seedProducts: true);
+
+        Assert.Contains("DefaultTake", session.GetDefinedIdentifiers());
+
+        const string snippet = """
+                               await ActiveProducts()
+                                   .OrderBy(product => product.Name)
+                                   .Take(DefaultTake)
+                                   .ToListAsync(cancellationToken);
+                               """;
+
+        var result = await session.EvaluateAsync(snippet);
+
+        Assert.NotNull(result);
+        var list = Assert.IsAssignableFrom<System.Collections.ICollection>(result);
+        Assert.Equal(3, list.Count);
     }
 
     [Fact]
@@ -113,7 +139,7 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
         Assert.True(LinqEfQueryHeuristics.LooksLikeEfQuery(statement));
     }
 
-    private async Task<ScriptSession> CreateSessionAsync()
+    private async Task<ScriptSession> CreateSessionAsync(bool seedProducts = false)
     {
         var options = new DbContextOptionsBuilder<QueryCompProductDbContext>()
             .UseSqlite($"Data Source=helper-query-{Guid.NewGuid():N};Mode=Memory;Cache=Shared")
@@ -121,6 +147,15 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
 
         var context = new QueryCompProductDbContext(options);
         await context.Database.EnsureCreatedAsync();
+
+        if (seedProducts)
+        {
+            context.Products.AddRange(
+                new QueryCompProduct { ProductId = 1, Name = "A", ListPrice = 10m },
+                new QueryCompProduct { ProductId = 2, Name = "B", ListPrice = 20m },
+                new QueryCompProduct { ProductId = 3, Name = "C", ListPrice = 30m });
+            await context.SaveChangesAsync();
+        }
 
         using var assemblyLoader = new InteractiveAssemblyLoader();
         assemblyLoader.RegisterDependency(typeof(QueryCompProductDbContext).Assembly);

@@ -9,7 +9,8 @@ internal static class SnippetNormalizer
     internal static string ForEvaluation(
         string snippet,
         Type? dbContextType = null,
-        bool preserveAsyncQueries = false)
+        bool preserveAsyncQueries = false,
+        IReadOnlySet<string>? preserveIdentifiers = null)
     {
         var trimmed = snippet.Trim();
 
@@ -30,7 +31,11 @@ internal static class SnippetNormalizer
 
         if (dbContextType is not null && LooksLikeRepositorySnippet(trimmed))
         {
-            return RepositorySnippetAdapter.PrepareForEvaluation(trimmed, dbContextType, preserveAsyncQueries);
+            return RepositorySnippetAdapter.PrepareForEvaluation(
+                trimmed,
+                dbContextType,
+                preserveAsyncQueries,
+                preserveIdentifiers);
         }
 
         if (QueryComprehensionSyntax.IsQueryComprehensionOnlySnippet(trimmed))
@@ -46,7 +51,8 @@ internal static class SnippetNormalizer
 
                 script = ProbeParameterStubber.Stub(
                     script,
-                    new ProbeStubContext(dbContextType, entityTypeName));
+                    new ProbeStubContext(dbContextType, entityTypeName),
+                    preserveIdentifiers: preserveIdentifiers);
             }
 
             return script;

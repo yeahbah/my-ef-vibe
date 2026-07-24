@@ -8,7 +8,8 @@ internal static class RepositorySnippetAdapter
     internal static string PrepareForEvaluation(
         string snippet,
         Type dbContextType,
-        bool preserveAsyncQueries = false)
+        bool preserveAsyncQueries = false,
+        IReadOnlySet<string>? preserveIdentifiers = null)
     {
         if (string.IsNullOrWhiteSpace(snippet))
         {
@@ -20,7 +21,8 @@ internal static class RepositorySnippetAdapter
         normalized = ProbeParameterStubber.Stub(
             normalized,
             new ProbeStubContext(dbContextType, null),
-            preserveAsyncQueries);
+            preserveAsyncQueries,
+            preserveIdentifiers);
 
         if (!preserveAsyncQueries)
         {

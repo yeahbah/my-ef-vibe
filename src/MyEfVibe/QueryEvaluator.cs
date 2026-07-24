@@ -44,7 +44,8 @@ internal static class QueryEvaluator
         var normalizedSnippet = SnippetNormalizer.ForEvaluation(
             executionSnippet,
             session.DbContextType,
-            session.PreserveAsyncQueries);
+            session.PreserveAsyncQueries,
+            session.GetDefinedIdentifiers());
         var warnings = new List<string>(SnippetWarningsAnalyzer.Analyze(normalizedSnippet));
 
         if (paging is not { IsRequested: true }

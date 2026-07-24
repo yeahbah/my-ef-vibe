@@ -57,12 +57,17 @@ internal static class LinqDeepSqlTranslator
                 "Open generic repository query (Set<T>) — no DbSet entity types found on the DbContext.");
         }
 
+        host.EnsureEntityFrameworkRelationalLoaded();
+
+        await session.EnsureInitializedAsync(cancellationToken);
+
         var probe = LinqDeepExpressionAdapter.TryCreateProbeExpression(
             statementOrCode,
             representativeEntity,
             session.DbContext.GetType(),
             queryEntityType,
-            contextInstanceIdentifiers);
+            contextInstanceIdentifiers,
+            session.GetDefinedIdentifiers());
 
         if (probe is null)
         {
@@ -70,8 +75,6 @@ internal static class LinqDeepSqlTranslator
                 null,
                 "Could not derive an IQueryable probe (unsupported syntax or terminal operator).");
         }
-
-        host.EnsureEntityFrameworkRelationalLoaded();
 
         var inspectionAssemblies = host.EnumerateLoadedAssemblies()
             .Concat(host.EnumerateDiscoveryAssemblies())

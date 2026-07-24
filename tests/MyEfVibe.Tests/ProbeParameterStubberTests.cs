@@ -149,6 +149,21 @@ public sealed class ProbeParameterStubberTests
     }
 
     [Fact]
+    public void Stub_PreservesSessionDefinedTakeIdentifier()
+    {
+        const string probe = "ActiveProducts().OrderBy(p => p.Name).Take(DefaultTake)";
+
+        var stubbed = ProbeParameterStubber.Stub(
+            probe,
+            preserveIdentifiers: new HashSet<string>(StringComparer.Ordinal) { "DefaultTake", "ActiveProducts" });
+
+        Assert.StartsWith("ActiveProducts()", stubbed, StringComparison.Ordinal);
+        Assert.Contains(".Take(DefaultTake)", stubbed, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(0)", stubbed, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(stubbed);
+    }
+
+    [Fact]
     public void Stub_QueryComprehensionRangeVariable_NotReplaced()
     {
         const string probe = """
