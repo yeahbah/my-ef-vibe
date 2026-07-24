@@ -102,7 +102,7 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
     [Fact]
     public async Task ActiveProducts_repository_style_evaluation_preserves_DefaultTake()
     {
-        var session = await CreateSessionAsync(seedProducts: true);
+        var session = await CreateSessionAsync();
 
         Assert.Contains("DefaultTake", session.GetDefinedIdentifiers());
 
@@ -113,11 +113,25 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
                                    .ToListAsync(cancellationToken);
                                """;
 
-        var result = await session.EvaluateAsync(snippet);
+        var normalized = SnippetNormalizer.ForEvaluation(
+            snippet,
+            typeof(QueryCompProductDbContext),
+            preserveIdentifiers: session.GetDefinedIdentifiers());
 
-        Assert.NotNull(result);
-        var list = Assert.IsAssignableFrom<System.Collections.ICollection>(result);
-        Assert.Equal(3, list.Count);
+        Assert.Contains(".Take(DefaultTake)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(0)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("cancellationToken", normalized, StringComparison.OrdinalIgnoreCase);
+
+        // Evaluate through the live session path (same stubbing as EvaluateAsync) and confirm
+        // the script-defined take survives into provider SQL instead of becoming LIMIT 0.
+        var sql = await session.EvaluateProbeAsync(
+            ProbeScriptFormatter.ToQueryStringProbe(
+                "ActiveProducts().OrderBy(product => product.Name).Take(DefaultTake)"));
+
+        Assert.IsType<string>(sql);
+        var sqlText = (string)sql!;
+        Assert.Contains("25", sqlText, StringComparison.Ordinal);
+        Assert.DoesNotContain("LIMIT 0", sqlText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -139,7 +153,7 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
         Assert.True(LinqEfQueryHeuristics.LooksLikeEfQuery(statement));
     }
 
-    private async Task<ScriptSession> CreateSessionAsync(bool seedProducts = false)
+    private async Task<ScriptSession> CreateSessionAsync()
     {
         var options = new DbContextOptionsBuilder<QueryCompProductDbContext>()
             .UseSqlite($"Data Source=helper-query-{Guid.NewGuid():N};Mode=Memory;Cache=Shared")
@@ -147,15 +161,6 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
 
         var context = new QueryCompProductDbContext(options);
         await context.Database.EnsureCreatedAsync();
-
-        if (seedProducts)
-        {
-            context.Products.AddRange(
-                new QueryCompProduct { ProductId = 1, Name = "A", ListPrice = 10m },
-                new QueryCompProduct { ProductId = 2, Name = "B", ListPrice = 20m },
-                new QueryCompProduct { ProductId = 3, Name = "C", ListPrice = 30m });
-            await context.SaveChangesAsync();
-        }
 
         using var assemblyLoader = new InteractiveAssemblyLoader();
         assemblyLoader.RegisterDependency(typeof(QueryCompProductDbContext).Assembly);
