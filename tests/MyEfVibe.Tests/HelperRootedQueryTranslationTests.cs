@@ -77,10 +77,13 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
             statement,
             nameof(QueryCompProduct),
             typeof(QueryCompProductDbContext),
-            nameof(QueryCompProduct));
+            nameof(QueryCompProduct),
+            preserveIdentifiers: session.GetDefinedIdentifiers());
 
         Assert.NotNull(probe);
         Assert.StartsWith("ActiveProducts()", probe, StringComparison.Ordinal);
+        Assert.Contains(".Take(DefaultTake)", probe, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(0)", probe, StringComparison.Ordinal);
         Assert.DoesNotContain("0()", probe, StringComparison.Ordinal);
         ProbeTestHelper.AssertParsesAsScript(probe);
 
@@ -92,6 +95,43 @@ public sealed class HelperRootedQueryTranslationTests : IDisposable
         Assert.Contains("Product", sqlText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ListPrice", sqlText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("SELECT 0", sqlText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("LIMIT 0", sqlText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("25", sqlText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ActiveProducts_repository_style_evaluation_preserves_DefaultTake()
+    {
+        var session = await CreateSessionAsync();
+
+        Assert.Contains("DefaultTake", session.GetDefinedIdentifiers());
+
+        const string snippet = """
+                               await ActiveProducts()
+                                   .OrderBy(product => product.Name)
+                                   .Take(DefaultTake)
+                                   .ToListAsync(cancellationToken);
+                               """;
+
+        var normalized = SnippetNormalizer.ForEvaluation(
+            snippet,
+            typeof(QueryCompProductDbContext),
+            preserveIdentifiers: session.GetDefinedIdentifiers());
+
+        Assert.Contains(".Take(DefaultTake)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(0)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("cancellationToken", normalized, StringComparison.OrdinalIgnoreCase);
+
+        // Evaluate through the live session path (same stubbing as EvaluateAsync) and confirm
+        // the script-defined take survives into provider SQL instead of becoming LIMIT 0.
+        var sql = await session.EvaluateProbeAsync(
+            ProbeScriptFormatter.ToQueryStringProbe(
+                "ActiveProducts().OrderBy(product => product.Name).Take(DefaultTake)"));
+
+        Assert.IsType<string>(sql);
+        var sqlText = (string)sql!;
+        Assert.Contains("25", sqlText, StringComparison.Ordinal);
+        Assert.DoesNotContain("LIMIT 0", sqlText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

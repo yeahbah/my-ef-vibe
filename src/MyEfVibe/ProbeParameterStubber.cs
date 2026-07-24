@@ -12,7 +12,8 @@ internal static class ProbeParameterStubber
     internal static string Stub(
         string probeExpression,
         ProbeStubContext? context = null,
-        bool preserveLeadingAwait = false)
+        bool preserveLeadingAwait = false,
+        IReadOnlySet<string>? preserveIdentifiers = null)
     {
         if (string.IsNullOrWhiteSpace(probeExpression))
         {
@@ -34,7 +35,8 @@ internal static class ProbeParameterStubber
                 .SelectMany(CollectQueryRangeVariables)
                 .ToHashSet(StringComparer.Ordinal);
 
-            var rewritten = new ParameterStubRewriter(context, queryRangeVariables).Visit(tree.GetRoot());
+            var rewritten = new ParameterStubRewriter(context, queryRangeVariables, preserveIdentifiers)
+                .Visit(tree.GetRoot());
 
             if (rewritten is null)
             {
@@ -109,12 +111,19 @@ internal static class ProbeParameterStubber
     {
         private readonly ProbeStubContext? _context;
         private readonly HashSet<string> _queryRangeVariables;
+        private readonly HashSet<string> _preserveIdentifiers;
         private readonly Stack<HashSet<string>> _lambdaParameters = new();
 
-        internal ParameterStubRewriter(ProbeStubContext? context, HashSet<string>? queryRangeVariables = null)
+        internal ParameterStubRewriter(
+            ProbeStubContext? context,
+            HashSet<string>? queryRangeVariables = null,
+            IReadOnlySet<string>? preserveIdentifiers = null)
         {
             _context = context;
             _queryRangeVariables = queryRangeVariables ?? new HashSet<string>(StringComparer.Ordinal);
+            _preserveIdentifiers = preserveIdentifiers is null
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : new HashSet<string>(preserveIdentifiers, StringComparer.Ordinal);
         }
 
         public override SyntaxNode? VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node)
@@ -191,6 +200,7 @@ internal static class ProbeParameterStubber
                 || string.Equals(name, "cancellationToken", StringComparison.OrdinalIgnoreCase)
                 || IsLambdaParameter(name)
                 || _queryRangeVariables.Contains(name)
+                || _preserveIdentifiers.Contains(name)
                 || IsInvocationCallee(node)
                 || IsDeclaredInProbe(node)
                 || IsInTypeContext(node)

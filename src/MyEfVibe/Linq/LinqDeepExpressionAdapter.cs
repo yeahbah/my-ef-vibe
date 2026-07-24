@@ -7,7 +7,8 @@ internal static class LinqDeepExpressionAdapter
         string? representativeEntityTypeName = null,
         Type? dbContextType = null,
         string? queryEntityTypeName = null,
-        IEnumerable<string>? contextInstanceIdentifiers = null)
+        IEnumerable<string>? contextInstanceIdentifiers = null,
+        IReadOnlySet<string>? preserveIdentifiers = null)
     {
         var normalized = NormalizeStatement(statementOrExpression);
 
@@ -31,7 +32,8 @@ internal static class LinqDeepExpressionAdapter
 
         probe = ProbeParameterStubber.Stub(
             ProbeScriptFormatter.ToScriptExpression(probe),
-            stubContext);
+            stubContext,
+            preserveIdentifiers: preserveIdentifiers);
 
         if (string.IsNullOrWhiteSpace(representativeEntityTypeName)
             || !OpenGenericProbeBinder.ContainsOpenGenericTypeParameter(probe))

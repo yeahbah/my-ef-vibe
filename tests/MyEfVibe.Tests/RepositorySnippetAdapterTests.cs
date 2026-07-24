@@ -41,6 +41,32 @@ public sealed class RepositorySnippetAdapterTests
     }
 
     [Fact]
+    public void PrepareForEvaluation_PreservesSessionDefinedTakeOnRepositorySnippet()
+    {
+        const string snippet = """
+                               await ActiveProducts()
+                                   .OrderBy(p => p.Name)
+                                   .Take(DefaultTake)
+                                   .ToListAsync(cancellationToken);
+                               """;
+
+        var withoutPreserve = SnippetNormalizer.ForEvaluation(
+            snippet,
+            typeof(FakeAdventureWorksDbContext));
+
+        Assert.Contains(".Take(0)", withoutPreserve, StringComparison.Ordinal);
+
+        var withPreserve = SnippetNormalizer.ForEvaluation(
+            snippet,
+            typeof(FakeAdventureWorksDbContext),
+            preserveIdentifiers: new HashSet<string>(StringComparer.Ordinal) { "DefaultTake", "ActiveProducts" });
+
+        Assert.Contains(".Take(DefaultTake)", withPreserve, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(0)", withPreserve, StringComparison.Ordinal);
+        Assert.DoesNotContain("cancellationToken", withPreserve, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PrepareForEvaluation_RepositoryQuery_StripsAwaitDbContextAndParameters()
     {
         const string snippet = """

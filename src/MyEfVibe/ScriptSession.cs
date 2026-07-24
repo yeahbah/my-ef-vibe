@@ -185,7 +185,11 @@ internal sealed class ScriptSession
     {
         await EnsureBootstrapAsync(cancellationToken);
 
-        var trimmed = SnippetNormalizer.ForEvaluation(code, DbContextType, PreserveAsyncQueries);
+        var trimmed = SnippetNormalizer.ForEvaluation(
+            code,
+            DbContextType,
+            PreserveAsyncQueries,
+            GetDefinedIdentifiers());
         if (string.IsNullOrEmpty(trimmed))
         {
             return null;
@@ -234,7 +238,8 @@ internal sealed class ScriptSession
             ScriptAttributeParser.StripScriptAttributeLines(
                 ProbeScriptFormatter.ToScriptExpression(code)),
             DbContextType,
-            PreserveAsyncQueries);
+            PreserveAsyncQueries,
+            GetDefinedIdentifiers());
 
         if (string.IsNullOrEmpty(trimmed))
         {
@@ -332,6 +337,18 @@ internal sealed class ScriptSession
         _submissionHistory.Add(normalized);
     }
 
+    internal IReadOnlySet<string> GetDefinedIdentifiers()
+    {
+        if (_state is null)
+        {
+            return ImmutableHashSet<string>.Empty;
+        }
+
+        return _state.Variables
+            .Select(static variable => variable.Name)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
     internal void Reset()
     {
         _state = null;
@@ -339,6 +356,9 @@ internal sealed class ScriptSession
         _submissionHistory.Clear();
         _bootstrapCompleted = false;
     }
+
+    internal Task EnsureInitializedAsync(CancellationToken cancellationToken = default)
+        => EnsureBootstrapAsync(cancellationToken);
 
     private async Task EnsureBootstrapAsync(CancellationToken cancellationToken)
     {
