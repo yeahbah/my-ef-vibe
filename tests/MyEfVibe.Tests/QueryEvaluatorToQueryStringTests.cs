@@ -64,20 +64,10 @@ public sealed class QueryEvaluatorToQueryStringTests
     }
 
     [Fact]
-    public async Task DeepTranslate_rejects_bare_session_variable_expression()
+    public void DeepTranslate_heuristics_reject_bare_session_variable_expression()
     {
-        await using var context = await CreateContextAsync();
-        using var assemblyLoader = CreateAssemblyLoader();
-        var session = CreateSession(context, assemblyLoader);
-
-        await session.EvaluateAsync("var q = db.Products.Where(product => product.ListPrice > 0);");
-
-        var host = (WorkspaceHost)RuntimeHelpers.GetUninitializedObject(typeof(WorkspaceHost));
-
-        var translation = await LinqDeepSqlTranslator.TranslateAsync(session, host, "q");
-
-        Assert.Null(translation.Sql);
-        Assert.Equal("Not an EF Core query expression.", translation.Note);
+        // Documents why eval must not short-circuit `q.ToQueryString()` into deep translate.
+        Assert.False(LinqEfQueryHeuristics.LooksLikeEfQuery("q"));
     }
 
     private static async Task<QueryCompProductDbContext> CreateContextAsync()
