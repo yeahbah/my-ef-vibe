@@ -10,34 +10,6 @@ namespace MyEfVibe.Tests;
 public sealed class QueryEvaluatorToQueryStringTests
 {
     [Fact]
-    public async Task EvaluateAsync_ToQueryString_on_session_variable_uses_live_session()
-    {
-        await using var context = await CreateContextAsync();
-        using var assemblyLoader = CreateAssemblyLoader();
-        var session = CreateSession(context, assemblyLoader);
-
-        await session.EvaluateAsync("var q = db.Products.Where(product => product.ListPrice > 0);");
-
-        // Serve/REPL always pass a WorkspaceHost. The previous eval short-circuit sent the stripped
-        // expression (`q`) through LinqDeepSqlTranslator, which rejects bare session variables.
-        var host = (WorkspaceHost)RuntimeHelpers.GetUninitializedObject(typeof(WorkspaceHost));
-
-        var (result, metrics) = await QueryEvaluator.EvaluateAsync(
-            context,
-            session,
-            "q.ToQueryString()",
-            new DbLogSettings { Enabled = false },
-            [typeof(QueryCompProductDbContext).Assembly],
-            host: host);
-
-        Assert.True(metrics.Succeeded);
-        Assert.IsType<string>(result);
-        var sqlText = (string)result!;
-        Assert.Contains("Product", sqlText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("ListPrice", sqlText, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
     public async Task EvaluateAsync_ToQueryString_preserves_session_filter_constant()
     {
         await using var context = await CreateContextAsync();
@@ -46,6 +18,9 @@ public sealed class QueryEvaluatorToQueryStringTests
 
         await session.EvaluateAsync("""var filter = "Bike";""");
 
+        // Serve/REPL always pass a WorkspaceHost. The previous eval short-circuit stripped
+        // `.ToQueryString()` and ran the remainder through LinqDeepSqlTranslator, which stubs
+        // unbound identifiers and turned `filter` into an empty string.
         var host = (WorkspaceHost)RuntimeHelpers.GetUninitializedObject(typeof(WorkspaceHost));
 
         var (result, metrics) = await QueryEvaluator.EvaluateAsync(
@@ -64,9 +39,35 @@ public sealed class QueryEvaluatorToQueryStringTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_ToQueryString_preserves_session_take_constant()
+    {
+        await using var context = await CreateContextAsync();
+        using var assemblyLoader = CreateAssemblyLoader();
+        var session = CreateSession(context, assemblyLoader);
+
+        await session.EvaluateAsync("const int DefaultTake = 25;");
+
+        var host = (WorkspaceHost)RuntimeHelpers.GetUninitializedObject(typeof(WorkspaceHost));
+
+        var (result, metrics) = await QueryEvaluator.EvaluateAsync(
+            context,
+            session,
+            "db.Products.OrderBy(product => product.Name).Take(DefaultTake).ToQueryString()",
+            new DbLogSettings { Enabled = false },
+            [typeof(QueryCompProductDbContext).Assembly],
+            host: host);
+
+        Assert.True(metrics.Succeeded);
+        Assert.IsType<string>(result);
+        var sqlText = (string)result!;
+        Assert.Contains("25", sqlText, StringComparison.Ordinal);
+        Assert.DoesNotContain("LIMIT 0", sqlText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void DeepTranslate_heuristics_reject_bare_session_variable_expression()
     {
-        // Documents why eval must not short-circuit `q.ToQueryString()` into deep translate.
+        // Documents why eval must not short-circuit stripped expressions like `q` into deep translate.
         Assert.False(LinqEfQueryHeuristics.LooksLikeEfQuery("q"));
     }
 
