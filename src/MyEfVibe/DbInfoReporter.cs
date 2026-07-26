@@ -123,7 +123,7 @@ internal static class DbInfoReporter
             rows.Add(("Database", NullIfEmpty(dbConnection.Database)));
             rows.Add(("Server version", await TryGetServerVersionAsync(dbConnection, providerName, cancellationToken)
                                         ?? "(unavailable)"));
-            rows.Add(("Connection string", NullIfEmpty(dbConnection.ConnectionString)));
+            rows.Add(("Connection string", RedactRelationalConnectionString(dbConnection.ConnectionString)));
         }
         catch (Exception failure)
         {
@@ -223,6 +223,75 @@ internal static class DbInfoReporter
         }
 
         return uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
+    }
+
+    /// <summary>
+    /// Masks secret-bearing keys in ADO.NET-style connection strings while preserving
+    /// host/database diagnostics for :dbinfo / --dbinfo-json surfaces.
+    /// </summary>
+    internal static string RedactRelationalConnectionString(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return "(empty)";
+        }
+
+        try
+        {
+            var builder = new DbConnectionStringBuilder
+            {
+                ConnectionString = connectionString
+            };
+
+            var keys = builder.Keys.Cast<object>().Select(static key => key.ToString()!).ToArray();
+
+            foreach (var key in keys)
+            {
+                if (IsSensitiveConnectionStringKey(key))
+                {
+                    builder[key] = "****";
+                }
+            }
+
+            return builder.ConnectionString;
+        }
+        catch (ArgumentException)
+        {
+            return RedactRelationalConnectionStringFallback(connectionString);
+        }
+    }
+
+    private static bool IsSensitiveConnectionStringKey(string key)
+    {
+        // Normalize separators so "Account Key", "AccountKey", and "account_key" match.
+        var normalized = key.Replace(" ", string.Empty, StringComparison.Ordinal)
+            .Replace("_", string.Empty, StringComparison.Ordinal);
+
+        return normalized.Equals("Password", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("Pwd", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("UserPassword", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("AccountKey", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("SharedAccessSignature", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("SharedAccessKey", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("ClientSecret", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("AccessToken", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("Secret", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("PrivateKey", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("SSLPassword", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("SSLKeyPassword", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string RedactRelationalConnectionStringFallback(string connectionString)
+    {
+        // Best-effort for malformed strings that DbConnectionStringBuilder rejects.
+        return System.Text.RegularExpressions.Regex.Replace(
+            connectionString,
+            @"(?i)\b(Password|Pwd|User\s*Password|Account\s*Key|Shared\s*Access\s*Signature|Shared\s*Access\s*Key|Client\s*Secret|Access\s*Token|Secret|Private\s*Key|SSL\s*Password|SSL\s*Key\s*Password)\s*=\s*[^;]*",
+            static match =>
+            {
+                var equals = match.Value.IndexOf('=');
+                return equals < 0 ? match.Value : match.Value[..(equals + 1)] + "****";
+            });
     }
 
     private static string? TryGetEfCoreVersion()

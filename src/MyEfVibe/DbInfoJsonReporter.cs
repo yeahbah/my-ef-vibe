@@ -151,7 +151,10 @@ internal static class DbInfoJsonReporter
                             ?? "(unknown)"
                 });
                 rows.Add(new DbInfoJsonEntry
-                    { Key = "Connection string", Value = NullIfEmpty(dbConnection.ConnectionString) });
+                {
+                    Key = "Connection string",
+                    Value = NullIfEmpty(DbInfoReporter.RedactRelationalConnectionString(dbConnection.ConnectionString))
+                });
             }
             catch (Exception failure)
             {
