@@ -11,8 +11,8 @@ internal static class ExpressionGuard
         new Regex(@"\b(?:Add|AddRange|Update|UpdateRange|Remove|RemoveRange|Attach|AttachRange)\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"\bExecuteDelete(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"\bExecuteUpdate(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new Regex(@"\bExecuteSql(?:Raw)?(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new Regex(@"\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bExecuteSql(?:Raw|Interpolated)?(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw|Interpolated)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"\bFromSqlRaw\s*<", RegexOptions.IgnoreCase | RegexOptions.Compiled),
     };
 
@@ -20,7 +20,7 @@ internal static class ExpressionGuard
     private static readonly Regex LineComments = new Regex(@"//.*$", RegexOptions.Multiline | RegexOptions.Compiled);
     private static readonly Regex ScriptReferenceDirective = new Regex(@"^\s*#(?:load|r)\b", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
     private static readonly Regex BlockedSql = new Regex(@"\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex SqlApi = new Regex(@"\b(?:ExecuteSql|FromSqlRaw|SqlQuery)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SqlApi = new Regex(@"\b(?:ExecuteSql(?:Raw|Interpolated)?|FromSqlRaw|SqlQuery)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     internal static bool IsReadOnly(string expression, out string reason)
     {

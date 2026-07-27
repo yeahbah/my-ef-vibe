@@ -6,13 +6,14 @@ object ExpressionGuard {
         Regex("""\b(?:Add|AddRange|Update|UpdateRange|Remove|RemoveRange|Attach|AttachRange)\s*\(""", RegexOption.IGNORE_CASE),
         Regex("""\bExecuteDelete(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
         Regex("""\bExecuteUpdate(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
-        Regex("""\bExecuteSql(?:Raw)?(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
-        Regex("""\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(""", RegexOption.IGNORE_CASE),
+        Regex("""\bExecuteSql(?:Raw|Interpolated)?(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
+        Regex("""\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw|Interpolated)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(""", RegexOption.IGNORE_CASE),
         Regex("""\bFromSqlRaw\s*<""", RegexOption.IGNORE_CASE),
     )
 
     private val blockedSql = Regex("""\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\b""", RegexOption.IGNORE_CASE)
     private val scriptReferenceDirective = Regex("""^\s*#(?:load|r)\b""", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
+    private val sqlApi = Regex("""\b(?:ExecuteSql(?:Raw|Interpolated)?|FromSqlRaw|SqlQuery)\b""", RegexOption.IGNORE_CASE)
 
     fun validate(expression: String): String? {
         val trimmed = expression.trim()
@@ -27,7 +28,7 @@ object ExpressionGuard {
             return "Read-only mode: SaveChanges, Add/Update/Remove, ExecuteSql, ExecuteDelete/Update, and schema changes are not allowed."
         }
 
-        if (blockedSql.containsMatchIn(stripped) && Regex("""\b(?:ExecuteSql|FromSqlRaw|SqlQuery)\b""", RegexOption.IGNORE_CASE).containsMatchIn(stripped)) {
+        if (blockedSql.containsMatchIn(stripped) && sqlApi.containsMatchIn(stripped)) {
             return "Destructive SQL keywords are not allowed in ExecuteSql / FromSqlRaw expressions."
         }
 

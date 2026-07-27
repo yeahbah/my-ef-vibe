@@ -3,8 +3,8 @@ const BLOCKED_EF_PATTERNS: RegExp[] = [
   /\b(?:Add|AddRange|Update|UpdateRange|Remove|RemoveRange|Attach|AttachRange)\s*\(/i,
   /\bExecuteDelete(?:Async)?\s*\(/i,
   /\bExecuteUpdate(?:Async)?\s*\(/i,
-  /\bExecuteSql(?:Raw)?(?:Async)?\s*\(/i,
-  /\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(/i,
+  /\bExecuteSql(?:Raw|Interpolated)?(?:Async)?\s*\(/i,
+  /\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw|Interpolated)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(/i,
   /\bFromSqlRaw\s*</i,
 ];
 
@@ -65,7 +65,7 @@ export function validateReadOnlyExpression(expression: string): ExpressionGuardR
     return { ok: false, reason: sqlInString };
   }
 
-  if (BLOCKED_SQL_IN_STRING.test(stripped) && /\b(?:ExecuteSql|FromSqlRaw|SqlQuery)\b/i.test(stripped)) {
+  if (BLOCKED_SQL_IN_STRING.test(stripped) && /\b(?:ExecuteSql(?:Raw|Interpolated)?|FromSqlRaw|SqlQuery)\b/i.test(stripped)) {
     return {
       ok: false,
       reason: 'Destructive SQL keywords are not allowed in ExecuteSql / FromSqlRaw expressions.',
