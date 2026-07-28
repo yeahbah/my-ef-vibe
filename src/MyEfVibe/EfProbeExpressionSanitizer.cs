@@ -4,6 +4,9 @@ namespace MyEfVibe;
 
 /// <summary>
 ///     Removes EF operators that do not affect translated SQL from deep-scan probe expressions.
+///     Operators that change SQL predicates/joins or result cardinality (IgnoreQueryFilters,
+///     IgnoreAutoIncludes, AsSplitQuery, AsSingleQuery) must not be stripped — they are also
+///     applied on live REPL evaluation rewrite paths.
 /// </summary>
 internal static class EfProbeExpressionSanitizer
 {
@@ -11,11 +14,7 @@ internal static class EfProbeExpressionSanitizer
     [
         "AsNoTracking",
         "AsTracking",
-        "AsNoTrackingWithIdentityResolution",
-        "AsSplitQuery",
-        "AsSingleQuery",
-        "IgnoreQueryFilters",
-        "IgnoreAutoIncludes"
+        "AsNoTrackingWithIdentityResolution"
     ];
 
     internal static string RemoveTranslationNeutralOperators(string expression)
