@@ -1060,9 +1060,29 @@ internal static partial class EfReplQueryableRewriter
         Type? entityType,
         bool descending)
     {
-        var runtimeMethod = descending ? "ThenByDescending" : "ThenBy";
+        // OrderBy rewrites return object via ReplQueryableRuntime; chaining .ThenBy on that fails to compile.
+        // Keep direct IQueryable extension calls only when the source is still a typed queryable expression.
+        _ = dbContextType;
 
-        return $"{source}.{runtimeMethod}({keySelector})";
+        if (!source.StartsWith("db.", StringComparison.Ordinal)
+            && !source.StartsWith(Runtime, StringComparison.Ordinal))
+        {
+            var method = descending ? "ThenByDescending" : "ThenBy";
+            return $"{source}.{method}({keySelector})";
+        }
+
+        var runtimeMethod = descending
+            ? nameof(ReplQueryableRuntime.ThenByDescending)
+            : nameof(ReplQueryableRuntime.ThenBy);
+
+        if (entityType is not null
+            && TryInferOrderByKeyType(entityType, keySelector, out var keyType))
+        {
+            return
+                $"{Runtime}.{runtimeMethod}<{FormatTypeNameForScript(entityType)}, {FormatTypeNameForScript(keyType)}>({source}, {keySelector})";
+        }
+
+        return $"{Runtime}.{runtimeMethod}({source}, {keySelector})";
     }
 
     private static bool SourceContainsProjection(string source)

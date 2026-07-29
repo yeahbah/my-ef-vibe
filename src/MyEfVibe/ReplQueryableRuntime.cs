@@ -119,6 +119,26 @@ public static class ReplQueryableRuntime
         return InvokeQueryableOrderBy("OrderByDescending", source, keySelector);
     }
 
+    public static object ThenBy(object source, Expression keySelector)
+    {
+        return InvokeQueryableOrderBy("ThenBy", source, keySelector);
+    }
+
+    public static object ThenBy<TSource, TKey>(object source, Expression<Func<TSource, TKey>> keySelector)
+    {
+        return InvokeQueryableOrderBy("ThenBy", source, keySelector);
+    }
+
+    public static object ThenByDescending(object source, Expression keySelector)
+    {
+        return InvokeQueryableOrderBy("ThenByDescending", source, keySelector);
+    }
+
+    public static object ThenByDescending<TSource, TKey>(object source, Expression<Func<TSource, TKey>> keySelector)
+    {
+        return InvokeQueryableOrderBy("ThenByDescending", source, keySelector);
+    }
+
     public static object Count(object source)
     {
         return InvokeQueryable("Count", source);

@@ -127,6 +127,31 @@ public sealed class ReplQueryableRuntimeTests
     }
 
     [Fact]
+    public void ThenBy_after_OrderBy_applies_secondary_sort()
+    {
+        using var context = new FakeRewriterDbContext(
+            new DbContextOptionsBuilder<FakeRewriterDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                .Options);
+
+        context.Users.AddRange(
+            new FakeRewriterUser { Id = 3, Name = "sam" },
+            new FakeRewriterUser { Id = 1, Name = "sam" },
+            new FakeRewriterUser { Id = 2, Name = "ada" });
+
+        context.SaveChanges();
+
+        var ordered = ReplQueryableRuntime.OrderBy<FakeRewriterUser, string>(context.Users, user => user.Name);
+        var thenBy = (IQueryable<FakeRewriterUser>)ReplQueryableRuntime.ThenBy<FakeRewriterUser, int>(
+            ordered,
+            user => user.Id);
+        var rows = thenBy.ToArray();
+
+        Assert.Equal([2, 1, 3], rows.Select(user => user.Id).ToArray());
+        Assert.Equal(["ada", "sam", "sam"], rows.Select(user => user.Name).ToArray());
+    }
+
+    [Fact]
     public void Select_after_Take_projects_with_expression_tree()
     {
         using var context = new FakeRewriterDbContext(
