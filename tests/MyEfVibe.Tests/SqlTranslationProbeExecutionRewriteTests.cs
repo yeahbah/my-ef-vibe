@@ -173,6 +173,44 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     }
 
     [Fact]
+    public void SnippetNormalizer_ForEvaluation_OrderByThenByToList_UsesRuntimeThenBy()
+    {
+        const string probe = "db.Users.OrderBy(x => x.Id).ThenBy(x => x.Name).ToList()";
+
+        var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
+
+        Assert.StartsWith("global::MyEfVibe.ReplQueryableRuntime.ToList(", normalized, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::MyEfVibe.ReplQueryableRuntime.OrderBy<global::MyEfVibe.Tests.FakeRewriterUser, global::System.Int32>(",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::MyEfVibe.ReplQueryableRuntime.ThenBy<global::MyEfVibe.Tests.FakeRewriterUser, global::System.String>(",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(".ThenBy(", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetNormalizer_ForEvaluation_OrderByDescendingThenByDescending_UsesRuntimeHelpers()
+    {
+        const string probe =
+            "db.Users.OrderByDescending(x => x.Id).ThenByDescending(x => x.Name).ToList()";
+
+        var normalized = SnippetNormalizer.ForEvaluation(probe, typeof(FakeRewriterDbContext));
+
+        Assert.Contains(
+            "global::MyEfVibe.ReplQueryableRuntime.OrderByDescending<global::MyEfVibe.Tests.FakeRewriterUser, global::System.Int32>(",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "global::MyEfVibe.ReplQueryableRuntime.ThenByDescending<global::MyEfVibe.Tests.FakeRewriterUser, global::System.String>(",
+            normalized,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(".ThenByDescending(", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SnippetNormalizer_ForEvaluation_TakeSelectOrderByToList_DoesNotCallSelectOnObject()
     {
         const string probe =
