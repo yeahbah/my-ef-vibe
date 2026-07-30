@@ -4,7 +4,7 @@ const BLOCKED_EF_PATTERNS: RegExp[] = [
   /\bExecuteDelete(?:Async)?\s*\(/i,
   /\bExecuteUpdate(?:Async)?\s*\(/i,
   /\bExecuteSql(?:Raw)?(?:Async)?\s*\(/i,
-  /\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(/i,
+  /\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted(?:Async)?|EnsureCreated(?:Async)?|Migrate(?:Async)?)\s*\(/i,
   /\bFromSqlRaw\s*</i,
 ];
 

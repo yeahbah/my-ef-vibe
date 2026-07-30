@@ -7,7 +7,7 @@ object ExpressionGuard {
         Regex("""\bExecuteDelete(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
         Regex("""\bExecuteUpdate(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
         Regex("""\bExecuteSql(?:Raw)?(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
-        Regex("""\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(""", RegexOption.IGNORE_CASE),
+        Regex("""\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted(?:Async)?|EnsureCreated(?:Async)?|Migrate(?:Async)?)\s*\(""", RegexOption.IGNORE_CASE),
         Regex("""\bFromSqlRaw\s*<""", RegexOption.IGNORE_CASE),
     )
 

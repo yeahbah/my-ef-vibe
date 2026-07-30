@@ -12,7 +12,7 @@ internal static class ExpressionGuard
         new Regex(@"\bExecuteDelete(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"\bExecuteUpdate(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"\bExecuteSql(?:Raw)?(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new Regex(@"\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted(?:Async)?|EnsureCreated(?:Async)?|Migrate(?:Async)?)\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"\bFromSqlRaw\s*<", RegexOptions.IgnoreCase | RegexOptions.Compiled),
     };
 
