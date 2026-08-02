@@ -69,4 +69,49 @@ public sealed class ProbeScriptFormatterTests
             script);
         Assert.Contains("e => e.JobTitle", script, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ToScriptExpression_PreservesMultipleSpacesInsideStringLiterals()
+    {
+        const string expression =
+            """await db.Users.Where(u => u.Name == "John  Smith").ToListAsync();""";
+
+        var script = ProbeScriptFormatter.ToScriptExpression(expression, preserveLeadingAwait: true);
+
+        Assert.Contains("\"John  Smith\"", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"John Smith\"", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ToScriptExpression_PreservesSpacesInsideVerbatimAndInterpolatedLiterals()
+    {
+        const string verbatim =
+            """db.Users.Include(u => u.Roles).Where(u => u.Name == @"Acme   Corp")""";
+        const string interpolated =
+            """db.Users.Where(u => u.Name == $"Acme  {suffix}")""";
+
+        var verbatimScript = ProbeScriptFormatter.ToScriptExpression(verbatim);
+        var interpolatedScript = ProbeScriptFormatter.ToScriptExpression(interpolated);
+
+        Assert.Contains("@\"Acme   Corp\"", verbatimScript, StringComparison.Ordinal);
+        Assert.Contains("$\"Acme  {suffix}\"", interpolatedScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ToScriptExpression_StillCollapsesWhitespaceOutsideLiterals()
+    {
+        const string expression =
+            """
+            db.Users
+                .Where(u => u.Name == "John  Smith")
+                .ToList()
+            """;
+
+        var script = ProbeScriptFormatter.ToScriptExpression(expression);
+
+        Assert.Contains("\"John  Smith\"", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n", script, StringComparison.Ordinal);
+        Assert.Contains("db.Users", script, StringComparison.Ordinal);
+        Assert.Contains(".Where(", script, StringComparison.Ordinal);
+    }
 }

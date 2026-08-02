@@ -41,6 +41,22 @@ public sealed class RepositorySnippetAdapterTests
     }
 
     [Fact]
+    public void PrepareForEvaluation_PreservesMultipleSpacesInsideStringFilterLiterals()
+    {
+        const string snippet =
+            """await db.Products.Where(p => p.Name == "John  Smith").ToListAsync();""";
+
+        var normalized = SnippetNormalizer.ForEvaluation(
+            snippet,
+            typeof(FakeAdventureWorksDbContext),
+            preserveAsyncQueries: true);
+
+        Assert.Contains("\"John  Smith\"", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"John Smith\"", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
     public void PrepareForEvaluation_RepositoryQuery_StripsAwaitDbContextAndParameters()
     {
         const string snippet = """
