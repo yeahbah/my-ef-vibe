@@ -75,9 +75,18 @@ internal static class ProbeScriptFormatter
     {
         var builder = new StringBuilder(expression.Length);
         var previousWasSpace = false;
+        var index = 0;
 
-        foreach (var character in expression.ReplaceLineEndings(" "))
+        while (index < expression.Length)
         {
+            if (TryAppendPreservedLiteral(expression, ref index, builder))
+            {
+                previousWasSpace = false;
+                continue;
+            }
+
+            var character = expression[index];
+
             if (char.IsWhiteSpace(character))
             {
                 if (!previousWasSpace)
@@ -86,14 +95,360 @@ internal static class ProbeScriptFormatter
                     previousWasSpace = true;
                 }
 
+                index++;
                 continue;
             }
 
             builder.Append(character);
             previousWasSpace = false;
+            index++;
         }
 
         return builder.ToString().Trim().TrimEnd(';').Trim();
+    }
+
+    /// <summary>
+    ///     Copies a string or character literal verbatim (including interior whitespace) so probe formatting
+    ///     does not rewrite filter values like <c>"John  Smith"</c> into <c>"John Smith"</c>.
+    /// </summary>
+    private static bool TryAppendPreservedLiteral(string expression, ref int index, StringBuilder builder)
+    {
+        if (index >= expression.Length)
+        {
+            return false;
+        }
+
+        if (expression[index] == '\'')
+        {
+            return TryAppendCharacterLiteral(expression, ref index, builder);
+        }
+
+        if (TryReadRawStringPrefix(expression, index, out var rawPrefixLength, out var quoteCount, out _))
+        {
+            return TryAppendRawStringLiteral(expression, ref index, builder, rawPrefixLength, quoteCount);
+        }
+
+        if (TryReadQuotedStringPrefix(expression, index, out var quotedPrefixLength, out var isVerbatim, out var isInterpolated))
+        {
+            return TryAppendQuotedStringLiteral(
+                expression,
+                ref index,
+                builder,
+                quotedPrefixLength,
+                isVerbatim,
+                isInterpolated);
+        }
+
+        return false;
+    }
+
+    private static bool TryAppendCharacterLiteral(string expression, ref int index, StringBuilder builder)
+    {
+        var start = index;
+        index++; // opening '
+
+        while (index < expression.Length)
+        {
+            var character = expression[index];
+
+            if (character == '\\' && index + 1 < expression.Length)
+            {
+                index += 2;
+                continue;
+            }
+
+            index++;
+
+            if (character == '\'')
+            {
+                builder.Append(expression, start, index - start);
+                return true;
+            }
+        }
+
+        // Unterminated: preserve the remainder rather than corrupting it.
+        builder.Append(expression, start, expression.Length - start);
+        index = expression.Length;
+        return true;
+    }
+
+    private static bool TryReadQuotedStringPrefix(
+        string expression,
+        int index,
+        out int prefixLength,
+        out bool isVerbatim,
+        out bool isInterpolated)
+    {
+        prefixLength = 0;
+        isVerbatim = false;
+        isInterpolated = false;
+
+        if (index >= expression.Length)
+        {
+            return false;
+        }
+
+        if (expression[index] == '"')
+        {
+            prefixLength = 1;
+            return true;
+        }
+
+        if (expression[index] == '$' && index + 1 < expression.Length)
+        {
+            if (expression[index + 1] == '"')
+            {
+                prefixLength = 2;
+                isInterpolated = true;
+                return true;
+            }
+
+            if (expression[index + 1] == '@' && index + 2 < expression.Length && expression[index + 2] == '"')
+            {
+                prefixLength = 3;
+                isVerbatim = true;
+                isInterpolated = true;
+                return true;
+            }
+        }
+
+        if (expression[index] == '@' && index + 1 < expression.Length)
+        {
+            if (expression[index + 1] == '"')
+            {
+                prefixLength = 2;
+                isVerbatim = true;
+                return true;
+            }
+
+            if (expression[index + 1] == '$' && index + 2 < expression.Length && expression[index + 2] == '"')
+            {
+                prefixLength = 3;
+                isVerbatim = true;
+                isInterpolated = true;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryAppendQuotedStringLiteral(
+        string expression,
+        ref int index,
+        StringBuilder builder,
+        int prefixLength,
+        bool isVerbatim,
+        bool isInterpolated)
+    {
+        var start = index;
+        index += prefixLength;
+
+        while (index < expression.Length)
+        {
+            var character = expression[index];
+
+            if (isInterpolated && character == '{')
+            {
+                if (index + 1 < expression.Length && expression[index + 1] == '{')
+                {
+                    index += 2;
+                    continue;
+                }
+
+                // Copy literal text before the hole, then collapse whitespace inside the hole (code).
+                builder.Append(expression, start, index - start);
+                builder.Append('{');
+                index++;
+                AppendCollapsedInterpolationHole(expression, ref index, builder);
+                start = index;
+                continue;
+            }
+
+            if (isVerbatim)
+            {
+                if (character == '"' && index + 1 < expression.Length && expression[index + 1] == '"')
+                {
+                    index += 2;
+                    continue;
+                }
+
+                index++;
+
+                if (character == '"')
+                {
+                    builder.Append(expression, start, index - start);
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (character == '\\' && index + 1 < expression.Length)
+            {
+                index += 2;
+                continue;
+            }
+
+            index++;
+
+            if (character == '"')
+            {
+                builder.Append(expression, start, index - start);
+                return true;
+            }
+        }
+
+        builder.Append(expression, start, expression.Length - start);
+        index = expression.Length;
+        return true;
+    }
+
+    private static void AppendCollapsedInterpolationHole(string expression, ref int index, StringBuilder builder)
+    {
+        var depth = 1;
+        var previousWasSpace = false;
+
+        while (index < expression.Length && depth > 0)
+        {
+            if (TryAppendPreservedLiteral(expression, ref index, builder))
+            {
+                previousWasSpace = false;
+                continue;
+            }
+
+            var character = expression[index];
+
+            if (character == '{')
+            {
+                depth++;
+                builder.Append(character);
+                previousWasSpace = false;
+                index++;
+                continue;
+            }
+
+            if (character == '}')
+            {
+                depth--;
+                builder.Append(character);
+                previousWasSpace = false;
+                index++;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(character))
+            {
+                if (!previousWasSpace)
+                {
+                    builder.Append(' ');
+                    previousWasSpace = true;
+                }
+
+                index++;
+                continue;
+            }
+
+            builder.Append(character);
+            previousWasSpace = false;
+            index++;
+        }
+    }
+
+    private static bool TryReadRawStringPrefix(
+        string expression,
+        int index,
+        out int prefixLength,
+        out int quoteCount,
+        out bool isInterpolated)
+    {
+        prefixLength = 0;
+        quoteCount = 0;
+        isInterpolated = false;
+
+        var cursor = index;
+
+        if (cursor < expression.Length && expression[cursor] == '$')
+        {
+            isInterpolated = true;
+            cursor++;
+        }
+
+        if (cursor >= expression.Length || expression[cursor] != '"')
+        {
+            return false;
+        }
+
+        while (cursor < expression.Length && expression[cursor] == '"')
+        {
+            quoteCount++;
+            cursor++;
+        }
+
+        if (quoteCount < 3)
+        {
+            return false;
+        }
+
+        prefixLength = cursor - index;
+        return true;
+    }
+
+    private static bool TryAppendRawStringLiteral(
+        string expression,
+        ref int index,
+        StringBuilder builder,
+        int prefixLength,
+        int quoteCount)
+    {
+        var start = index;
+        var isInterpolated = expression[index] == '$';
+        index += prefixLength;
+
+        while (index < expression.Length)
+        {
+            if (isInterpolated && expression[index] == '{')
+            {
+                if (index + 1 < expression.Length && expression[index + 1] == '{')
+                {
+                    index += 2;
+                    continue;
+                }
+
+                builder.Append(expression, start, index - start);
+                builder.Append('{');
+                index++;
+                AppendCollapsedInterpolationHole(expression, ref index, builder);
+                start = index;
+                continue;
+            }
+
+            if (expression[index] == '"')
+            {
+                var run = 0;
+
+                while (index + run < expression.Length && expression[index + run] == '"')
+                {
+                    run++;
+                }
+
+                if (run == quoteCount)
+                {
+                    index += run;
+                    builder.Append(expression, start, index - start);
+                    return true;
+                }
+
+                index += run;
+                continue;
+            }
+
+            index++;
+        }
+
+        builder.Append(expression, start, expression.Length - start);
+        index = expression.Length;
+        return true;
     }
 
     private static string StripVariableDeclarationPrefix(string expression)
