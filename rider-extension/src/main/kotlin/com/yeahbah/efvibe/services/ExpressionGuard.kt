@@ -18,7 +18,7 @@ object ExpressionGuard {
         Regex("""\bFromSqlRaw\s*<""", RegexOption.IGNORE_CASE),
     )
 
-    private val blockedSql = Regex("""\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\b""", RegexOption.IGNORE_CASE)
+    private val blockedSql = Regex("""\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE|EXEC(?:UTE)?|CALL|MERGE)\b""", RegexOption.IGNORE_CASE)
     private val scriptReferenceDirective = Regex("""^\s*#(?:load|r)\b""", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
 
     fun validate(expression: String): String? {
@@ -34,8 +34,8 @@ object ExpressionGuard {
             return "Read-only mode: SaveChanges, Add/Update/Remove, ExecuteSql, ExecuteDelete/Update, and schema changes are not allowed."
         }
 
-        if (blockedSql.containsMatchIn(stripped) && Regex("""\b(?:ExecuteSql|FromSqlRaw|SqlQuery)\b""", RegexOption.IGNORE_CASE).containsMatchIn(stripped)) {
-            return "Destructive SQL keywords are not allowed in ExecuteSql / FromSqlRaw expressions."
+        if (blockedSql.containsMatchIn(stripped) && Regex("""\b(?:ExecuteSql|FromSql|SqlQuery)\b""", RegexOption.IGNORE_CASE).containsMatchIn(stripped)) {
+            return "Destructive SQL keywords are not allowed in ExecuteSql / FromSql / SqlQuery expressions."
         }
 
         return null

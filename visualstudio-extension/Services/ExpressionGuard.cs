@@ -23,8 +23,8 @@ internal static class ExpressionGuard
     private static readonly Regex BlockComments = new Regex(@"/\*[\s\S]*?\*/", RegexOptions.Compiled);
     private static readonly Regex LineComments = new Regex(@"//.*$", RegexOptions.Multiline | RegexOptions.Compiled);
     private static readonly Regex ScriptReferenceDirective = new Regex(@"^\s*#(?:load|r)\b", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
-    private static readonly Regex BlockedSql = new Regex(@"\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex SqlApi = new Regex(@"\b(?:ExecuteSql|FromSqlRaw|SqlQuery)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex BlockedSql = new Regex(@"\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE|EXEC(?:UTE)?|CALL|MERGE)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SqlApi = new Regex(@"\b(?:ExecuteSql|FromSql|SqlQuery)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     internal static bool IsReadOnly(string expression, out string reason)
     {
@@ -54,7 +54,7 @@ internal static class ExpressionGuard
 
         if (BlockedSql.IsMatch(stripped) && SqlApi.IsMatch(stripped))
         {
-            reason = "Destructive SQL keywords are not allowed in ExecuteSql / FromSqlRaw expressions.";
+            reason = "Destructive SQL keywords are not allowed in ExecuteSql / FromSql / SqlQuery expressions.";
             return false;
         }
 

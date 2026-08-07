@@ -35,9 +35,15 @@ assertBlocked('db.Database.GetService<IMigrator>().Migrate()');
 assertBlocked('db.GetService<IRelationalDatabaseCreator>().Delete()');
 assertBlocked('db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM T")');
 assertBlocked('db.SaveChangesAsync()');
+assertBlocked('db.Products.FromSqlRaw("EXEC DangerousProc").ToList()');
+assertBlocked('db.Products.FromSql($"EXEC DangerousProc").ToList()');
+assertBlocked('db.Products.FromSqlInterpolated($"CALL DangerousProc").ToList()');
+assertBlocked('db.Database.SqlQueryRaw<int>("EXECUTE DangerousProc").ToList()');
+assertBlocked('db.Products.FromSqlRaw("MERGE INTO T USING S ON 1=1 WHEN MATCHED THEN UPDATE SET X = 1").ToList()');
 
 assertAllowed('db.Products.Where(p => p.Id > 0).ToList()');
 assertAllowed('db.Products.Count()');
 assertAllowed('db.Products.Where(p => p.Name == "ExecuteDelete").ToList()');
+assertAllowed('db.Products.FromSqlRaw("SELECT * FROM Products").ToList()');
 
 console.log('expressionGuard.smoke.cjs: ok');

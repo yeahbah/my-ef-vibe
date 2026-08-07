@@ -16,7 +16,10 @@ const BLOCKED_EF_PATTERNS: RegExp[] = [
   /\bFromSqlRaw\s*</i,
 ];
 
-const BLOCKED_SQL_IN_STRING = /\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\b/i;
+// Include EXEC/EXECUTE/CALL/MERGE: FromSql*/SqlQuery* can run procs / merge DML without
+// classic DELETE/UPDATE tokens, which previously bypassed read-only guards.
+const BLOCKED_SQL_IN_STRING = /\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE|EXEC(?:UTE)?|CALL|MERGE)\b/i;
+const SQL_API_PATTERN = /\b(?:ExecuteSql|FromSql|SqlQuery)\b/i;
 const SCRIPT_REFERENCE_DIRECTIVE_PATTERN = /^\s*#(?:load|r)\b/im;
 
 function stripCSharpComments(expression: string): string {
@@ -32,7 +35,7 @@ function findBlockedSqlInStrings(expression: string): string | undefined {
   while ((match = stringPattern.exec(expression)) !== null) {
     const literal = match[0];
     if (BLOCKED_SQL_IN_STRING.test(literal)) {
-      return 'SQL literals cannot contain DROP, DELETE, INSERT, UPDATE, TRUNCATE, ALTER, or CREATE.';
+      return 'SQL literals cannot contain DROP, DELETE, INSERT, UPDATE, TRUNCATE, ALTER, CREATE, EXEC, CALL, or MERGE.';
     }
   }
 
@@ -73,10 +76,10 @@ export function validateReadOnlyExpression(expression: string): ExpressionGuardR
     return { ok: false, reason: sqlInString };
   }
 
-  if (BLOCKED_SQL_IN_STRING.test(stripped) && /\b(?:ExecuteSql|FromSqlRaw|SqlQuery)\b/i.test(stripped)) {
+  if (BLOCKED_SQL_IN_STRING.test(stripped) && SQL_API_PATTERN.test(stripped)) {
     return {
       ok: false,
-      reason: 'Destructive SQL keywords are not allowed in ExecuteSql / FromSqlRaw expressions.',
+      reason: 'Destructive SQL keywords are not allowed in ExecuteSql / FromSql / SqlQuery expressions.',
     };
   }
 
