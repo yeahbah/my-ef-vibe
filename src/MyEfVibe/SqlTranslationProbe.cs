@@ -426,6 +426,13 @@ internal static class SqlTranslationProbe
     {
         var trimmed = snippet.Trim().TrimEnd(';').Trim();
 
+        // Mutating terminals (ExecuteDelete/ExecuteSql*/SaveChanges/…) are eager. Returning them as
+        // "bare queryable" probes lets deep-scan / translate EvaluateProbeAsync run DML against the live DB.
+        if (ProbeMutationGuard.ContainsMutatingOperation(trimmed))
+        {
+            return null;
+        }
+
         foreach (var (suffix, takeLimit) in TerminalMaterializationSuffixes)
         {
             if (!trimmed.EndsWith(suffix, StringComparison.Ordinal))

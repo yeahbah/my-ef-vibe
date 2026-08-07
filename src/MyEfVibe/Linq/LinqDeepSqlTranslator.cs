@@ -31,6 +31,13 @@ internal static class LinqDeepSqlTranslator
                 "Not an EF Core query expression.");
         }
 
+        if (ProbeMutationGuard.ContainsMutatingOperation(statementOrCode))
+        {
+            return new LinqSqlTranslationResult(
+                null,
+                ProbeMutationGuard.DescribeBlockedOperation());
+        }
+
         var includedModelEntities = DbContextModelEntityDiscovery.DiscoverIncludedEntityTypeNames(session.DbContext);
 
         if (QueryableEntityTypeResolver.TryExtractConcreteEntityTypeName(
