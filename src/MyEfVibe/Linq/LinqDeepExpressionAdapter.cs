@@ -16,7 +16,17 @@ internal static class LinqDeepExpressionAdapter
             return null;
         }
 
+        if (ProbeMutationGuard.ContainsMutatingOperation(normalized))
+        {
+            return null;
+        }
+
         normalized = ReplaceContextAliases(normalized, contextInstanceIdentifiers);
+
+        if (ProbeMutationGuard.ContainsMutatingOperation(normalized))
+        {
+            return null;
+        }
 
         var probe = SqlTranslationProbe.TryCreateProbeExpression(normalized);
 

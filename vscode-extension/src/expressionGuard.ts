@@ -1,14 +1,25 @@
+/** Optional C# generic type-argument list before `(`, e.g. ExecuteDeleteAsync<Product>(...). */
+const OPTIONAL_TYPE_ARGS = '(?:\\s*<[^>(]+>)?';
+
 const BLOCKED_EF_PATTERNS: RegExp[] = [
-  /\bSaveChanges(?:Async)?\s*\(/i,
+  new RegExp(`\\bSaveChanges(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
   /\b(?:Add|AddRange|Update|UpdateRange|Remove|RemoveRange|Attach|AttachRange)\s*\(/i,
-  /\bExecuteDelete(?:Async)?\s*\(/i,
-  /\bExecuteUpdate(?:Async)?\s*\(/i,
-  /\bExecuteSql(?:Raw)?(?:Async)?\s*\(/i,
-  /\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(/i,
+  // Allow ExecuteDeleteAsync<T>(...) / ExecuteUpdateAsync<T>(...) static/generic call shapes.
+  new RegExp(`\\bExecuteDelete(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
+  new RegExp(`\\bExecuteUpdate(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
+  new RegExp(`\\bExecuteSql(?:Raw|Interpolated)?(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
+  // Standalone schema APIs catch Database.GetService<...>().EnsureDeleted() indirection.
+  new RegExp(`\\b(?:EnsureDeleted|EnsureCreated|Migrate)(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
+  /\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw|Interpolated)?(?:Async)?|EnsureDeleted(?:Async)?|EnsureCreated(?:Async)?|Migrate(?:Async)?)\s*\(/i,
+  // IRelationalDatabaseCreator.Delete() via GetService<...>().Delete()
+  /\bGetService\s*<[^>]*>\s*\(\s*\)\s*\.\s*Delete\s*\(/i,
   /\bFromSqlRaw\s*</i,
 ];
 
-const BLOCKED_SQL_IN_STRING = /\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\b/i;
+// Include EXEC/EXECUTE/CALL/MERGE: FromSql*/SqlQuery* can run procs / merge DML without
+// classic DELETE/UPDATE tokens, which previously bypassed read-only guards.
+const BLOCKED_SQL_IN_STRING = /\b(?:DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE|EXEC(?:UTE)?|CALL|MERGE)\b/i;
+const SQL_API_PATTERN = /\b(?:ExecuteSql|FromSql|SqlQuery)\b/i;
 const SCRIPT_REFERENCE_DIRECTIVE_PATTERN = /^\s*#(?:load|r)\b/im;
 
 function stripCSharpComments(expression: string): string {
@@ -24,7 +35,7 @@ function findBlockedSqlInStrings(expression: string): string | undefined {
   while ((match = stringPattern.exec(expression)) !== null) {
     const literal = match[0];
     if (BLOCKED_SQL_IN_STRING.test(literal)) {
-      return 'SQL literals cannot contain DROP, DELETE, INSERT, UPDATE, TRUNCATE, ALTER, or CREATE.';
+      return 'SQL literals cannot contain DROP, DELETE, INSERT, UPDATE, TRUNCATE, ALTER, CREATE, EXEC, CALL, or MERGE.';
     }
   }
 
@@ -65,10 +76,10 @@ export function validateReadOnlyExpression(expression: string): ExpressionGuardR
     return { ok: false, reason: sqlInString };
   }
 
-  if (BLOCKED_SQL_IN_STRING.test(stripped) && /\b(?:ExecuteSql|FromSqlRaw|SqlQuery)\b/i.test(stripped)) {
+  if (BLOCKED_SQL_IN_STRING.test(stripped) && SQL_API_PATTERN.test(stripped)) {
     return {
       ok: false,
-      reason: 'Destructive SQL keywords are not allowed in ExecuteSql / FromSqlRaw expressions.',
+      reason: 'Destructive SQL keywords are not allowed in ExecuteSql / FromSql / SqlQuery expressions.',
     };
   }
 
