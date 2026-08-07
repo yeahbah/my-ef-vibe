@@ -33,7 +33,11 @@ internal static partial class ProbeMutationGuard
             EnsureDeleted(?:Async)?|
             EnsureCreated(?:Async)?|
             Migrate(?:Async)?
-        )\s*\(
+        )
+        (?:\s*<[^>(]+>)?
+        \s*\(
+        |
+        \bGetService\s*<[^>]*>\s*\(\s*\)\s*\.\s*Delete\s*\(
         """,
         RegexOptions.IgnoreCase | RegexOptions.IgnorePatternWhitespace | RegexOptions.CultureInvariant)]
     private static partial Regex MutatingApiRegex();

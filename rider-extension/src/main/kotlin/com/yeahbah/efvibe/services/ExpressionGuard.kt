@@ -1,13 +1,20 @@
 package com.yeahbah.efvibe.services
 
 object ExpressionGuard {
+    private const val optionalTypeArgs = """(?:\s*<[^>(]+>)?"""
+
     private val blockedEfPatterns = listOf(
-        Regex("""\bSaveChanges(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
+        Regex("""\bSaveChanges(?:Async)?$optionalTypeArgs\s*\(""", RegexOption.IGNORE_CASE),
         Regex("""\b(?:Add|AddRange|Update|UpdateRange|Remove|RemoveRange|Attach|AttachRange)\s*\(""", RegexOption.IGNORE_CASE),
-        Regex("""\bExecuteDelete(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
-        Regex("""\bExecuteUpdate(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
-        Regex("""\bExecuteSql(?:Raw)?(?:Async)?\s*\(""", RegexOption.IGNORE_CASE),
-        Regex("""\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(""", RegexOption.IGNORE_CASE),
+        Regex("""\bExecuteDelete(?:Async)?$optionalTypeArgs\s*\(""", RegexOption.IGNORE_CASE),
+        Regex("""\bExecuteUpdate(?:Async)?$optionalTypeArgs\s*\(""", RegexOption.IGNORE_CASE),
+        Regex("""\bExecuteSql(?:Raw|Interpolated)?(?:Async)?$optionalTypeArgs\s*\(""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:EnsureDeleted|EnsureCreated|Migrate)(?:Async)?$optionalTypeArgs\s*\(""", RegexOption.IGNORE_CASE),
+        Regex(
+            """\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw|Interpolated)?(?:Async)?|EnsureDeleted(?:Async)?|EnsureCreated(?:Async)?|Migrate(?:Async)?)\s*\(""",
+            RegexOption.IGNORE_CASE,
+        ),
+        Regex("""\bGetService\s*<[^>]*>\s*\(\s*\)\s*\.\s*Delete\s*\(""", RegexOption.IGNORE_CASE),
         Regex("""\bFromSqlRaw\s*<""", RegexOption.IGNORE_CASE),
     )
 

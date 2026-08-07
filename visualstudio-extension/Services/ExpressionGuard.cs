@@ -5,14 +5,18 @@ namespace MyEfVibe.VisualStudio.Services;
 
 internal static class ExpressionGuard
 {
+    private const string OptionalTypeArgs = @"(?:\s*<[^>(]+>)?";
+
     private static readonly Regex[] BlockedEfPatterns =
     {
-        new Regex(@"\bSaveChanges(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bSaveChanges(?:Async)?" + OptionalTypeArgs + @"\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"\b(?:Add|AddRange|Update|UpdateRange|Remove|RemoveRange|Attach|AttachRange)\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new Regex(@"\bExecuteDelete(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new Regex(@"\bExecuteUpdate(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new Regex(@"\bExecuteSql(?:Raw)?(?:Async)?\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new Regex(@"\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bExecuteDelete(?:Async)?" + OptionalTypeArgs + @"\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bExecuteUpdate(?:Async)?" + OptionalTypeArgs + @"\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bExecuteSql(?:Raw|Interpolated)?(?:Async)?" + OptionalTypeArgs + @"\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\b(?:EnsureDeleted|EnsureCreated|Migrate)(?:Async)?" + OptionalTypeArgs + @"\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw|Interpolated)?(?:Async)?|EnsureDeleted(?:Async)?|EnsureCreated(?:Async)?|Migrate(?:Async)?)\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bGetService\s*<[^>]*>\s*\(\s*\)\s*\.\s*Delete\s*\(", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"\bFromSqlRaw\s*<", RegexOptions.IgnoreCase | RegexOptions.Compiled),
     };
 

@@ -10,12 +10,15 @@ public sealed class ProbeMutationGuardTests
     [Theory]
     [InlineData("db.Products.Where(p => p.ProductId > 0).ExecuteDelete()")]
     [InlineData("await db.Products.Where(p => p.ProductId > 0).ExecuteDeleteAsync();")]
+    [InlineData("EntityFrameworkQueryableExtensions.ExecuteDeleteAsync<Product>(db.Products)")]
     [InlineData("db.Products.Where(p => p.ListPrice < 1).ExecuteUpdate(s => s.SetProperty(p => p.ListPrice, 0));")]
     [InlineData("db.Database.ExecuteSqlRaw(\"DELETE FROM Production.Product\");")]
     [InlineData("await _dbContext.Database.ExecuteSqlRawAsync(\"DELETE FROM Production.Product\");")]
     [InlineData("db.Database.ExecuteSqlInterpolated($\"DELETE FROM Production.Product WHERE ProductID = {id}\");")]
     [InlineData("db.SaveChanges()")]
     [InlineData("await db.Database.EnsureDeletedAsync();")]
+    [InlineData("db.Database.GetService<IRelationalDatabaseCreator>().EnsureDeleted()")]
+    [InlineData("db.GetService<IRelationalDatabaseCreator>().Delete()")]
     public void ContainsMutatingOperation_detects_eager_mutators(string expression)
     {
         Assert.True(ProbeMutationGuard.ContainsMutatingOperation(expression));

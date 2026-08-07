@@ -1,10 +1,18 @@
+/** Optional C# generic type-argument list before `(`, e.g. ExecuteDeleteAsync<Product>(...). */
+const OPTIONAL_TYPE_ARGS = '(?:\\s*<[^>(]+>)?';
+
 const BLOCKED_EF_PATTERNS: RegExp[] = [
-  /\bSaveChanges(?:Async)?\s*\(/i,
+  new RegExp(`\\bSaveChanges(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
   /\b(?:Add|AddRange|Update|UpdateRange|Remove|RemoveRange|Attach|AttachRange)\s*\(/i,
-  /\bExecuteDelete(?:Async)?\s*\(/i,
-  /\bExecuteUpdate(?:Async)?\s*\(/i,
-  /\bExecuteSql(?:Raw)?(?:Async)?\s*\(/i,
-  /\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw)?|EnsureDeleted|EnsureCreated|Migrate)\s*\(/i,
+  // Allow ExecuteDeleteAsync<T>(...) / ExecuteUpdateAsync<T>(...) static/generic call shapes.
+  new RegExp(`\\bExecuteDelete(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
+  new RegExp(`\\bExecuteUpdate(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
+  new RegExp(`\\bExecuteSql(?:Raw|Interpolated)?(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
+  // Standalone schema APIs catch Database.GetService<...>().EnsureDeleted() indirection.
+  new RegExp(`\\b(?:EnsureDeleted|EnsureCreated|Migrate)(?:Async)?${OPTIONAL_TYPE_ARGS}\\s*\\(`, 'i'),
+  /\bDatabase\s*\.\s*(?:ExecuteSql(?:Raw|Interpolated)?(?:Async)?|EnsureDeleted(?:Async)?|EnsureCreated(?:Async)?|Migrate(?:Async)?)\s*\(/i,
+  // IRelationalDatabaseCreator.Delete() via GetService<...>().Delete()
+  /\bGetService\s*<[^>]*>\s*\(\s*\)\s*\.\s*Delete\s*\(/i,
   /\bFromSqlRaw\s*</i,
 ];
 
