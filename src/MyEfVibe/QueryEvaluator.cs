@@ -159,7 +159,10 @@ internal static class QueryEvaluator
         DbLogSettings dbLogSettings,
         CancellationToken cancellationToken)
     {
-        if (SqlTranslationProbe.TryCreateProbeExpression(snippet) is { } probeExpression)
+        // The snippet already ran. Re-evaluating Add/ExecuteUpdate/SaveChanges (etc.) to recover
+        // SQL duplicates tracker entries or applies DML twice when no executed SQL was captured.
+        if (!EvaluationSqlFallbackGuard.ShouldSkipProbe(snippet)
+            && SqlTranslationProbe.TryCreateProbeExpression(snippet) is { } probeExpression)
         {
             try
             {
