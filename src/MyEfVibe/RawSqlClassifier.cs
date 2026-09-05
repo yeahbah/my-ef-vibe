@@ -62,6 +62,36 @@ internal static partial class RawSqlClassifier
         return false;
     }
 
+    /// <summary>
+    ///     Returns a single statement that is safe to wrap with EXPLAIN. Multi-statement batches
+    ///     keep only the last query (or the first non-preamble statement) so trailing DML is never
+    ///     executed when the provider prefixes EXPLAIN on the first statement only.
+    /// </summary>
+    internal static string? SelectExplainableStatement(string sql)
+    {
+        string? firstNonPreamble = null;
+        string? lastQuery = null;
+
+        foreach (var statement in EnumerateStatements(sql))
+        {
+            var keyword = FirstStatementKeyword(statement);
+
+            if (string.IsNullOrEmpty(keyword) || PreambleKeywords.Contains(keyword))
+            {
+                continue;
+            }
+
+            firstNonPreamble ??= statement;
+
+            if (QueryKeywords.Contains(keyword))
+            {
+                lastQuery = statement;
+            }
+        }
+
+        return lastQuery ?? firstNonPreamble;
+    }
+
     private static IEnumerable<string> EnumerateStatements(string sql)
     {
         foreach (var part in sql.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))

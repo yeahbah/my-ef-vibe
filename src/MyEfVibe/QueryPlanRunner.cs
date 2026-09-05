@@ -132,7 +132,7 @@ internal static partial class QueryPlanRunner
             body = InlineParameter(body, name, parameters[name]);
         }
 
-        return body;
+        return RawSqlClassifier.SelectExplainableStatement(body) ?? body;
     }
 
     private static void CollectParameterAssignments(string sql, Dictionary<string, string> parameters)

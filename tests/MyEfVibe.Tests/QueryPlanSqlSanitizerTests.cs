@@ -76,4 +76,19 @@ public sealed class QueryPlanSqlSanitizerTests
         Assert.DoesNotContain("@__p_0", explainable, StringComparison.Ordinal);
         Assert.DoesNotContain("DbType", explainable, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SanitizeSqlForExplain_MixedBatch_DropsTrailingDml()
+    {
+        const string batch =
+            """
+            SELECT COUNT(*) AS Total FROM Products;
+            DELETE FROM Products WHERE ProductId = 1
+            """;
+
+        var explainable = QueryPlanRunner.SanitizeSqlForExplain(batch, MyEfVibeProvider.Sqlite);
+
+        Assert.Contains("SELECT COUNT(*)", explainable, StringComparison.Ordinal);
+        Assert.DoesNotContain("DELETE", explainable, StringComparison.OrdinalIgnoreCase);
+    }
 }
