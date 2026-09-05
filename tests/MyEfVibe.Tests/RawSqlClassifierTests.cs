@@ -28,4 +28,15 @@ public sealed class RawSqlClassifierTests
 
         Assert.True(RawSqlClassifier.ContainsQueryStatement(sql));
     }
+
+    [Theory]
+    [InlineData("SELECT 1", "SELECT 1")]
+    [InlineData("SELECT COUNT(*) FROM Products; INSERT INTO Products (Name) VALUES ('x')", "SELECT COUNT(*) FROM Products")]
+    [InlineData("INSERT INTO Products (Name) VALUES ('x'); SELECT COUNT(*) FROM Products", "SELECT COUNT(*) FROM Products")]
+    [InlineData("SET NOCOUNT ON; SELECT 1; DELETE FROM Products", "SELECT 1")]
+    [InlineData("DELETE FROM Products WHERE Id = 1", "DELETE FROM Products WHERE Id = 1")]
+    public void SelectExplainableStatement_keeps_a_single_statement(string sql, string expected)
+    {
+        Assert.Equal(expected, RawSqlClassifier.SelectExplainableStatement(sql));
+    }
 }
