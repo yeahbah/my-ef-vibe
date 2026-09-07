@@ -92,6 +92,30 @@ internal static class SnippetNormalizer
             preserveAsyncQueries);
     }
 
+    /// <summary>
+    ///     Rewrites <c>db.*</c> expressions inside <c>--script-load</c> / <c>#load</c> files so operators bind
+    ///     to EF queryables. Does not apply interactive eval limits (auto-<c>Take(100)</c>) or probe
+    ///     parameter stubbing, which would silently change helper queries.
+    /// </summary>
+    internal static string ForScriptLoad(
+        string snippet,
+        Type? dbContextType,
+        bool preserveAsyncQueries)
+    {
+        var trimmed = snippet.Trim();
+
+        if (string.IsNullOrEmpty(trimmed) || dbContextType is null)
+        {
+            return trimmed;
+        }
+
+        return RewriteBoundedEfQuery(
+            ReplaceContextAliases(trimmed),
+            dbContextType,
+            preserveAsyncQueries,
+            applyBoundedMaterialization: false);
+    }
+
     private static string ReplaceContextAliases(string snippet)
     {
         try
@@ -107,7 +131,8 @@ internal static class SnippetNormalizer
     private static string RewriteBoundedEfQuery(
         string snippet,
         Type? dbContextType,
-        bool preserveAsyncQueries = false)
+        bool preserveAsyncQueries = false,
+        bool applyBoundedMaterialization = true)
     {
         if (dbContextType is null || ScriptDirectiveSyntax.ContainsScriptDirectives(snippet))
         {
@@ -118,7 +143,9 @@ internal static class SnippetNormalizer
             ? EfReplQueryRewriteOptions.Async
             : EfReplQueryRewriteOptions.Sync;
 
-        var bounded = SqlTranslationProbe.TryRewriteBoundedTerminalQuery(snippet) ?? snippet;
+        var bounded = applyBoundedMaterialization
+            ? SqlTranslationProbe.TryRewriteBoundedTerminalQuery(snippet) ?? snippet
+            : snippet;
 
         var rewritten = EfReplQueryableRewriter.TryRewriteToEfStaticCalls(bounded, dbContextType, options)
                         ?? bounded;
