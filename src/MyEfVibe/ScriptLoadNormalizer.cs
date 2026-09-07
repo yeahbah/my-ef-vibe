@@ -84,7 +84,7 @@ internal static class ScriptLoadNormalizer
             return line;
         }
 
-        var rewritten = SnippetNormalizer.ForEvaluation(expression, dbContextType, preserveAsyncQueries);
+        var rewritten = SnippetNormalizer.ForScriptLoad(expression, dbContextType, preserveAsyncQueries);
 
         if (string.Equals(rewritten, expression, StringComparison.Ordinal))
         {
