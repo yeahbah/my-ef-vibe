@@ -27,6 +27,10 @@ internal static class RepositorySnippetAdapter
             normalized = AsyncQueryableSyncRewriter.Rewrite(normalized);
         }
 
+        // Bound list materializers before EF static rewrites. Async snippets are routed here
+        // via LooksLikeRepositorySnippet and previously skipped auto-Take(100).
+        normalized = SqlTranslationProbe.TryRewriteBoundedTerminalQuery(normalized) ?? normalized;
+
         var options = preserveAsyncQueries
             ? EfReplQueryRewriteOptions.Async
             : EfReplQueryRewriteOptions.Sync;
