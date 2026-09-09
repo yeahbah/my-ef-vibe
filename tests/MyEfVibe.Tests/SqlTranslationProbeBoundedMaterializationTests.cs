@@ -66,4 +66,33 @@ public sealed class SqlTranslationProbeBoundedMaterializationTests
         Assert.NotNull(warning);
         Assert.Contains("100 rows", warning, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("db.Users.ToListAsync()")]
+    [InlineData("await db.Users.ToListAsync()")]
+    [InlineData("db.Users.ToArrayAsync()")]
+    public void ForEvaluation_async_list_materializers_add_auto_take(string original)
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(original, typeof(FakeRewriterDbContext));
+
+        Assert.Contains("Take", normalized, StringComparison.Ordinal);
+        Assert.Contains("100", normalized, StringComparison.Ordinal);
+
+        var warning = SqlTranslationProbe.DescribeAutoMaterializationLimit(normalized, original);
+
+        Assert.NotNull(warning);
+        Assert.Contains("100 rows", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ForEvaluation_async_list_materializer_respects_existing_take()
+    {
+        const string original = "await db.Users.Take(25).ToListAsync()";
+        var normalized = SnippetNormalizer.ForEvaluation(original, typeof(FakeRewriterDbContext));
+
+        Assert.Contains("25", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("Take(db.Users, 100)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(100)", normalized, StringComparison.Ordinal);
+        Assert.Null(SqlTranslationProbe.DescribeAutoMaterializationLimit(normalized, original));
+    }
 }

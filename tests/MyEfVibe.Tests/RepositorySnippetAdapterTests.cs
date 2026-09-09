@@ -21,6 +21,19 @@ public sealed class RepositorySnippetAdapterTests
     }
 
     [Fact]
+    public void PrepareForEvaluation_ToListAsync_AddsAutoTake()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "await db.BusinessEntities.ToListAsync()",
+            typeof(FakeAdventureWorksDbContext));
+
+        Assert.Contains("Take", normalized, StringComparison.Ordinal);
+        Assert.Contains("100", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToListAsync", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
     public void PrepareForEvaluation_PreservesAsyncWhenRequested()
     {
         const string snippet = """
