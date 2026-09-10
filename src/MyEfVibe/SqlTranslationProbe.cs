@@ -260,9 +260,9 @@ internal static class SqlTranslationProbe
                 return null;
             }
 
-            var bounded = TryFinalizeProbe(queryable, DefaultMaterializationTake);
+            var bounded = TryFinalizeListMaterializationProbe(queryable);
 
-            if (bounded is null || string.Equals(bounded, queryable, StringComparison.Ordinal))
+            if (bounded is null)
             {
                 return null;
             }
@@ -307,9 +307,9 @@ internal static class SqlTranslationProbe
                 continue;
             }
 
-            var bounded = TryFinalizeProbe(queryable, DefaultMaterializationTake);
+            var bounded = TryFinalizeListMaterializationProbe(queryable);
 
-            if (bounded is null || string.Equals(bounded, queryable, StringComparison.Ordinal))
+            if (bounded is null)
             {
                 continue;
             }
@@ -610,6 +610,94 @@ internal static class SqlTranslationProbe
         return methodName.EndsWith("Async", StringComparison.Ordinal)
             ? methodName[..^5]
             : methodName;
+    }
+
+    private static string? TryFinalizeListMaterializationProbe(string queryable)
+    {
+        if (string.IsNullOrWhiteSpace(queryable) || ContainsEagerLoad(queryable))
+        {
+            return null;
+        }
+
+        var bounded = InsertSkipTakeBeforeClientEnumeration(queryable, skip: 0, take: DefaultMaterializationTake);
+
+        return string.Equals(bounded, queryable, StringComparison.Ordinal) ? null : bounded;
+    }
+
+    /// <summary>
+    ///     Inserts <c>Skip</c>/<c>Take</c> on the IQueryable side of <c>AsEnumerable</c>/<c>AsAsyncEnumerable</c>
+    ///     so LIMIT/TOP is applied in SQL instead of after the full table has already been loaded.
+    ///     A trailing client-enumeration switch with no further operators is dropped so later rewrites can
+    ///     still bind <c>Take</c> through <c>ReplQueryableRuntime</c>.
+    /// </summary>
+    internal static string InsertSkipTakeBeforeClientEnumeration(string queryable, int skip, int take)
+    {
+        var paging = skip == 0
+            ? $".Take({take})"
+            : $".Skip({skip}).Take({take})";
+
+        if (!TrySplitAtClientEnumeration(queryable, out var serverQuery, out var clientTail))
+        {
+            return queryable + paging;
+        }
+
+        var bounded = serverQuery + paging;
+
+        return IsRedundantClientEnumeration(clientTail)
+            ? bounded
+            : bounded + clientTail;
+    }
+
+    private static bool TrySplitAtClientEnumeration(string queryable, out string serverQuery, out string clientTail)
+    {
+        serverQuery = queryable;
+        clientTail = string.Empty;
+
+        var asEnumerableIndex = queryable.IndexOf(".AsEnumerable(", StringComparison.Ordinal);
+        var asAsyncEnumerableIndex = queryable.IndexOf(".AsAsyncEnumerable(", StringComparison.Ordinal);
+        var splitIndex = MinNonNegative(asEnumerableIndex, asAsyncEnumerableIndex);
+
+        if (splitIndex < 0)
+        {
+            return false;
+        }
+
+        serverQuery = queryable[..splitIndex].TrimEnd();
+        clientTail = queryable[splitIndex..];
+
+        return !string.IsNullOrWhiteSpace(serverQuery);
+    }
+
+    private static bool IsRedundantClientEnumeration(string clientTail)
+    {
+        var trimmed = clientTail.Trim();
+
+        if (!trimmed.StartsWith(".AsEnumerable(", StringComparison.Ordinal)
+            && !trimmed.StartsWith(".AsAsyncEnumerable(", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var openParenIndex = trimmed.IndexOf('(');
+
+        return openParenIndex >= 0
+               && TryFindClosingParenthesis(trimmed, openParenIndex, out var closeParenIndex)
+               && IsEndOfExpression(trimmed, closeParenIndex + 1);
+    }
+
+    private static int MinNonNegative(int left, int right)
+    {
+        if (left < 0)
+        {
+            return right;
+        }
+
+        if (right < 0)
+        {
+            return left;
+        }
+
+        return Math.Min(left, right);
     }
 
     private static string? TryFinalizeProbe(string queryable, int? takeLimit, string? terminalArguments = null)

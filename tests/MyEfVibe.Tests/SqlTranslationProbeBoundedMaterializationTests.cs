@@ -23,6 +23,37 @@ public sealed class SqlTranslationProbeBoundedMaterializationTests
     }
 
     [Fact]
+    public void TryRewriteBoundedTerminalQuery_adds_take_before_as_enumerable_to_list()
+    {
+        var rewritten = SqlTranslationProbe.TryRewriteBoundedTerminalQuery("db.Products.AsEnumerable().ToList()");
+
+        Assert.NotNull(rewritten);
+        Assert.Equal("db.Products.Take(100).ToList()", ProbeTestHelper.CollapseWhitespace(rewritten));
+    }
+
+    [Fact]
+    public void TryRewriteBoundedTerminalQuery_keeps_client_operators_after_as_enumerable()
+    {
+        var rewritten = SqlTranslationProbe.TryRewriteBoundedTerminalQuery(
+            "db.Products.AsEnumerable().Where(product => product.Name.StartsWith(\"A\")).ToList()");
+
+        Assert.NotNull(rewritten);
+        Assert.Equal(
+            "db.Products.Take(100).AsEnumerable().Where(product => product.Name.StartsWith(\"A\")).ToList()",
+            ProbeTestHelper.CollapseWhitespace(rewritten));
+    }
+
+    [Fact]
+    public void TryRewriteBoundedTerminalQuery_adds_take_before_as_async_enumerable_to_list_async()
+    {
+        var rewritten = SqlTranslationProbe.TryRewriteBoundedTerminalQuery(
+            "db.Products.AsAsyncEnumerable().ToListAsync()");
+
+        Assert.NotNull(rewritten);
+        Assert.Equal("db.Products.Take(100).ToListAsync()", ProbeTestHelper.CollapseWhitespace(rewritten));
+    }
+
+    [Fact]
     public void TryRewriteBoundedTerminalQuery_respects_existing_take()
     {
         var rewritten = SqlTranslationProbe.TryRewriteBoundedTerminalQuery("db.Products.Take(25).ToList()");

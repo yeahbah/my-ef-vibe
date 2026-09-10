@@ -256,6 +256,18 @@ public sealed class SqlTranslationProbeExecutionRewriteTests
     }
 
     [Fact]
+    public void SnippetNormalizer_ForEvaluation_AsEnumerableToList_UsesQueryableTake()
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(
+            "db.Users.AsEnumerable().ToList()",
+            typeof(FakeRewriterDbContext));
+
+        Assert.Equal(
+            "global::MyEfVibe.ReplQueryableRuntime.ToList(global::MyEfVibe.ReplQueryableRuntime.Take(db.Users, 100))",
+            normalized);
+    }
+
+    [Fact]
     public void SnippetNormalizer_ForEvaluation_DoesNotLeaveToArrayOnObjectAfterTake()
     {
         var normalized = SnippetNormalizer.ForEvaluation(

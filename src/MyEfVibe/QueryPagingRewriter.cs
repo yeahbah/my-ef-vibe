@@ -63,9 +63,7 @@ internal static class QueryPagingRewriter
                 return null;
             }
 
-            var paged = skip == 0
-                ? $"{queryable}.Take({pageSize})"
-                : $"{queryable}.Skip({skip}).Take({pageSize})";
+            var paged = SqlTranslationProbe.InsertSkipTakeBeforeClientEnumeration(queryable, skip, pageSize);
 
             return paged + suffix;
         }
