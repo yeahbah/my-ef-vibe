@@ -59,7 +59,8 @@ internal static partial class EfReplQueryableRewriter
 
         if (string.IsNullOrWhiteSpace(trimmed)
             || !LinqEfQueryHeuristics.LooksLikeEfQuery(trimmed)
-            || trimmed.Contains(Runtime, StringComparison.Ordinal))
+            || trimmed.Contains(Runtime, StringComparison.Ordinal)
+            || SqlTranslationProbe.ContainsTopLevelStatementSeparator(trimmed))
         {
             return null;
         }

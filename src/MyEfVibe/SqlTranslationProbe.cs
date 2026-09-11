@@ -711,6 +711,75 @@ internal static class SqlTranslationProbe
         };
     }
 
+    /// <summary>
+    ///     Splits a script snippet on top-level <c>;</c> so multi-statement eval can rewrite each
+    ///     query independently. Semicolons inside strings, chars, or nested <c>()[]{}</c> are ignored.
+    /// </summary>
+    internal static IReadOnlyList<string> SplitTopLevelStatements(string snippet)
+    {
+        if (string.IsNullOrWhiteSpace(snippet))
+        {
+            return [];
+        }
+
+        var statements = new List<string>();
+        var start = 0;
+        var depth = 0;
+
+        for (var index = 0; index < snippet.Length; index++)
+        {
+            switch (snippet[index])
+            {
+                case '(':
+                case '[':
+                case '{':
+                    depth++;
+                    break;
+
+                case ')':
+                case ']':
+                case '}':
+                    depth--;
+                    break;
+
+                case ';' when depth == 0:
+                    var part = snippet[start..index].Trim();
+
+                    if (!string.IsNullOrWhiteSpace(part))
+                    {
+                        statements.Add(part);
+                    }
+
+                    start = index + 1;
+                    break;
+
+                case '"':
+                    index = SkipStringLiteral(snippet, index);
+                    break;
+
+                case '\'':
+                    index = SkipCharLiteral(snippet, index);
+                    break;
+            }
+        }
+
+        var tail = snippet[start..].Trim();
+
+        if (!string.IsNullOrWhiteSpace(tail))
+        {
+            statements.Add(tail);
+        }
+
+        return statements;
+    }
+
+    internal static bool ContainsTopLevelStatementSeparator(string snippet)
+    {
+        var trimmed = snippet.Trim().TrimEnd(';').Trim();
+
+        return SplitTopLevelStatements(trimmed).Count > 1;
+    }
+
     internal static bool IsEndOfExpression(string expression, int startIndex)
     {
         for (var index = startIndex; index < expression.Length; index++)

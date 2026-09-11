@@ -114,6 +114,31 @@ internal static class SnippetNormalizer
             return snippet;
         }
 
+        var statements = SqlTranslationProbe.SplitTopLevelStatements(snippet);
+
+        if (statements.Count > 1)
+        {
+            var rewrittenStatements = new string[statements.Count];
+
+            for (var index = 0; index < statements.Count; index++)
+            {
+                rewrittenStatements[index] = RewriteSingleBoundedEfQuery(
+                    statements[index],
+                    dbContextType,
+                    preserveAsyncQueries);
+            }
+
+            return JoinRewrittenStatements(snippet, rewrittenStatements);
+        }
+
+        return RewriteSingleBoundedEfQuery(snippet, dbContextType, preserveAsyncQueries);
+    }
+
+    private static string RewriteSingleBoundedEfQuery(
+        string snippet,
+        Type dbContextType,
+        bool preserveAsyncQueries)
+    {
         var options = preserveAsyncQueries
             ? EfReplQueryRewriteOptions.Async
             : EfReplQueryRewriteOptions.Sync;
@@ -129,6 +154,19 @@ internal static class SnippetNormalizer
         return EfReplQueryableRewriter.TryRewriteWhereTakePipeline(rewritten, dbContextType, options)
                ?? EfReplQueryableRewriter.TryRewriteBareWhere(rewritten, dbContextType)
                ?? rewritten;
+    }
+
+    private static string JoinRewrittenStatements(string originalSnippet, IReadOnlyList<string> statements)
+    {
+        var joined = string.Join("; ", statements);
+        var trimmedOriginal = originalSnippet.TrimEnd();
+
+        if (trimmedOriginal.EndsWith(';') && !joined.EndsWith(';'))
+        {
+            return $"{joined};";
+        }
+
+        return joined;
     }
 
     private static int IndexOfLastNonEmptyLine(string[] lines)
