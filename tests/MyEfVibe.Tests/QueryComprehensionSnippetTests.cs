@@ -143,6 +143,73 @@ public sealed class QueryComprehensionSnippetTests
         Assert.Contains("from reviews in db.Products", normalized, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("select reviews", normalized, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(".ToArray()", normalized, StringComparison.Ordinal);
+        Assert.Contains(".Take(100)", normalized, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("(from product in db.Products select product).ToList()")]
+    [InlineData("(from product in db.Products select product).ToArray()")]
+    [InlineData("(from product in db.Products select product).ToListAsync()")]
+    public void ForEvaluation_query_comprehension_materializer_gets_auto_take(string snippet)
+    {
+        var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeRewriterDbContext));
+
+        Assert.Contains(".Take(100)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReplQueryableRuntime", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
+    public void ForEvaluation_multiline_query_comprehension_to_list_gets_auto_take()
+    {
+        const string snippet = """
+                               (from product in db.Products
+                               select product).ToList()
+                               """;
+
+        var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeRewriterDbContext));
+
+        Assert.Equal(
+            "(from product in db.Products select product).Take(100).ToList()",
+            ProbeTestHelper.CollapseWhitespace(normalized));
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
+    public void ForEvaluation_bare_query_comprehension_does_not_add_take()
+    {
+        const string snippet = """
+                               from product in db.Products
+                               select product
+                               """;
+
+        var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeRewriterDbContext));
+
+        Assert.DoesNotContain(".Take(", normalized, StringComparison.Ordinal);
+        Assert.Contains("from product in db.Products", normalized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ForEvaluation_query_comprehension_respects_existing_take()
+    {
+        const string snippet = "(from product in db.Products select product).Take(25).ToList()";
+
+        var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeRewriterDbContext));
+
+        Assert.Contains(".Take(25)", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(100)", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DescribeAutoMaterializationLimit_reports_for_query_comprehension_to_list()
+    {
+        const string original = "(from product in db.Products select product).ToList()";
+        var normalized = SnippetNormalizer.ForEvaluation(original, typeof(FakeRewriterDbContext));
+
+        var warning = SqlTranslationProbe.DescribeAutoMaterializationLimit(normalized, original);
+
+        Assert.NotNull(warning);
+        Assert.Contains("100 rows", warning, StringComparison.Ordinal);
     }
 
     [Fact]
