@@ -49,7 +49,9 @@ internal static class SnippetNormalizer
                     new ProbeStubContext(dbContextType, entityTypeName));
             }
 
-            return script;
+            // Query-comprehension snippets skip RewriteBoundedEfQuery (method-syntax rewriter).
+            // Still apply the ToList/ToArray auto-Take(100) cap so SELECT * is not unbounded.
+            return SqlTranslationProbe.TryRewriteBoundedTerminalQuery(script) ?? script;
         }
 
         var lines = InputLineUtilities.SplitLines(trimmed);
