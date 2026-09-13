@@ -22,19 +22,24 @@ internal static class ProbeParameterStubber
         try
         {
             var singleLine = ProbeScriptFormatter.ToScriptExpression(probeExpression, preserveLeadingAwait);
-            var wrapped = $"var __efProbe = {singleLine};";
+            var parseText = ProbeScriptFormatter.HasMultipleTopLevelStatements(singleLine)
+                ? singleLine
+                : $"var __efProbe = {singleLine};";
 
             var tree = CSharpSyntaxTree.ParseText(
-                wrapped,
+                parseText,
                 CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
 
-            var queryRangeVariables = tree.GetRoot()
+            var root = tree.GetRoot();
+            var queryRangeVariables = root
                 .DescendantNodes()
                 .OfType<QueryExpressionSyntax>()
                 .SelectMany(CollectQueryRangeVariables)
                 .ToHashSet(StringComparer.Ordinal);
+            var declaredIdentifiers = CollectDeclaredIdentifiers(root);
 
-            var rewritten = new ParameterStubRewriter(context, queryRangeVariables).Visit(tree.GetRoot());
+            var rewritten = new ParameterStubRewriter(context, queryRangeVariables, declaredIdentifiers)
+                .Visit(root);
 
             if (rewritten is null)
             {
@@ -105,16 +110,38 @@ internal static class ProbeParameterStubber
         return rangeVariables;
     }
 
+    private static HashSet<string> CollectDeclaredIdentifiers(SyntaxNode root)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var declarator in root.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+        {
+            names.Add(declarator.Identifier.Text);
+        }
+
+        foreach (var loop in root.DescendantNodes().OfType<ForEachStatementSyntax>())
+        {
+            names.Add(loop.Identifier.Text);
+        }
+
+        return names;
+    }
+
     private sealed class ParameterStubRewriter : CSharpSyntaxRewriter
     {
         private readonly ProbeStubContext? _context;
         private readonly HashSet<string> _queryRangeVariables;
+        private readonly HashSet<string> _declaredIdentifiers;
         private readonly Stack<HashSet<string>> _lambdaParameters = new();
 
-        internal ParameterStubRewriter(ProbeStubContext? context, HashSet<string>? queryRangeVariables = null)
+        internal ParameterStubRewriter(
+            ProbeStubContext? context,
+            HashSet<string>? queryRangeVariables = null,
+            HashSet<string>? declaredIdentifiers = null)
         {
             _context = context;
             _queryRangeVariables = queryRangeVariables ?? new HashSet<string>(StringComparer.Ordinal);
+            _declaredIdentifiers = declaredIdentifiers ?? new HashSet<string>(StringComparer.Ordinal);
         }
 
         public override SyntaxNode? VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node)
@@ -191,6 +218,7 @@ internal static class ProbeParameterStubber
                 || string.Equals(name, "cancellationToken", StringComparison.OrdinalIgnoreCase)
                 || IsLambdaParameter(name)
                 || _queryRangeVariables.Contains(name)
+                || _declaredIdentifiers.Contains(name)
                 || IsInvocationCallee(node)
                 || IsDeclaredInProbe(node)
                 || IsInTypeContext(node)
@@ -302,6 +330,7 @@ internal static class ProbeParameterStubber
 
             if (string.Equals(receiverName, "db", StringComparison.Ordinal)
                 || IsLambdaParameter(receiverName)
+                || _declaredIdentifiers.Contains(receiverName)
                 || IsDeclaredInProbe(receiver))
             {
                 return false;

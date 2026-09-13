@@ -69,4 +69,19 @@ public sealed class ProbeScriptFormatterTests
             script);
         Assert.Contains("e => e.JobTitle", script, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ToScriptExpression_LeadingLocalThenQuery_PreservesLocalDeclaration()
+    {
+        const string expression = """
+                                  var minId = 10;
+                                  await db.Users.Where(u => u.Id > minId).ToListAsync();
+                                  """;
+
+        var script = ProbeScriptFormatter.ToScriptExpression(expression);
+
+        Assert.Contains("var minId = 10", script, StringComparison.Ordinal);
+        Assert.Contains("u.Id > minId", script, StringComparison.Ordinal);
+        Assert.False(script.StartsWith("10;", StringComparison.Ordinal));
+    }
 }

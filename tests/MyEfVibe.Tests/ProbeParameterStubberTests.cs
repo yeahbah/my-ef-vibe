@@ -149,6 +149,22 @@ public sealed class ProbeParameterStubberTests
     }
 
     [Fact]
+    public void Stub_LocalDeclaredInSameSnippet_NotReplaced()
+    {
+        const string probe = """
+                             var minId = 10;
+                             await db.Users.Where(u => u.Id > minId).ToListAsync();
+                             """;
+
+        var stubbed = ProbeParameterStubber.Stub(probe, preserveLeadingAwait: true);
+
+        Assert.Contains("var minId = 10", stubbed, StringComparison.Ordinal);
+        Assert.Contains("u.Id > minId", stubbed, StringComparison.Ordinal);
+        Assert.DoesNotContain("u.Id > 0", stubbed, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(stubbed);
+    }
+
+    [Fact]
     public void Stub_QueryComprehensionRangeVariable_NotReplaced()
     {
         const string probe = """

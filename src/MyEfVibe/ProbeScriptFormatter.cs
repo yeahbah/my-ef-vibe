@@ -1,4 +1,7 @@
 using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace MyEfVibe;
 
@@ -115,7 +118,37 @@ internal static class ProbeScriptFormatter
         var declaredName = TryParseVarDeclarationName(trimmed);
         var rhs = trimmed[(equalsIndex + 1)..].Trim();
 
+        // A leading `var filter = 10; query` is two statements. Stripping `var filter =`
+        // leaves a dangling identifier that ProbeParameterStubber then replaces with a
+        // literal (0 / ""), silently changing the executed filter.
+        if (HasMultipleTopLevelStatements(trimmed))
+        {
+            return trimmed;
+        }
+
         return FixMistakenCountSelfReference(declaredName, rhs);
+    }
+
+    internal static bool HasMultipleTopLevelStatements(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        try
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                text,
+                CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
+
+            // Script-level `var minId = 10;` is a field, not a GlobalStatement.
+            return tree.GetRoot() is CompilationUnitSyntax unit && unit.Members.Count > 1;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     internal static string? TryParseVarDeclarationName(string text)

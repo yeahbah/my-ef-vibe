@@ -122,6 +122,39 @@ public sealed class RepositorySnippetAdapterTests
     }
 
     [Fact]
+    public void PrepareForEvaluation_LeadingVarThenAsyncQuery_PreservesLocal()
+    {
+        const string snippet = """
+                               var minId = 10;
+                               await db.Users.Where(u => u.Id > minId).ToListAsync();
+                               """;
+
+        var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeGuidNoteDbContext));
+
+        Assert.Contains("var minId = 10", normalized, StringComparison.Ordinal);
+        Assert.Contains("u.Id > minId", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("u.Id > 0", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToListAsync", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
+    public void PrepareForEvaluation_LeadingVarThenIncludeQuery_PreservesLocal()
+    {
+        const string snippet = """
+                               var id = 5;
+                               db.Employees.Include(e => e.PersonBusinessEntity).Where(e => e.BusinessEntityId == id).ToList();
+                               """;
+
+        var normalized = SnippetNormalizer.ForEvaluation(snippet, typeof(FakeAdventureWorksDbContext));
+
+        Assert.Contains("var id = 5", normalized, StringComparison.Ordinal);
+        Assert.Contains("e.BusinessEntityId == id", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("BusinessEntityId == 0", normalized, StringComparison.Ordinal);
+        ProbeTestHelper.AssertParsesAsScript(normalized);
+    }
+
+    [Fact]
     public void ReplQueryableRuntime_IsPublicForRoslynScriptSubmissions()
     {
         var type = typeof(ReplQueryableRuntime);
