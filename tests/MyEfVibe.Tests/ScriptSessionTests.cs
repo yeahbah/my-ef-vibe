@@ -86,6 +86,50 @@ public sealed class ScriptSessionTests
         Assert.Equal(2, result);
     }
 
+    [Fact]
+    public async Task EvaluateAsync_preserves_leading_local_used_by_async_filter()
+    {
+        var options = new DbContextOptionsBuilder<ProbeHistoryDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ProbeHistoryDbContext(options);
+        context.Users.AddRange(
+            new ProbeHistoryUser { Id = 1 },
+            new ProbeHistoryUser { Id = 10 },
+            new ProbeHistoryUser { Id = 15 });
+        await context.SaveChangesAsync();
+
+        using var assemblyLoader = new InteractiveAssemblyLoader();
+        assemblyLoader.RegisterDependency(typeof(ProbeHistoryDbContext).Assembly);
+        assemblyLoader.RegisterDependency(typeof(DbContext).Assembly);
+        assemblyLoader.RegisterDependency(typeof(ReplQueryableRuntime).Assembly);
+
+        var workspaceAssemblyPaths = new[]
+            {
+                typeof(ProbeHistoryDbContext).Assembly.Location,
+                typeof(DbContext).Assembly.Location,
+                typeof(ReplQueryableRuntime).Assembly.Location
+            }
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var session = new ScriptSession(
+            typeof(ProbeHistoryDbContext),
+            context,
+            workspaceAssemblyPaths,
+            assemblyLoader);
+
+        var result = await session.EvaluateAsync(
+            """
+            var minId = 10;
+            await db.Users.Where(u => u.Id > minId).ToListAsync();
+            """);
+
+        var users = Assert.IsAssignableFrom<IEnumerable<ProbeHistoryUser>>(result);
+        Assert.Equal([15], users.Select(static user => user.Id).ToArray());
+    }
+
 }
 
 public sealed class ProbeHistoryDbContext(DbContextOptions<ProbeHistoryDbContext> options)
