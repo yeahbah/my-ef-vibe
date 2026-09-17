@@ -239,7 +239,6 @@ internal sealed class EfvibeDaemonClient : IDisposable
     private sealed class DaemonState : IDisposable
     {
         private readonly BlockingCollection<string> _lines = new();
-        private readonly StringBuilder _buffer = new();
         private readonly StringBuilder _stderr = new();
 
         internal DaemonState(Process process)
@@ -286,26 +285,9 @@ internal sealed class EfvibeDaemonClient : IDisposable
 
         private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
         {
-            if (e.Data is null)
-                return;
-
-            lock (_buffer)
+            foreach (var line in DaemonStdoutLineParser.CompleteLinesFromBeginOutputReadLine(e.Data))
             {
-                _buffer.Append(e.Data);
-                while (true)
-                {
-                    var text = _buffer.ToString();
-                    var index = text.IndexOf('\n');
-                    if (index < 0)
-                        break;
-
-                    var line = text.Substring(0, index).Trim('\r', '\n', ' ');
-                    _buffer.Clear();
-                    _buffer.Append(text.Substring(index + 1));
-
-                    if (line.Length > 0)
-                        _lines.Add(line);
-                }
+                _lines.Add(line);
             }
         }
     }

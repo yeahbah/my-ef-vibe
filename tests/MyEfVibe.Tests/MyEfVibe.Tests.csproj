@@ -14,6 +14,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\MyEfVibe\MyEfVibe.csproj"/>
+        <Compile Include="..\..\visualstudio-extension\Services\DaemonStdoutLineParser.cs" Link="DaemonStdoutLineParser.cs" />
     </ItemGroup>
 
     <ItemGroup>
