@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { buildReplCommand } from './cliRunner';
 import type { EfvibeSettings } from './config';
+import { formatSnippetForReplSubmit as flattenSnippetForRepl } from './snippetWhitespace';
 
 /** Terminals we have already launched `efvibe` in (or user started via Start REPL). */
 const replBootstrapped = new WeakSet<vscode.Terminal>();
@@ -24,18 +25,10 @@ export function registerReplTerminal(context: vscode.ExtensionContext): void {
 /**
  * Collapse editor selection to one REPL submission. The REPL runs on `;` (see QueryRepl).
  * Repository-style snippets are normalized inside the CLI once the line is read.
+ * Whitespace inside string/char literals is preserved so filters are not rewritten.
  */
 export function formatSnippetForReplSubmit(snippet: string): string {
-  const collapsed = snippet
-    .replace(/\r?\n/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!collapsed) {
-    return '';
-  }
-
-  return collapsed.endsWith(';') ? collapsed : `${collapsed};`;
+  return flattenSnippetForRepl(snippet);
 }
 
 export async function ensureEfvibeReplTerminal(
