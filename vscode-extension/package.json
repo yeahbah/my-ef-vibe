@@ -467,6 +467,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "tsc -p ./ --noEmit",
+    "test:shell-quote": "npm run compile && node scripts/shellQuote.smoke.cjs",
     "package": "npm run compile && vsce package --no-dependencies"
   },
   "devDependencies": {

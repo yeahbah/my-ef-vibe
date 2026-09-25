@@ -2,8 +2,10 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import type { EfvibeSettings } from './config';
 import { parseEvaluationJson, type EvaluationJsonPayload } from './evaluationTypes';
+import { joinShellCommand } from './shellQuote';
 
 const execFileAsync = promisify(execFile);
 
@@ -96,18 +98,6 @@ export interface CompletionsJsonPayload {
 export interface TablesJsonPayload {
   dbContext: string;
   tables: TablesJsonEntry[];
-}
-
-function quoteArg(value: string): string {
-  if (value.length === 0) {
-    return '""';
-  }
-
-  if (!/[ \t"]/u.test(value)) {
-    return value;
-  }
-
-  return `"${value.replace(/"/g, '\\"')}"`;
 }
 
 export function resolveToolInvocation(
@@ -220,8 +210,7 @@ export function buildEfvibeArgs(settings: EfvibeSettings, baseDirectory?: string
 }
 
 export function buildCommandLine(invocation: ToolInvocation, args: string[]): string {
-  const tokens = [...invocation.prefixArgs, ...args];
-  return [quoteArg(invocation.command), ...tokens.map(quoteArg)].join(' ');
+  return joinShellCommand([invocation.command, ...invocation.prefixArgs, ...args], vscode.env.shell);
 }
 
 export function buildReplCommand(settings: EfvibeSettings, searchDirectory: string): string {
