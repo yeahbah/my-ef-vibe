@@ -19,14 +19,16 @@ class StartReplAction : AnAction() {
 
     override fun actionPerformed(event: AnActionEvent) {
         val project = EfvibeActionSupport.requireProject(event) ?: return
-        val command = CliRunner(project).buildReplCommandLine()
+        val runner = CliRunner(project)
+        var command = runner.buildReplCommandLine()
 
         runCatching {
             val workingDirectory = PathResolver.solutionDirectory(project).toString()
+            command = runner.replTerminalCommand(workingDirectory)
             val terminal = createTerminalSession(project)
             terminal.javaClass
                 .getMethod("sendCommandToExecute", String::class.java)
-                .invoke(terminal, "cd ${shellQuote(workingDirectory)} && $command")
+                .invoke(terminal, command)
         }.onFailure {
             CopyPasteManager.getInstance().setContents(StringSelection(command))
             Messages.showInfoMessage(
@@ -47,6 +49,3 @@ private fun createTerminalSession(project: Project): Any {
         .getMethod("createNewSession")
         .invoke(manager)
 }
-
-private fun shellQuote(value: String): String =
-    "\"${value.replace("\"", "\\\"")}\""
