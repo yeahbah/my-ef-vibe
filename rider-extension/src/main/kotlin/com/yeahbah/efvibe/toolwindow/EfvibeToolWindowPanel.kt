@@ -896,10 +896,9 @@ class EfvibeToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     }
 
     private fun formatServeCommandLine(): String {
-        val spec = CliRunner(project).buildServeSpec()
-        return (listOf(spec.command) + spec.args).joinToString(" ") { token ->
-            if (token.any { it.isWhitespace() || it == '"' }) "\"${token.replace("\"", "\\\"")}\"" else token
-        }
+        val runner = CliRunner(project)
+        val spec = runner.buildServeSpec()
+        return (listOf(spec.command) + spec.args).joinToString(" ") { runner.quoteForTerminal(it) }
     }
 
     private fun formatEvaluationSummary(payload: EvaluationPayload): String =

@@ -13,13 +13,29 @@ import kotlin.io.path.exists
 class CliRunner(private val project: Project) {
     private val settings: EfvibeSettingsState get() = project.service<EfvibeSettingsService>().state
 
-    fun buildReplCommandLine(): String {
+    fun buildReplCommandLine(): String = joinQuoted(currentShellKind())
+
+    fun replTerminalCommand(workingDirectory: String): String {
+        val kind = currentShellKind()
+        return ShellQuote.prependWorkingDirectory(workingDirectory, joinQuoted(kind), kind)
+    }
+
+    fun quoteForTerminal(value: String): String =
+        ShellQuote.quote(value, currentShellKind())
+
+    private fun joinQuoted(kind: ShellKind): String {
         val invocation = resolveInvocation()
         return listOf(invocation.command)
             .plus(invocation.prefixArgs)
             .plus(baseArgs())
-            .joinToString(" ") { quote(it) }
+            .joinToString(" ") { ShellQuote.quote(it, kind) }
     }
+
+    private fun currentShellKind(): ShellKind =
+        ShellQuote.kindFor(
+            System.getProperty("os.name").orEmpty(),
+            TerminalShellProbe.shellPath(project),
+        )
 
     fun runAboutJson(): CliResult =
         run(listOf("--about-json", "--no-banner"), timeoutMs = 30_000)
@@ -322,5 +338,5 @@ class CliRunner(private val project: Project) {
     }
 
     private fun quote(value: String): String =
-        if (value.any { it.isWhitespace() || it == '"' }) "\"${value.replace("\"", "\\\"")}\"" else value
+        ShellQuote.quote(value, currentShellKind())
 }
