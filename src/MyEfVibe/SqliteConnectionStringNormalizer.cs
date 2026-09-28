@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace MyEfVibe;
 
 internal static class SqliteConnectionStringNormalizer
@@ -15,19 +17,19 @@ internal static class SqliteConnectionStringNormalizer
             return connectionString;
         }
 
-        if (!TryParseDataSource(connectionString, out var dataSource, out var usesPrefix))
+        if (!TryParseDataSource(connectionString, out var dataSource, out var usesPrefix, out var trailingOptions))
         {
             return connectionString;
         }
 
-        if (IsLiteralDataSource(dataSource))
+        if (IsLiteralDataSource(dataSource) || IsInMemoryMode(trailingOptions))
         {
             return connectionString;
         }
 
         if (Path.IsPathRooted(dataSource))
         {
-            return FormatDataSource(dataSource, usesPrefix);
+            return FormatDataSource(dataSource, usesPrefix, trailingOptions);
         }
 
         foreach (var searchRoot in EnumerateSearchRoots(startupProjectPath, efOutputDirectory))
@@ -36,14 +38,14 @@ internal static class SqliteConnectionStringNormalizer
 
             if (File.Exists(candidate))
             {
-                return FormatDataSource(candidate, usesPrefix);
+                return FormatDataSource(candidate, usesPrefix, trailingOptions);
             }
         }
 
         var fallbackRoot = Path.GetDirectoryName(startupProjectPath)!;
         var fallbackPath = Path.GetFullPath(Path.Combine(fallbackRoot, dataSource));
 
-        return FormatDataSource(fallbackPath, usesPrefix);
+        return FormatDataSource(fallbackPath, usesPrefix, trailingOptions);
     }
 
     internal static bool LooksLikeSqliteConnection(string connectionString)
@@ -60,7 +62,7 @@ internal static class SqliteConnectionStringNormalizer
         }
 
         if (connectionString.Contains(DataSourcePrefix, StringComparison.OrdinalIgnoreCase)
-            && TryParseDataSource(connectionString, out var dataSource, out _))
+            && TryParseDataSource(connectionString, out var dataSource, out _, out _))
         {
             if (dataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase)
                 || dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
@@ -83,23 +85,36 @@ internal static class SqliteConnectionStringNormalizer
                || connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
                || connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase)
                || (connectionString.Contains(DataSourcePrefix, StringComparison.OrdinalIgnoreCase)
-                   && TryParseDataSource(connectionString, out var dataSource, out _)
+                   && TryParseDataSource(connectionString, out var dataSource, out _, out _)
                    && dataSource.Contains(',', StringComparison.Ordinal));
     }
 
     private static bool TryParseDataSource(
         string connectionString,
         out string dataSource,
-        out bool usesPrefix)
+        out bool usesPrefix,
+        out string trailingOptions)
     {
         dataSource = string.Empty;
         usesPrefix = false;
+        trailingOptions = string.Empty;
 
         if (connectionString.StartsWith(DataSourcePrefix, StringComparison.OrdinalIgnoreCase))
         {
             usesPrefix = true;
-            dataSource = connectionString[DataSourcePrefix.Length..].Trim().Trim('"');
-            SplitAdditionalOptions(ref dataSource);
+            var remainder = connectionString[DataSourcePrefix.Length..].TrimStart();
+
+            if (!TryReadConnectionStringValue(remainder, out dataSource, out var consumed))
+            {
+                return false;
+            }
+
+            var rest = remainder[consumed..].TrimStart();
+
+            if (rest.StartsWith(';'))
+            {
+                trailingOptions = rest[1..].Trim();
+            }
 
             return !string.IsNullOrWhiteSpace(dataSource);
         }
@@ -114,16 +129,115 @@ internal static class SqliteConnectionStringNormalizer
         return !string.IsNullOrWhiteSpace(dataSource);
     }
 
-    private static void SplitAdditionalOptions(ref string dataSource)
+    private static bool TryReadConnectionStringValue(string remainder, out string value, out int consumed)
     {
-        var separatorIndex = dataSource.IndexOf(';', StringComparison.Ordinal);
+        value = string.Empty;
+        consumed = 0;
+
+        if (remainder.Length == 0)
+        {
+            return false;
+        }
+
+        if (remainder[0] == '"')
+        {
+            var builder = new StringBuilder();
+            var index = 1;
+
+            while (index < remainder.Length)
+            {
+                if (remainder[index] == '"')
+                {
+                    if (index + 1 < remainder.Length && remainder[index + 1] == '"')
+                    {
+                        builder.Append('"');
+                        index += 2;
+                        continue;
+                    }
+
+                    value = builder.ToString();
+                    consumed = index + 1;
+
+                    return !string.IsNullOrWhiteSpace(value);
+                }
+
+                builder.Append(remainder[index]);
+                index++;
+            }
+
+            return false;
+        }
+
+        var separatorIndex = remainder.IndexOf(';');
 
         if (separatorIndex < 0)
         {
-            return;
+            value = remainder.Trim().Trim('"');
+            consumed = remainder.Length;
+
+            return !string.IsNullOrWhiteSpace(value);
         }
 
-        dataSource = dataSource[..separatorIndex].Trim();
+        value = remainder[..separatorIndex].Trim().Trim('"');
+        consumed = separatorIndex;
+
+        return !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static bool IsInMemoryMode(string trailingOptions)
+    {
+        return TryGetConnectionOption(trailingOptions, "Mode", out var mode)
+               && mode.Equals("Memory", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetConnectionOption(string options, string key, out string value)
+    {
+        value = string.Empty;
+        var index = 0;
+
+        while (index < options.Length)
+        {
+            while (index < options.Length && (options[index] == ';' || char.IsWhiteSpace(options[index])))
+            {
+                index++;
+            }
+
+            if (index >= options.Length)
+            {
+                break;
+            }
+
+            var keyStart = index;
+
+            while (index < options.Length && options[index] != '=')
+            {
+                index++;
+            }
+
+            if (index >= options.Length)
+            {
+                break;
+            }
+
+            var optionKey = options[keyStart..index].Trim();
+            index++;
+
+            if (!TryReadConnectionStringValue(options[index..], out var optionValue, out var consumed))
+            {
+                break;
+            }
+
+            if (optionKey.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                value = optionValue;
+
+                return true;
+            }
+
+            index += consumed;
+        }
+
+        return false;
     }
 
     private static bool IsLiteralDataSource(string dataSource)
@@ -133,11 +247,34 @@ internal static class SqliteConnectionStringNormalizer
                || dataSource.Contains("mode=memory", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string FormatDataSource(string absoluteOrRootedPath, bool usesPrefix)
+    private static string FormatDataSource(
+        string absoluteOrRootedPath,
+        bool usesPrefix,
+        string trailingOptions)
     {
-        return usesPrefix
-            ? $"{DataSourcePrefix}{absoluteOrRootedPath}"
+        var formatted = usesPrefix
+            ? $"{DataSourcePrefix}{QuoteDataSourceIfNeeded(absoluteOrRootedPath)}"
             : absoluteOrRootedPath;
+
+        if (!usesPrefix || string.IsNullOrEmpty(trailingOptions))
+        {
+            return formatted;
+        }
+
+        return $"{formatted};{trailingOptions}";
+    }
+
+    private static string QuoteDataSourceIfNeeded(string path)
+    {
+        if (!path.Contains(';')
+            && !path.Contains('"')
+            && !path.StartsWith(' ')
+            && !path.EndsWith(' '))
+        {
+            return path;
+        }
+
+        return $"\"{path.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }
 
     private static IEnumerable<string> EnumerateSearchRoots(
