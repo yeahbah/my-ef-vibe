@@ -61,6 +61,60 @@ public sealed class SqliteConnectionStringNormalizerTests
     }
 
     [Fact]
+    public void Normalize_preserves_options_while_resolving_relative_data_source()
+    {
+        using var temp = new TempDirectory();
+        var databasePath = Path.Combine(temp.Path, "shop.db");
+        File.WriteAllText(databasePath, string.Empty);
+
+        var startupProject = Path.Combine(temp.Path, "App.csproj");
+        File.WriteAllText(startupProject, "<Project />");
+
+        var normalized = SqliteConnectionStringNormalizer.Normalize(
+            "Data Source=shop.db;Mode=ReadOnly;Cache=Shared",
+            startupProject);
+
+        Assert.Equal($"Data Source={databasePath};Mode=ReadOnly;Cache=Shared", normalized);
+    }
+
+    [Fact]
+    public void Normalize_resolves_quoted_data_source_and_preserves_options()
+    {
+        using var temp = new TempDirectory();
+        var databasePath = Path.Combine(temp.Path, "My Data", "shop.db");
+        Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+        File.WriteAllText(databasePath, string.Empty);
+
+        var startupProject = Path.Combine(temp.Path, "App.csproj");
+        File.WriteAllText(startupProject, "<Project />");
+
+        var normalized = SqliteConnectionStringNormalizer.Normalize(
+            "Data Source=\"My Data/shop.db\";Mode=ReadOnly;Password=\"sec;ret\"",
+            startupProject);
+
+        Assert.Equal($"Data Source={databasePath};Mode=ReadOnly;Password=\"sec;ret\"", normalized);
+        Assert.DoesNotContain("shop.db\"", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Normalize_does_not_rewrite_in_memory_mode_as_a_file()
+    {
+        using var temp = new TempDirectory();
+        var databasePath = Path.Combine(temp.Path, "cache.db");
+        File.WriteAllText(databasePath, "on-disk");
+
+        var startupProject = Path.Combine(temp.Path, "App.csproj");
+        File.WriteAllText(startupProject, "<Project />");
+
+        const string connectionString = "Data Source=cache.db;Mode=Memory;Cache=Shared";
+
+        var normalized = SqliteConnectionStringNormalizer.Normalize(connectionString, startupProject);
+
+        Assert.Equal(connectionString, normalized);
+        Assert.DoesNotContain(databasePath, normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LooksLikeSqliteConnection_is_false_for_sql_server_host_comma_port()
     {
         const string connectionString =
