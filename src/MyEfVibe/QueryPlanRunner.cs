@@ -235,11 +235,9 @@ internal static partial class QueryPlanRunner
             return boolean ? "1" : "0";
         }
 
-        if (value.StartsWith('\'') && value.EndsWith('\'') && value.Length >= 2)
-        {
-            return value;
-        }
-
+        // Parameter text comes from the ADO.NET value, so leading and trailing quotes are data.
+        // Splicing them through unchanged lets a value such as `'x'; DROP TABLE ...; --'`
+        // close the literal and run as a second statement under EXPLAIN.
         return $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
     }
 
