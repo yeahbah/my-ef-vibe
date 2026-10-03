@@ -225,6 +225,7 @@ internal static class TabularExportBuilder
         return type.IsPrimitive
                || type.IsEnum
                || type == typeof(string)
+               || type == typeof(byte[])
                || type == typeof(decimal)
                || type == typeof(DateTime)
                || type == typeof(DateTimeOffset)

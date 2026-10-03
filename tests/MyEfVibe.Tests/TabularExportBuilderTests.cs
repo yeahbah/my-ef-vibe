@@ -66,6 +66,20 @@ public sealed class TabularExportBuilderTests
     }
 
     [Fact]
+    public void ToJson_formats_byte_array_rows_as_base64()
+    {
+        var content = new byte[] { 0x00, 0xFF, 0x10 };
+
+        var json = TabularExportBuilder.ToJson([content]);
+
+        using var document = JsonDocument.Parse(json);
+        var row = document.RootElement[0];
+        var property = Assert.Single(row.EnumerateObject());
+        Assert.Equal("value", property.Name);
+        Assert.Equal(Convert.ToBase64String(content), property.Value.GetString());
+    }
+
+    [Fact]
     public void FormatScalar_formats_scalar_collections_without_json_cycles()
     {
         var formatted = TabularExportBuilder.FormatScalar(new[] { 1, 2, 3 });

@@ -21,6 +21,13 @@ internal static class ResultAnalyzer
             return (ResultKind.String, typeName, 1, true, value.ToString()!.Length * 2L, [value]);
         }
 
+        // byte[] implements IEnumerable<byte>. Enumerating it turns a blob into one row per byte
+        // (and can exhaust memory). Export it as one scalar, matching column formatting.
+        if (value is byte[] binary)
+        {
+            return (ResultKind.Object, typeName, 1, true, binary.LongLength, [TabularExportBuilder.FormatScalar(binary)]);
+        }
+
         if (value is IQueryable)
         {
             return (ResultKind.Queryable, FormatType(type), null, false, null, []);
