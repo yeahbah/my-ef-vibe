@@ -81,6 +81,61 @@ public sealed class EvaluationJsonReporterTests
     }
 
     [Fact]
+    public void BuildSuccess_formats_byte_array_as_one_scalar_row()
+    {
+        var metrics = new EvaluationMetrics
+        {
+            Snippet = "db.Files.Select(file => file.Content).First()",
+            TotalMilliseconds = 4,
+            SqlCommandCount = 1,
+            ExecutedSql = [],
+            ResultKind = ResultKind.Object,
+            ResultTypeName = "Byte[]",
+            RowCount = 1,
+            IsMaterialized = true,
+            Warnings = [],
+            Succeeded = true,
+        };
+
+        var content = new byte[] { 0x00, 0xFF, 0x10 };
+        var payload = EvaluationJsonReporter.BuildSuccess(content, metrics);
+
+        Assert.Equal(Convert.ToBase64String(content), payload.Value);
+        Assert.NotNull(payload.Rows);
+        Assert.Single(payload.Rows!);
+        Assert.Equal(Convert.ToBase64String(content), payload.Rows![0]["value"]);
+    }
+
+    [Fact]
+    public void BuildSuccess_formats_projected_byte_arrays_as_base64_values()
+    {
+        var metrics = new EvaluationMetrics
+        {
+            Snippet = "db.Files.Select(file => file.Content).ToList()",
+            TotalMilliseconds = 4,
+            SqlCommandCount = 1,
+            ExecutedSql = [],
+            ResultKind = ResultKind.Enumerable,
+            ResultTypeName = "List`1",
+            RowCount = 2,
+            IsMaterialized = true,
+            Warnings = [],
+            Succeeded = true,
+        };
+
+        var first = new byte[] { 0x01, 0x02 };
+        var second = new byte[] { 0x03 };
+        var payload = EvaluationJsonReporter.BuildSuccess(new[] { first, second }, metrics);
+
+        Assert.Equal("2 rows", payload.Value);
+        Assert.NotNull(payload.Rows);
+        Assert.Equal(2, payload.Rows!.Count);
+        Assert.Equal(Convert.ToBase64String(first), payload.Rows[0]["value"]);
+        Assert.Equal(Convert.ToBase64String(second), payload.Rows[1]["value"]);
+        Assert.False(payload.Rows[0].ContainsKey("Length"));
+    }
+
+    [Fact]
     public void BuildFailure_IncludesErrorAndWarnings()
     {
         var metrics = EvaluationMetrics.Failed("db.Bad", 3, "Compilation error");

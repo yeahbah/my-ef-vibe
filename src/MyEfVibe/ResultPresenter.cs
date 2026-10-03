@@ -37,6 +37,12 @@ internal static class ResultPresenter
             return;
         }
 
+        if (evaluatedProjection is byte[] bytes)
+        {
+            WriteResultPanel(TabularExportBuilder.FormatScalar(bytes));
+            return;
+        }
+
         if (evaluatedProjection is IQueryable queryable)
         {
             WriteResultPanel(DescribeDeferredQueryable(queryable));
@@ -101,6 +107,12 @@ internal static class ResultPresenter
         if (evaluatedProjection is string textLiteral)
         {
             writer.WriteLine(textLiteral);
+            return;
+        }
+
+        if (evaluatedProjection is byte[] bytes)
+        {
+            writer.WriteLine(TabularExportBuilder.FormatScalar(bytes));
             return;
         }
 

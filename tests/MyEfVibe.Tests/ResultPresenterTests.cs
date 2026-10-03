@@ -19,6 +19,18 @@ public sealed class ResultPresenterTests
         Assert.Equal(0, queryable.EnumerationCount);
     }
 
+    [Fact]
+    public void Present_formats_byte_array_as_base64_not_one_row_per_byte()
+    {
+        var content = new byte[] { 0x00, 0xFF, 0x10 };
+        using var writer = new StringWriter();
+
+        ResultPresenter.Present(content, writer);
+
+        var lines = writer.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Assert.Equal([Convert.ToBase64String(content)], lines);
+    }
+
     private sealed class ThrowOnEnumerateQueryable<T> : IQueryable<T>
     {
         internal int EnumerationCount { get; private set; }
