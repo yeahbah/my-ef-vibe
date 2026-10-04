@@ -76,7 +76,7 @@ internal static class DbContextActivator
             && providerDescriptor is not null
             && TryCreateUsingOptionsConstructor(
                 selectedDbContextType,
-                NormalizeSqlServerConnectionString(connectionString),
+                NormalizeSqlServerConnectionString(connectionString, providerDescriptor),
                 providerDescriptor,
                 host,
                 out var explicitOptionsInstance))
@@ -168,7 +168,7 @@ internal static class DbContextActivator
             && providerDescriptor is not null
             && TryCreateUsingOptionsConstructor(
                 selectedDbContextType,
-                NormalizeSqlServerConnectionString(connectionString),
+                NormalizeSqlServerConnectionString(connectionString, providerDescriptor),
                 providerDescriptor,
                 host,
                 out var optionsInstance))
@@ -1338,9 +1338,11 @@ internal static class DbContextActivator
         }
     }
 
-    private static string NormalizeSqlServerConnectionString(string connectionString)
+    private static string NormalizeSqlServerConnectionString(
+        string connectionString,
+        ProviderDescriptor providerDescriptor)
     {
-        return SqlServerConnectionStringNormalizer.Normalize(connectionString);
+        return SqlServerConnectionStringNormalizer.NormalizeForProvider(connectionString, providerDescriptor);
     }
 
     private static object Finish(
