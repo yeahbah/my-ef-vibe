@@ -8,6 +8,34 @@ namespace MyEfVibe;
 /// </summary>
 internal static class SqlServerConnectionStringNormalizer
 {
+    /// <summary>
+    ///     Applies <see cref="Normalize"/> only when <paramref name="provider"/> is SQL Server.
+    ///     MySQL, MariaDB, Npgsql, and Oracle also accept <c>Server=</c> or <c>Data Source=</c>.
+    ///     Injecting <c>Encrypt</c> / <c>TrustServerCertificate</c> into those strings makes the
+    ///     provider reject the connection (<c>Option 'encrypt' not supported</c> / <c>Keyword not supported</c>).
+    /// </summary>
+    internal static string NormalizeForProvider(string connectionString, ProviderDescriptor provider)
+    {
+        return AppliesTo(provider)
+            ? Normalize(connectionString)
+            : connectionString;
+    }
+
+    internal static bool AppliesTo(ProviderDescriptor provider)
+    {
+        if (provider.KnownProvider == MyEfVibeProvider.SqlServer)
+        {
+            return true;
+        }
+
+        if (provider.KnownProvider is not null)
+        {
+            return false;
+        }
+
+        return provider.PackageId.Contains("SqlServer", StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static string Normalize(string connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString)

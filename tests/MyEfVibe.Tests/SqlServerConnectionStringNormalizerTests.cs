@@ -55,6 +55,71 @@ public sealed class SqlServerConnectionStringNormalizerTests
     }
 
     [Fact]
+    public void NormalizeForProvider_keeps_mysql_server_localhost_free_of_sql_server_tls_flags()
+    {
+        const string connectionString = "Server=localhost;Database=shop;User=root;Password=secret";
+
+        var normalized = SqlServerConnectionStringNormalizer.NormalizeForProvider(
+            connectionString,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.MySql));
+
+        Assert.Equal(connectionString, normalized);
+    }
+
+    [Fact]
+    public void NormalizeForProvider_keeps_npgsql_server_localhost_free_of_sql_server_tls_flags()
+    {
+        const string connectionString =
+            "Server=localhost;Port=5432;Database=app;User Id=postgres;Password=secret";
+
+        var normalized = SqlServerConnectionStringNormalizer.NormalizeForProvider(
+            connectionString,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Npgsql));
+
+        Assert.Equal(connectionString, normalized);
+    }
+
+    [Fact]
+    public void NormalizeForProvider_keeps_oracle_data_source_localhost_unchanged()
+    {
+        const string connectionString = "Data Source=localhost;User Id=app;Password=secret";
+
+        var normalized = SqlServerConnectionStringNormalizer.NormalizeForProvider(
+            connectionString,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.Oracle));
+
+        Assert.Equal(connectionString, normalized);
+    }
+
+    [Fact]
+    public void NormalizeForProvider_still_adds_tls_flags_for_local_sql_server()
+    {
+        const string connectionString =
+            "Server=localhost,1433;Database=AdventureWorks;User Id=sa;Password=secret";
+
+        var normalized = SqlServerConnectionStringNormalizer.NormalizeForProvider(
+            connectionString,
+            ProviderDescriptor.FromKnownProvider(MyEfVibeProvider.SqlServer));
+
+        Assert.Contains("Encrypt=False", normalized, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("TrustServerCertificate=True", normalized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void NormalizeForProvider_adds_tls_flags_for_an_unclassified_sql_server_package()
+    {
+        const string connectionString = "Server=127.0.0.1;Database=AdventureWorks;User Id=sa;Password=secret";
+        var provider = new ProviderDescriptor(
+            "Contoso.EntityFrameworkCore.SqlServer",
+            "Contoso.EntityFrameworkCore.SqlServer",
+            ExtensionMethodName: null);
+
+        var normalized = SqlServerConnectionStringNormalizer.NormalizeForProvider(connectionString, provider);
+
+        Assert.Contains("Encrypt=False", normalized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Normalize_rejects_integrated_security_without_sql_credentials_on_linux()
     {
         if (OperatingSystem.IsWindows())
