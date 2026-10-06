@@ -104,12 +104,52 @@ internal static class SqliteConnectionStringNormalizer
             return !string.IsNullOrWhiteSpace(dataSource);
         }
 
+        // Microsoft.Data.Sqlite treats "DataSource" and "Filename" as aliases of "Data Source".
+        // A single-key string such as DataSource=shop.db must not be used as the filename itself.
+        if (TryParseAliasDataSource(connectionString, out dataSource))
+        {
+            usesPrefix = true;
+
+            return true;
+        }
+
         if (connectionString.Contains(';', StringComparison.Ordinal))
         {
             return false;
         }
 
         dataSource = connectionString.Trim().Trim('"');
+
+        return !string.IsNullOrWhiteSpace(dataSource);
+    }
+
+    private static bool TryParseAliasDataSource(string connectionString, out string dataSource)
+    {
+        dataSource = string.Empty;
+
+        // Strings with extra options are left unchanged. Rewriting them here would drop
+        // Mode/Password/Cache, which is handled separately.
+        if (connectionString.Contains(';', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var separatorIndex = connectionString.IndexOf('=', StringComparison.Ordinal);
+
+        if (separatorIndex <= 0)
+        {
+            return false;
+        }
+
+        var key = connectionString[..separatorIndex].Trim();
+
+        if (!key.Equals("DataSource", StringComparison.OrdinalIgnoreCase)
+            && !key.Equals("Filename", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        dataSource = connectionString[(separatorIndex + 1)..].Trim().Trim('"');
 
         return !string.IsNullOrWhiteSpace(dataSource);
     }
