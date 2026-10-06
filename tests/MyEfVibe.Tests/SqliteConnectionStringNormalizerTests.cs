@@ -60,6 +60,40 @@ public sealed class SqliteConnectionStringNormalizerTests
         Assert.Equal($"Data Source={databasePath}", normalized);
     }
 
+    [Theory]
+    [InlineData("DataSource")]
+    [InlineData("Filename")]
+    public void Normalize_resolves_sqlite_data_source_aliases_to_the_database_file(string key)
+    {
+        using var temp = new TempDirectory();
+        var databasePath = Path.Combine(temp.Path, "shop.db");
+        File.WriteAllText(databasePath, "sqlite");
+
+        var startupProject = Path.Combine(temp.Path, "App.csproj");
+        File.WriteAllText(startupProject, "<Project />");
+
+        var normalized = SqliteConnectionStringNormalizer.Normalize(
+            $"{key}=shop.db",
+            startupProject);
+
+        Assert.Equal($"Data Source={databasePath}", normalized);
+        Assert.DoesNotContain($"{key}=shop.db", normalized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Normalize_leaves_aliased_connection_strings_with_extra_options_unchanged()
+    {
+        using var temp = new TempDirectory();
+        var startupProject = Path.Combine(temp.Path, "App.csproj");
+        File.WriteAllText(startupProject, "<Project />");
+
+        const string connectionString = "DataSource=shop.db;Mode=ReadOnly";
+
+        var normalized = SqliteConnectionStringNormalizer.Normalize(connectionString, startupProject);
+
+        Assert.Equal(connectionString, normalized);
+    }
+
     [Fact]
     public void LooksLikeSqliteConnection_is_false_for_sql_server_host_comma_port()
     {
